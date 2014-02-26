@@ -1,6 +1,8 @@
 #ifndef _NUMBER_H_
 #define _NUMBER_H_
 
+#include <stdio.h>
+
 #ifdef DEBUG
 #if defined(UCHAR)
 #define DEBUG_TYPE unsigned char
@@ -65,6 +67,9 @@ void number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num,
     u1024_t *mod);
 
 void rsa_key(void);
+
+FILE *rsa_file_open(char *preffix, int is_slink, int is_new);
+int rsa_file_close(FILE *fp);
 
 #ifdef DEBUG
 void number_reset(u1024_t *num);
