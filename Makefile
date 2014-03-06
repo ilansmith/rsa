@@ -21,26 +21,22 @@ DEC=dec
 TEST=test
 ALL_TARGETS=$(RSA) $(RSA)_$(ENC) $(RSA)_$(DEC) $(TEST)_$(RSA)
 
-ifeq ($(TESTS),y) #debug mode: create unit tests
-TARGET=$(TEST)_$(RSA)
-test_rsa: rsa_test.o rsa_num.o
-	gcc -o $@ $^ -lm
-else # creat rsa applications
-ifeq ($(SIG),) # create master
-TARGET=$(RSA)
-else # create separate encoder/decoder
-TARGET=$(RSA)_$(ENC) $(RSA)_$(DEC)
-endif
-endif
-
-.PHONY: all clean cleanapps cleantags cleanall
-all: $(TARGET)
-
 CC=gcc
-CFLAGS=-Wall -Werror
 TARGET_OBJS=rsa_num.o
 
-ifeq ($(TESTS),y) #debug mode
+ENC_LEVEL_VALUES=128 256 512 1024
+ifeq ($(ENC_LEVEL),)
+ENC_LEVEL=1024
+else
+ifeq ($(filter $(ENC_LEVEL_VALUES),$(ENC_LEVEL)),)
+$(error ENC_LEVEL possible values = {$(ENC_LEVEL_VALUES)}) # error!
+endif
+endif
+
+CFLAGS=-Wall -Werror -DEL=$(ENC_LEVEL)
+
+ifeq ($(TESTS),y) # create unit tests
+TARGET=$(TEST)_$(RSA)
 TARGET_OBJS+=rsa_test.o
 CFLAGS+=-g -DTESTS
 
@@ -50,25 +46,28 @@ CFLAGS+=-DTIME_FUNCTIONS
 endif
 
 # u64 type definition
-ifeq ($(U64),UCHAR)
-CFLAGS+=-DUCHAR
+U64_VALUES=UCHAR USHORT ULONG ULLONG
+ifeq ($(U64),)
+U64=ULLONG
 else
-ifeq ($(U64),USHORT)
-CFLAGS+=-DUSHORT
+ifeq ($(filter $(U64_VALUES),$(U64)),)
+$(error U64 possible values = {$(U64_VALUES)}) # error!
 else
-ifeq ($(U64),ULONG)
-CFLAGS+=-DULONG
-else
-ifeq ($(U64),ULLONG)
-CFLAGS+=-DULLONG
-else
-$(error please define U64= {UCHAR or USHORT or ULONG or ULLONG}) # error!
+ifneq ($(ENC_LEVEL),1024)
+ifneq ($(U64),ULLONG)
+$(error (for ENC_LEVEL=$(ENC_LEVEL) U64 must be ULLONG)) # error!
 endif
 endif
 endif
 endif
-else #not debug
+CFLAGS+=-D$(U64)
+else # creat rsa applications
+ifeq ($(SIG),) # create master
+TARGET=$(RSA)
+else # create separate encoder/decoder
+TARGET=$(RSA)_$(ENC) $(RSA)_$(DEC)
 TAILOR_OBJS=main.o rsa_key.o rsa_io.o
+CFLAGS+=-DULLONG
 
 ifeq ($(SIG),) #master encrypter/decrypter
 %.o: %.c rsa.h
@@ -89,6 +88,13 @@ $(RSA)%: $(TARGET_OBJS) $(TAILOR_OBJS:.o=%.o)
 	$(CC) -o $@ $^
 endif
 endif
+endif
+
+.PHONY: all clean cleanapps cleantags cleanall
+all: $(TARGET)
+
+$(TARGET): $(TARGET_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 clean:
 	rm -rf *.o

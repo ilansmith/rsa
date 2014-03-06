@@ -104,7 +104,7 @@ static void INLINE number_shift_right_once(u1024_t *num)
 static void INLINE number_shift_left_once(u1024_t *num)
 {
     u64 mask_lsb = (u64)~1;
-    u64 *seg = (u64 *)num + BLOCK_SZ_U1024 - 1;
+    u64 *seg = (u64 *)num + BLOCK_SZ_U1024;
 
     TIMER_START(FUNC_NUMBER_SHIFT_LEFT_ONCE);
     *seg = *seg << 1;
@@ -220,7 +220,7 @@ STATIC void INLINE number_2complement(u1024_t *res, u1024_t *num)
     num_1 = NUM_1;
     tmp = *num;
     for (seg = (u64 *)&tmp; 
-	seg - (u64 *)&tmp < BLOCK_SZ_U1024; seg++)
+	seg - (u64 *)&tmp <= BLOCK_SZ_U1024; seg++)
     {
 	*seg = ~*seg; /* one's complement */
     }
@@ -293,8 +293,8 @@ STATIC void INLINE number_absolute_value(u1024_t *abs, u1024_t *num)
 static int INLINE number_compare(u1024_t *num1, u1024_t *num2, int ret_on_equal)
 {
     int ret;
-    u64 *seg1 = (u64 *)num1 + BLOCK_SZ_U1024 - 1;
-    u64 *seg2 = (u64 *)num2 + BLOCK_SZ_U1024 - 1;
+    u64 *seg1 = (u64 *)num1 + BLOCK_SZ_U1024;
+    u64 *seg2 = (u64 *)num2 + BLOCK_SZ_U1024;
 
     TIMER_START(FUNC_NUMBER_COMPARE);
     for (; seg1 > (u64 *)num1 && *seg1==*seg2; seg1--, seg2--);
@@ -580,17 +580,14 @@ void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
 
     while (exp < exp_max)
     {
-	int is_overflow;
-
-	while (!(is_overflow = number_is_equal(&factor, &num_0)) && 
-	    number_is_greater(num_n, &factor))
+	while (!factor.buffer && number_is_greater(num_n, &factor))
 	{
 	    if (exp == exp_max)
 		goto Exit;
 	    number_shift_left_once(&factor);
 	    exp++;
 	}
-	number_sub(&factor, is_overflow ? &num_0 : &factor, num_n);
+	number_sub(&factor, &factor, num_n);
     }
 
 Exit:
@@ -806,7 +803,7 @@ STATIC int INLINE number_is_prime(u1024_t *num_n)
  * incrementor
  */
 static void INLINE number_small_prime_init(small_prime_entry_t *entry, 
-    u1024_t *num_pi, u1024_t *num_increment)
+    u64 exp_initializer, u1024_t *num_pi, u1024_t *num_increment)
 {
     TIMER_START(FUNC_NUMBER_SMALL_PRIME_INIT);
 
@@ -814,7 +811,7 @@ static void INLINE number_small_prime_init(small_prime_entry_t *entry,
     number_small_dec2num(&(entry->prime), entry->prime_initializer);
 
     /* initiate the entry's exponent */
-    number_small_dec2num(&(entry->exp), entry->exp_initializer);
+    number_small_dec2num(&(entry->exp), exp_initializer);
 
     /* rase the entry's prime to the required power */
     number_exponentiation(&(entry->power_of_prime), &(entry->prime), 
@@ -844,19 +841,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
     static u1024_t num_0, num_pi, num_mod, num_jumper, num_inc;
     static int init;
     static small_prime_entry_t small_primes[] = {
-	{ .prime_initializer = 2, .exp_initializer = 10 },
-	{ .prime_initializer = 3, .exp_initializer = 10 },
-	{ .prime_initializer = 5, .exp_initializer = 11 },
-	{ .prime_initializer = 7, .exp_initializer = 11 },
-	{ .prime_initializer = 11, .exp_initializer = 10 },
-	{ .prime_initializer = 13, .exp_initializer = 10 },
-	{ .prime_initializer = 17, .exp_initializer = 10 },
-	{ .prime_initializer = 19, .exp_initializer = 10 },
-	{ .prime_initializer = 23, .exp_initializer = 11 },
-	{ .prime_initializer = 29, .exp_initializer = 11 },
-	{ .prime_initializer = 31, .exp_initializer = 11 },
-	{ .prime_initializer = 37, .exp_initializer = 11 },
-	{ .prime_initializer = 41, .exp_initializer = 11 },
+	{2}, {3}, {5}, {7}, {11}, {13}, {17}, {19}, {23}, {29}, {31}, {37}, {41}
     };
 
 #ifdef TESTS
@@ -870,13 +855,32 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
     TIMER_START(FUNC_NUMBER_GENERATE_COPRIME);
     if (!init)
     {
+	u64 exp_initializer[] = {
+#if ENC_LEVEL(128)
+	    /* 16353755914851064710 */
+	    1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2
+#elif ENC_LEVEL(256)
+	    /* 3.310090638572971097793164988204e+38 */
+	    3, 3, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3
+#elif ENC_LEVEL(512)
+	    /* 1.1469339122146834228518724332952e+77 */
+	    5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 5, 6, 6
+#elif ENC_LEVEL(1024)
+	    /* 7.4619233495664116883370964193144e+153 */
+	    10, 10, 11, 11, 10, 10, 10, 10, 11, 11, 11, 11, 11
+#endif
+	};
+
 	/* initiate prime, exp and power_of_prime fields in all small_primes[] 
 	 * elements. generate num_inc and num_pi at the same time.
 	 */
 	num_0 = NUM_0;
 	num_pi = num_inc = NUM_1;
 	for (i = 0; i < ARRAY_SZ(small_primes); i++)
-	    number_small_prime_init(&small_primes[i], &num_pi, &num_inc);
+	{
+	    number_small_prime_init(&small_primes[i], exp_initializer[i], 
+		&num_pi, &num_inc);
+	}
 
 	init = 1;
     }
