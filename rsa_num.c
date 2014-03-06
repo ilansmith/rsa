@@ -76,26 +76,6 @@ STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
     for (seg = (u64*)&num_res, seg1 = (u64*)&num_big, seg2 = (u64*)&num_small;
 	seg < top; seg++, seg1++, seg2++)
     {
-	if (!*seg1)
-	{
-	    *seg = *seg2;
-	    if (carry)
-	    {
-		carry = *seg2 == (u64)-1 ? (u64)1 : (u64)0;
-		(*seg)++;
-	    }
-	    continue;
-	}
-	if (!*seg2)
-	{
-	    *seg = *seg1;
-	    if (carry)
-	    {
-		carry = *seg1 == (u64)-1 ? (u64)1 : (u64)0;
-		(*seg)++;
-	    }
-	    continue;
-	}
 	*seg = *seg1 + *seg2 + carry;
 	if ((*seg1 & MSB_PT(u64)) && (*seg2 & MSB_PT(u64)))
 	    carry = 1;
