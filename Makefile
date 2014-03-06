@@ -25,9 +25,9 @@
 
 CC=gcc
 TARGET_OBJS=rsa_num.o
-CONFIGFILE=rsa.mk
+CONFFILE=rsa.mk
 
--include $(CONFIGFILE)
+-include $(CONFFILE)
 
 # set encryption level
 ENC_LEVEL_VALUES=128 256 512 1024
@@ -96,7 +96,7 @@ rsa_%: $(TARGET_OBJS) $(TAILOR_OBJS:.o=%.o)
   CFLAGS+=-DULLONG
 endif
 
-.PHONY: all clean cleanapps cleantags cleanconfig cleanall config
+.PHONY: all clean cleanapps cleantags cleanconf cleanall config
 
 %.o: %.c rsa.h
 	$(CC) -o $@ $(CFLAGS) -c $<
@@ -109,8 +109,8 @@ $(TARGET): $(TARGET_OBJS)
 config:
 	@echo "doing make config"
 	set -e; \
-	rm -f $(CONFIGFILE); \
-	echo "$(strip $(MAKEFLAGS))" | sed -e 's/ /\r\n/g' > $(CONFIGFILE);
+	rm -f $(CONFFILE); \
+	echo "$(strip $(MAKEFLAGS))" | sed -e 's/ /\r\n/g' > $(CONFFILE);
 
 clean:
 	rm -f *.o
@@ -121,7 +121,7 @@ cleanapps:
 cleantags:
 	rm -f tags
 
-cleanconfig:
-	rm -f $(CONFIGFILE)
+cleanconf:
+	rm -f $(CONFFILE)
 
-cleanall: clean cleanapps cleantags cleanconfig
+cleanall: clean cleanapps cleantags cleanconf
