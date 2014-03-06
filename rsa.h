@@ -24,6 +24,10 @@ typedef unsigned long long u64;
 #define STATIC static
 #endif
 
+#define RSA_MASTER (!defined(RSA_ENC) && !defined(RSA_DEC))
+#define RSA_ENCRYPTER (!defined(RSA_DEC) && !RSA_MASTER)
+#define RSA_DECRYPTER (!defined(RSA_ENC) && !RSA_MASTER)
+
 #define BYTES_SZ(X) (sizeof(X))
 #define BITS_SZ(X) (BYTES_SZ(X) * 8)
 #define ARRAY_SZ(X) (sizeof(X) / sizeof((X)[0]))
@@ -61,6 +65,7 @@ typedef struct {
     u1024_t power_of_prime;
 } small_prime_entry_t;
 
+void number_reset(u1024_t *num);
 void number_sub1(u1024_t *num);
 void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2);
 int number_init_random(u1024_t *num);
@@ -69,10 +74,18 @@ void number_find_prime(u1024_t *num);
 int number_radix(u1024_t *num_radix, u1024_t *num_n);
 void number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num, 
     u1024_t *mod);
+void number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a, 
+    u1024_t *b, u1024_t *n);
 
-void rsa_key(void);
+void rsa_key_generate(void);
 
-FILE *rsa_file_open(char *preffix, int is_slink, int is_new);
+int rsa_io_init(void);
+#if RSA_MASTER || RSA_DECRYPTER
+FILE *rsa_file_create_private(void);
+FILE *rsa_file_create_public(void);
+#endif
+FILE *rsa_file_open(char *path, char *preffix, char *suffix, int is_slink, 
+    int is_new);
 int rsa_file_close(FILE *fp);
 int rsa_file_write_u1024_hi(FILE *fptr, u1024_t *num);
 int rsa_file_read_u1024_hi(FILE *fptr, u1024_t *num);
@@ -80,9 +93,10 @@ int rsa_file_write_u1024_low(FILE *fptr, u1024_t *num);
 int rsa_file_read_u1024_low(FILE *fptr, u1024_t *num);
 int rsa_file_write_u1024(FILE *fptr, u1024_t *num);
 int rsa_file_read_u1024(FILE *fptr, u1024_t *num);
+int str2u1024_t(u1024_t *num, char *str);
+int u1024_t2str(u1024_t *num, char *str);
 
 #ifdef DEBUG
-void number_reset(u1024_t *num);
 int number_init_str(u1024_t *num, char *init_str);
 void number_add(u1024_t *res, u1024_t *num1, u1024_t *num2);
 void number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2);
