@@ -102,7 +102,7 @@ typedef unsigned int prng_seed_t;
 #define ENC_LEVEL_128 (ENC_LEVEL(128) || ENC_LEVEL_256)
 #define ENC_LEVEL_64 (ENC_LEVEL(64) || ENC_LEVEL_128)
 
-typedef struct u1024_t {
+typedef struct {
 #if ENC_LEVEL_64
     u64 seg_00; /* bits:   0 -   63 */
 #endif
@@ -130,6 +130,10 @@ typedef struct u1024_t {
     u64 seg_15; /* bits: 960 - 1023 */
 #endif
     u64 buffer; /* buffer */
+} u1024_arr_t;
+
+typedef struct {
+    u1024_arr_t arr;
     int top;
 } u1024_t;
 
@@ -213,9 +217,9 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 
 #define number_reset_buffer(num) { \
     do { \
-	*((u64*)(num) + block_sz_u1024) = 0; \
+	*((u64*)&(num)->arr + block_sz_u1024) = 0; \
 	if ((num)->top == block_sz_u1024) \
-	    while ((num)->top && !*((u64*)(num) + --(num)->top)); \
+	    while ((num)->top && !*((u64*)&(num)->arr + --(num)->top)); \
     } while (0); \
 }
 
@@ -226,8 +230,8 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 	u64 *seg, *top; \
 	/* shifting is done up to, at most, the buffer u64 to accomodate for \
 	 * number_montgomery_product() */ \
-	top = (u64*)(num) + (num)->top; \
-	for (seg = (u64*)(num); seg < top; seg++) \
+	top = (u64*)&(num)->arr + (num)->top; \
+	for (seg = (u64*)&(num)->arr; seg < top; seg++) \
 	{ \
 	    *seg = *seg >> 1; \
 	    *seg = (*(seg+1) & (u64)1) ? *seg | MSB_PT(u64) : \
@@ -244,8 +248,8 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 	u64 *seg, *top; \
 	int is_top_can_shift = (num)->top < block_sz_u1024 ? 1 : 0; \
 	/* shifting is done from, at most, the buffer u64 */ \
-	top = (u64*)(num) + (num)->top + is_top_can_shift; \
-	for (seg = top; seg > (u64*)(num); seg--) \
+	top = (u64*)&(num)->arr + (num)->top + is_top_can_shift; \
+	for (seg = top; seg > (u64*)&(num)->arr; seg--) \
 	{ \
 	    *seg = *seg << 1; \
 	    *seg = *(seg-1) & MSB_PT(u64) ? *seg | (u64)1 : *seg & ~(u64)1; \
@@ -270,9 +274,9 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
     do { \
 	if ((num1)->top == (num2)->top) \
 	{ \
-	    u64 *seg1 = (u64*)(num1) + (num1)->top; \
-	    u64 *seg2 = (u64*)(num2) + (num2)->top; \
-	    for (; seg1 > (u64*)(num1) && *seg1==*seg2; seg1--, seg2--); \
+	    u64 *seg1 = (u64*)&(num1)->arr + (num1)->top; \
+	    u64 *seg2 = (u64*)&(num2)->arr + (num2)->top; \
+	    for (; seg1 > (u64*)&(num1)->arr && *seg1==*seg2; seg1--, seg2--); \
 	    ret = (*seg1 == *seg2) ? ret_on_equal : *seg1 > *seg2; \
 	} \
 	else \
@@ -301,8 +305,9 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 #define number_top_set(num) { \
     do { \
 	u64 *seg; \
-	for (seg = (u64*)(num) + block_sz_u1024, (num)->top = block_sz_u1024; \
-	    seg > (u64*)(num) && !*seg; seg--, (num)->top--); \
+	for (seg = (u64*)&(num)->arr + block_sz_u1024, \
+	    (num)->top = block_sz_u1024; \
+	    seg > (u64*)&(num)->arr && !*seg; seg--, (num)->top--); \
     } \
     while (0); \
 }
@@ -310,9 +315,10 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 #define number_xor(res, num1, num2) { \
     do { \
 	u64 *seg, *seg1, *seg2; \
-	for (seg = (u64*)(res) + block_sz_u1024, seg1 = (u64*)(num1) + \
-	    block_sz_u1024, seg2 = (u64*)(num2) + block_sz_u1024; \
-	    seg >= (u64*)(res); *seg-- = *seg1-- ^ *seg2--); \
+	for (seg = (u64*)&(res)->arr + block_sz_u1024, \
+	    seg1 = (u64*)&(num1)->arr + block_sz_u1024, \
+	    seg2 = (u64*)&(num2)->arr + block_sz_u1024; \
+	    seg >= (u64*)&(res)->arr; *seg-- = *seg1-- ^ *seg2--); \
 	number_top_set(res); \
     } \
     while (0); \

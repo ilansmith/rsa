@@ -37,11 +37,11 @@
     1 \
 )
 
-u1024_t NUM_0 = {.seg_00=0};
-u1024_t NUM_1 = {.seg_00=1};
-u1024_t NUM_2 = {.seg_00=2};
-u1024_t NUM_5 = {.seg_00=5};
-u1024_t NUM_10 = {.seg_00=10};
+u1024_t NUM_0 = {.arr.seg_00=0};
+u1024_t NUM_1 = {.arr.seg_00=1};
+u1024_t NUM_2 = {.arr.seg_00=2};
+u1024_t NUM_5 = {.arr.seg_00=5};
+u1024_t NUM_10 = {.arr.seg_00=10};
 int bit_sz_u64 = BIT_SZ_U64;
 int encryption_level = BIT_SZ_U1024;
 int block_sz_u1024 = BLOCK_SZ_U1024;
@@ -72,9 +72,9 @@ STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
     }
 
     num_res = num_big;
-    top = (u64*)&num_res + num_small.top + 1;
-    for (seg = (u64*)&num_res, seg1 = (u64*)&num_big, seg2 = (u64*)&num_small;
-	seg < top; seg++, seg1++, seg2++)
+    top = (u64*)&num_res.arr + num_small.top + 1;
+    for (seg = (u64*)&num_res.arr, seg1 = (u64*)&num_big.arr, 
+	seg2 = (u64*)&num_small.arr; seg < top; seg++, seg1++, seg2++)
     {
 	*seg = *seg1 + *seg2 + carry;
 	if ((*seg1 & MSB_PT(u64)) && (*seg2 & MSB_PT(u64)))
@@ -85,12 +85,12 @@ STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 	    carry = (*seg & MSB_PT(u64)) ? 0 : 1;
     }
 
-    top_max = (u64*)&num_res + block_sz_u1024;
+    top_max = (u64*)&num_res.arr + block_sz_u1024;
     for ( ; carry && seg <= top_max; seg++)
     {
 	carry = *seg == (u64)-1;
 	(*seg)++;
-	if (seg > (u64*)&num_res + num_res.top)
+	if (seg > (u64*)&num_res.arr + num_res.top)
 	    num_res.top++;
     }
     if (num_res.top > block_sz_u1024)
@@ -140,13 +140,13 @@ int INLINE number_init_random(u1024_t *num, int blocks)
     for (i = 0; i < blocks; i++)
     {
 #ifdef MERSENNE_TWISTER
-	*((u64*)num + i) = (u64)genrand64_int64();
+	*((u64*)&num->arr + i) = (u64)genrand64_int64();
 #else
-	*((u64*)num + i) = (u64)random();
+	*((u64*)&num->arr + i) = (u64)random();
 #ifdef ULLONG
 	/* random() returns a long int so another call is required to fill
 	 * the block's higher bits */
-	*((u64*)num + i) |= (u64)random()<<(bit_sz_u64/2);
+	*((u64*)&num->arr + i) |= (u64)random()<<(bit_sz_u64/2);
 #endif
 #endif
     }
@@ -164,7 +164,7 @@ STATIC int INLINE number_find_most_significant_set_bit(u1024_t *num,
     int minor_offset;
 
     TIMER_START(FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT);
-    *major = (u64*)num + num->top;
+    *major = (u64*)&num->arr + num->top;
     *minor = MSB_PT(u64);
     minor_offset = bit_sz_u64;
 
@@ -186,19 +186,20 @@ STATIC void INLINE number_small_dec2num(u1024_t *num_n, u64 dec)
 
     TIMER_START(FUNC_NUMBER_SMALL_DEC2NUM);
     number_reset(num_n);
-    *(u64 *)num_n = (u64)(*ptr | dec);
+    *(u64 *)&num_n->arr = (u64)(*ptr | dec);
     TIMER_STOP(FUNC_NUMBER_SMALL_DEC2NUM);
 }
 
 STATIC void INLINE number_2complement(u1024_t *res, u1024_t *num)
 {
     u1024_t tmp;
-    u64 *seg = NULL, *seg_max = (u64 *)&tmp + block_sz_u1024;
+    u64 *seg = NULL, *seg_max = (u64 *)&tmp.arr + block_sz_u1024;
     int cur_block;
 
     TIMER_START(FUNC_NUMBER_2COMPLEMENT);
     tmp = *num;
-    for (seg = (u64 *)&tmp, cur_block = 0; seg <= seg_max; seg++,  cur_block++)
+    for (seg = (u64 *)&tmp.arr, cur_block = 0; seg <= seg_max; seg++, 
+	cur_block++)
     {
 	if ((*seg = ~*seg)) /* one's complement */
 	    tmp.top = cur_block;
@@ -234,7 +235,7 @@ void INLINE number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
 
 	for (j = 0; j < bit_sz_u64; j++)
 	{
-	    if ((*((u64 *)(&multiplier) + i)) & mask)
+	    if ((*((u64*)&multiplier.arr + i)) & mask)
 		number_add(&tmp_res, &tmp_res, &multiplicand);
 	    number_shift_left_once(&multiplicand);
 	    number_reset_buffer(&multiplicand);
@@ -254,8 +255,11 @@ STATIC void INLINE number_absolute_value(u1024_t *abs, u1024_t *num)
 	u64 *seg;
 
 	number_sub(abs, abs, &NUM_1);
-	for (seg = (u64 *)abs + block_sz_u1024 - 1; seg >= (u64 *)abs; seg--)
+	for (seg = (u64*)&abs->arr + block_sz_u1024 - 1; seg >= (u64*)&abs->arr;
+	    seg--)
+	{
 	    *seg = ~*seg;
+	}
     }
     TIMER_STOP(FUNC_NUMBER_ABSOLUTE_VALUE);
 }
@@ -265,8 +269,9 @@ STATIC void INLINE number_dev(u1024_t *num_q, u1024_t *num_r,
 {
     u1024_t dividend = *num_dividend, divisor = *num_divisor, quotient, 
 	remainder;
-    u64 *seg_dividend = (u64 *)&dividend + block_sz_u1024 - 1;
-    u64 *remainder_ptr = (u64 *)&remainder, *quotient_ptr = (u64 *)&quotient;
+    u64 *seg_dividend = (u64 *)&dividend.arr + block_sz_u1024 - 1;
+    u64 *remainder_ptr = (u64 *)&remainder.arr;
+    u64 *quotient_ptr = (u64 *)&quotient.arr;
 
     TIMER_START(FUNC_NUMBER_DEV);
     number_reset(&remainder);
@@ -354,7 +359,7 @@ STATIC int INLINE number_modular_exponentiation_naive(u1024_t *res, u1024_t *a,
     TIMER_START(FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE);
     d = NUM_1;
     number_find_most_significant_set_bit(b, &seg, &mask);
-    while (seg >= (u64 *)b)
+    while (seg >= (u64*)&b->arr)
     {
 	while (mask)
 	{
@@ -381,7 +386,7 @@ STATIC inline int number_is_odd(u1024_t *num)
     int ret;
 
     TIMER_START(FUNC_NUMBER_IS_ODD);
-    ret = *(u64 *)num & (u64)1;
+    ret = *(u64*)&num->arr & (u64)1;
     TIMER_STOP(FUNC_NUMBER_IS_ODD);
     return ret;
 }
@@ -400,7 +405,7 @@ static void INLINE number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
     u1024_t *num_b, u1024_t *num_n)
 {
     u1024_t multiplier = *num_a, num_s;
-    u64 *seg = NULL, *top = (u64 *)num_b + block_sz_u1024;
+    u64 *seg = NULL, *top = (u64*)&num_b->arr + block_sz_u1024;
     int i;
 
     TIMER_START(FUNC_NUMBER_MONTGOMERY_PRODUCT);
@@ -408,7 +413,7 @@ static void INLINE number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
     number_shift_left_once(&multiplier);
 
     /* handle the first BIT_SZ_U1024 iterations */
-    for (seg = (u64 *)num_b; seg < top; seg++)
+    for (seg = (u64*)&num_b->arr; seg < top; seg++)
     {
 	u64 mask;
 
@@ -442,6 +447,7 @@ void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
 {
     u1024_t factor;
     int exp, exp_max;
+    u64 *buffer;
 
     TIMER_START(FUNC_NUMBER_MONTGOMERY_FACTOR_SET);
     if (number_is_equal(&num_montgomery_n, num_n))
@@ -453,10 +459,11 @@ void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
     exp_max = 2*(encryption_level+2);
     number_small_dec2num(&factor, (u64)1);
     exp = 0;
+    buffer = (u64*)&factor.arr + block_sz_u1024;
 
     while (exp < exp_max)
     {
-	while (!factor.buffer && number_is_greater(num_n, &factor))
+	while (!*buffer && number_is_greater(num_n, &factor))
 	{
 	    if (exp == exp_max)
 		goto Exit;
@@ -536,7 +543,7 @@ STATIC int INLINE number_modular_exponentiation_montgomery(u1024_t *res,
     number_montgomery_product(&a_nresidue, &num_montgomery_factor, a, n);
     *res = num_res_nresidue;
 
-    for (seg = (u64 *)b; seg < (u64 *)b + block_sz_u1024; seg++)
+    for (seg = (u64*)&b->arr; seg < (u64*)&b->arr + block_sz_u1024; seg++)
     {
 	u64 mask;
 
@@ -919,8 +926,8 @@ int number_str2num(u1024_t *num, char *str)
 	return -1;
     number_reset(num);
     sprintf((char *)num, "%s", str);
-    for (seg = (u64*)num + block_sz_u1024, num->top = block_sz_u1024; 
-	seg >= (u64*)num && !*seg; seg--, num->top--);
+    for (seg = (u64*)&num->arr + block_sz_u1024, num->top = block_sz_u1024; 
+	seg >= (u64*)&num->arr && !*seg; seg--, num->top--);
     return 0;
 }
 
@@ -952,7 +959,7 @@ static u64 *number_get_seg(u1024_t *num, int seg)
     if (!num)
 	return NULL;
 
-    ret = (u64 *)num + seg;
+    ret = (u64*)&num->arr + seg;
     return ret;
 }
 
