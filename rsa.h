@@ -88,6 +88,12 @@ typedef unsigned long long u64;
 #define INLINE inline
 #endif /*  TESTS */
 
+#ifdef MERSENNE_TWISTER
+typedef unsigned long long prng_seed_t;
+#else
+typedef unsigned int prng_seed_t;
+#endif
+
 #define ENC_LEVEL(X) (EL==(X))
 
 #define ENC_LEVEL_1024 (ENC_LEVEL(1024))
@@ -165,7 +171,7 @@ typedef struct {
 } small_prime_entry_t;
 
 void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2);
-unsigned int number_seed_set(unsigned int seed);
+prng_seed_t number_seed_set(prng_seed_t seed);
 int number_init_random(u1024_t *num, int blocks);
 void number_init_random_coprime(u1024_t *num, u1024_t *coprime);
 void number_find_prime(u1024_t *num);
@@ -311,10 +317,11 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
     } \
     while (0); \
 }
+
 #ifdef TESTS
 extern int init_reset;
 extern u1024_t num_montgomery_n, num_montgomery_factor;
-extern unsigned int number_random_seed;
+extern prng_seed_t number_random_seed;
 
 int number_init_str(u1024_t *num, char *init_str);
 void number_add(u1024_t *res, u1024_t *num1, u1024_t *num2);

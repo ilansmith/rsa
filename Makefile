@@ -29,6 +29,18 @@ CONFFILE=rsa.mk
 
 -include $(CONFFILE)
 
+CFLAGS=-Wall -Werror 
+
+# Takuji Nishimura and Makoto Matsumoto's 64-bit version of Mersenne Twister 
+# pseudorandom number generator
+ifeq ($(MERSENNE_TWISTER),)
+  MERSENNE_TWISTER=y
+endif
+ifeq ($(MERSENNE_TWISTER),y)
+  TARGET_OBJS+=mt19937_64.o
+  CFLAGS+=-DMERSENNE_TWISTER
+endif
+
 # set encryption level
 ENC_LEVEL_VALUES=128 256 512 1024
 ifeq ($(ENC_LEVEL),)
@@ -39,7 +51,7 @@ else
   endif
 endif
 
-CFLAGS=-Wall -Werror -DEL=$(ENC_LEVEL)
+CFLAGS+=-DEL=$(ENC_LEVEL)
 
 # set unit test configuration
 ifeq ($(TESTS),y)
