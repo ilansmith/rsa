@@ -2130,15 +2130,53 @@ static void rsa_key_generator(u1024_t *p1, u1024_t *p2, u1024_t *n, u1024_t *e,
 	p_comment("key generation required %d iterations", iter);
 }
 
+static int rsa_pre_encrypt(u1024_t *input, u64 *multiplier, u1024_t *encryptor,
+    u1024_t *n)
+{
+    u1024_t q, num_0;
+
+    if (!number_is_greater_or_equal(input, n))
+    {
+	*encryptor = *input;
+	*multiplier = (u64)0;
+	return 0;
+    }
+    number_dev(&q, encryptor, input, n);
+    *multiplier = *(u64*)&q;
+
+    /* varify that q can be represented by a u64 */
+    number_shift_right(&q, BIT_SZ_U64);
+    number_reset(&num_0);
+    return !number_is_equal(&q, &num_0);
+}
+
+static int rsa_post_decrypt(u1024_t *output, u64 multiplier, 
+    u1024_t *decryption, u1024_t *n)
+{
+    if (multiplier)
+    {
+	u1024_t num_multipier;
+
+	number_small_dec2num(&num_multipier, multiplier);
+	number_mul(output, &num_multipier, n);
+	number_add(output, output, decryption);
+    }
+    else
+	*output = *decryption;
+
+    return output->buffer ? -1 : 0;
+}
+
 static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d, 
     u1024_t *data, int is_print)
 {
     int res;
-    u1024_t input, output, encryption, decryption, q, r;
+    u1024_t input, output, encryption, decryption, r;
+    u64 q;
 #if ENC_LEVEL(128) /* 16 bytes */
 #define PHRASE "Testing 128 bits"
 #elif ENC_LEVEL(256) /* 32 bytes */
-#define PHRASE "Ilan A. Smith 256 bit validation"
+#define PHRASE "Validation of 256 bit encryption"
 #elif ENC_LEVEL(512) /* 64 bytes */
 #define PHRASE "Ilan A. Smith 512 bits encryption / decryption validation " \
     "string"
@@ -2158,11 +2196,12 @@ static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d,
     number_reset(&decryption);
 
     /* RSA requires that input is in Zn, that is: 1 <= input < n */
-    number_dev(&q, &r, &input, n);
-
+    if (rsa_pre_encrypt(&input, &q, &r, n))
+	return -1;
     if (is_print)
     {
-	p_comment("encrypting input...");
+	p_comment("data: `%s`", &input);
+	p_comment("encrypting...");
 	local_timer_start();
     }
     number_modular_exponentiation_montgomery(&encryption, &r, e, n);
@@ -2171,7 +2210,7 @@ static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d,
 	local_timer_stop();
 	p_local_timer();
 
-	p_comment("decrypting encrypted input...");
+	p_comment("decrypting...");
 	local_timer_start();
     }
     number_modular_exponentiation_montgomery(&decryption, &encryption, d, n);
@@ -2181,8 +2220,8 @@ static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d,
 	p_local_timer();
     }
 
-    number_mul(&output, &q, n);
-    number_add(&output, &output, &decryption);
+    if (rsa_post_decrypt(&output, q, &decryption, n))
+	return -1;
     res = memcmp(&input, &output, sizeof(u1024_t));
     if (is_print)
     {
@@ -2292,6 +2331,37 @@ static int test109(void)
     return rsa_encryptor_decryptor(&n, &e, &d, &data, 1);
 }
 
+static int test110(void)
+{ 
+#define K (1024)
+    u1024_t p1, p2, n, e, data, encryption;
+    int i, max = K/(BIT_SZ_U64>>2);
+    number_init_str(&data, 
+	"0000000000000000011001010111001101100001011010000111000000100000"
+	"0111010001101001011000100010000000110001001100110010000001100001");
+
+    number_init_str(&p1, 
+	"1011010001000100100011101100011110010000011010011010110111110101");
+
+    number_init_str(&p2,
+	"1101010011111100001011111011000100101111111100000011010110111001");
+    number_mul(&n, &p1, &p2);
+
+    number_init_str(&e,
+	"0111101001111100100110010101111100000001011011001001000000100000"
+	"0001110001111101011010101011111001011001011110110110001001100101"
+	);
+
+    p_comment("encrypting 1KB of data:");
+    local_timer_start();
+    for (i = 0; i < max; i++)
+	number_modular_exponentiation_montgomery(&encryption, &data, &e, &n);
+    local_timer_stop();
+    p_local_timer();
+    return 0;
+#undef K
+}
+
 static int test111(void)
 {
     u1024_t p1, p2, n, e, d;
@@ -2332,7 +2402,8 @@ static int test112(void)
     return 0;
 
 error:
-    p_comment("\niteration %d failed", i + 1);
+    fprintf(stdout, "\n");
+    p_comment("iteration %d failed", i + 1);
     p_comment("p1:");
     p_u1024(&p1);
     p_comment("p2:");
@@ -3094,6 +3165,13 @@ static test_t rsa_tests[] =
 	description: "encryption - decryption: overflow during "
 	    "num_montgomery_factor cration",
 	func: test109,
+#if !defined(ULLONG) || !ENC_LEVEL(128)
+	disabled: 1,
+#endif
+    },
+    {
+	description: "multiple encryption",
+	func: test110,
 #if !defined(ULLONG) || !ENC_LEVEL(128)
 	disabled: 1,
 #endif
