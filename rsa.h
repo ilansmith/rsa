@@ -165,7 +165,8 @@ typedef struct {
 } small_prime_entry_t;
 
 void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2);
-int number_init_random(u1024_t *num, int bit_len);
+unsigned int number_seed_set(unsigned int seed);
+int number_init_random(u1024_t *num, int blocks);
 void number_init_random_coprime(u1024_t *num, u1024_t *coprime);
 void number_find_prime(u1024_t *num);
 void number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor);
@@ -295,14 +296,25 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
     do { \
 	u64 *seg; \
 	for (seg = (u64*)(num) + block_sz_u1024, (num)->top = block_sz_u1024; \
-		seg > (u64*)(num) && !*seg; seg--, (num)->top--); \
+	    seg > (u64*)(num) && !*seg; seg--, (num)->top--); \
     } \
     while (0); \
 }
 
+#define number_xor(res, num1, num2) { \
+    do { \
+	u64 *seg, *seg1, *seg2; \
+	for (seg = (u64*)(res) + block_sz_u1024, seg1 = (u64*)(num1) + \
+	    block_sz_u1024, seg2 = (u64*)(num2) + block_sz_u1024; \
+	    seg >= (u64*)(res); *seg-- = *seg1-- ^ *seg2--); \
+	number_top_set(res); \
+    } \
+    while (0); \
+}
 #ifdef TESTS
 extern int init_reset;
 extern u1024_t num_montgomery_n, num_montgomery_factor;
+extern unsigned int number_random_seed;
 
 int number_init_str(u1024_t *num, char *init_str);
 void number_add(u1024_t *res, u1024_t *num1, u1024_t *num2);

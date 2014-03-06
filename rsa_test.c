@@ -35,6 +35,9 @@
     "string\n used for testing whether or not the RSA key needs regenerating"
 #endif
 
+#define K (1024)
+#define M (K*K)
+
 /* io functionality */
 typedef int (* vio_t)(const char *format, va_list ap);
 int vscanf(const char *format, va_list ap);
@@ -479,7 +482,7 @@ static int test011(void)
 
     for (i = 0; i < RNDM_TBL_SZ; i++)
     {
-	if (number_init_random(&number[i], encryption_level/2))
+	if (number_init_random(&number[i], block_sz_u1024/2))
 	    continue;
 	for (j = 0; j < i; j++)
 	{
@@ -598,8 +601,8 @@ static int test019(void)
 {
     u1024_t a, b, c;
 
-    if (number_init_random(&a, encryption_level/2) || 
-	number_init_random(&b, encryption_level/2))
+    if (number_init_random(&a, block_sz_u1024/2) || 
+	number_init_random(&b, block_sz_u1024/2))
     {
 	p_comment("initializing a failed");
 	return -1;
@@ -774,7 +777,7 @@ static int test029(void)
 	"11111111"
 	"11111111"
 	) ||
-	(number_init_random(&b, encryption_level/2)) ||
+	(number_init_random(&b, block_sz_u1024/2)) ||
 	(number_init_str(&res,
 	"00000001"
 	"11111111"
@@ -1679,7 +1682,7 @@ static int test072(void)
 {
     u1024_t num_n;
 
-    number_init_random(&num_n, encryption_level);
+    number_init_random(&num_n, block_sz_u1024);
     *(u64*)&num_n |= (u64)1;
     number_montgomery_factor_set(&num_n, NULL);
     p_comment("n, is a ~%d bit sized random odd number:", encryption_level);
@@ -2385,9 +2388,8 @@ static int test112(void)
 
 static int test116(void)
 { 
-#define K (1024)
     u1024_t p1, p2, n, e, data, encryption;
-    int i, max = K/encryption_level;
+    int i, iter = K/(bit_sz_u64 * block_sz_u1024);
     number_init_str(&data, 
 	"0000000000000000011001010111001101100001011010000111000000100000"
 	"0111010001101001011000100010000000110001001100110010000001100001");
@@ -2406,12 +2408,11 @@ static int test116(void)
 
     p_comment("encrypting 1KB of data:");
     local_timer_start();
-    for (i = 0; i < max; i++)
+    for (i = 0; i < iter; i++)
 	number_modular_exponentiation_montgomery(&encryption, &data, &e, &n);
     local_timer_stop();
     p_local_timer();
     return 0;
-#undef K
 }
 
 static int test117(void)
@@ -2471,12 +2472,176 @@ error:
 #undef LEN
 }
 
-typedef struct test116_t {
+static int test120(void)
+{
+    u1024_t p1, p2, n, e, d, input, encryption, decryption, num_xor, num_seed;
+    int res;
+
+    rsa_key_generator(&p1, &p2, &n, &e, &d, 1);
+
+    number_str2num(&input, PHRASE);
+    p_comment("data: \"%s\"", &input);
+
+    p_comment("encrypting...");
+    local_timer_start();
+    number_reset(&num_seed);
+    if (!(*(unsigned int*)&num_seed = number_seed_set(0)))
+    {
+	p_comment("number_seed_set()");
+	return -1;
+    }
+    number_modular_exponentiation_montgomery(&num_seed, &num_seed, &e, &n);
+    number_init_random(&num_xor, block_sz_u1024);
+    number_xor(&encryption, &num_xor, &input);
+    local_timer_stop();
+    p_local_timer();
+
+    p_comment("decrypting...");
+    local_timer_start();
+    number_modular_exponentiation_montgomery(&num_seed, &num_seed, &d, &n);
+    if (!number_seed_set(*(unsigned int*)&num_seed))
+    {
+	p_comment("number_seed_set()");
+	return -1;
+    }
+    number_init_random(&num_xor, block_sz_u1024);
+    number_xor(&decryption, &num_xor, &encryption);
+    local_timer_stop();
+    p_local_timer();
+
+    res = memcmp(&input, &decryption, sizeof(u1024_t));
+    p_comment("decryption of encrypted data %s data",  res ? 
+	"does not equal" : "equals");
+    return res;
+}
+
+static int test125(void)
+{ 
+    u1024_t p1, p2, n, e, data, encryption, num_seed;
+    int i, mb, max;
+
+    mb = 5;
+    max = (mb * M)/(bit_sz_u64 * block_sz_u1024);
+
+    number_init_str(&data, 
+#if ENC_LEVEL(128)
+	"0000000000000000011001010111001101100001011010000111000000100000"
+	"0111010001101001011000100010000000110001001100110010000001100001"
+#elif ENC_LEVEL(1024)
+	"0110011101101110011010010111010001100001011100100110010101101110"
+	"0110010101100111011001010111001000100000011100110110010001100101"
+	"0110010101101110001000000111100101100101011010110010000001000001"
+	"0101001101010010001000000110010101101000011101000010000001110100"
+	"0110111101101110001000000111001001101111001000000111001001100101"
+	"0110100001110100011001010110100001110111001000000110011101101110"
+	"0110100101110100011100110110010101110100001000000111001001101111"
+	"0110011000100000011001000110010101110011011101010010000000001010"
+	"0110011101101110011010010111001001110100011100110010000001101110"
+	"0110111101101001011101000110000101100100011010010110110001100001"
+	"0111011000100000011011100110111101101001011101000111000001111001"
+	"0111001001100011011001010110010000100000001011110010000001101110"
+	"0110111101101001011101000111000001111001011100100110001101101110"
+	"0110010100100000011101000110100101100010001000000011010000110010"
+	"0011000000110001001000000110100001110100011010010110110101010011"
+	"0010000000101110010000010010000001101110011000010110110001001001"
+#else
+	""
+#endif
+	);
+
+    number_init_str(&p1, 
+#if ENC_LEVEL(128)
+	"1011010001000100100011101100011110010000011010011010110111110101"
+#elif ENC_LEVEL(1024)
+	"1000000100010100111001000110011011001010010011110011011101111000"
+	"1000101011110100100010011000110010100101000011011100000111110011"
+	"0000010110101011001110110110111000001000100100101101000001110010"
+	"1100100101101110101110011010111101001100101111011000111101001110"
+	"1011110001010001001111110100001011010010110111111110010011011110"
+	"0010001111000101011011011111011111110110111011111100011111101000"
+	"1010011010001100001011110101000101101010111111110000111001101100"
+	"0111101001110110011110010000110010001110011001101001001110101111"
+#else
+	""
+#endif
+	);
+
+    number_init_str(&p2,
+#if ENC_LEVEL(128)
+	"1101010011111100001011111011000100101111111100000011010110111001"
+#elif ENC_LEVEL(1024)
+	"1000001111101111010111100000010010011011010010010100001011100000"
+	"1010101100111111010000000001011010000001000100011010110011000011"
+	"0011100111100100101100001000110010101010111110111110001000010011"
+	"1001110101111100110010110111100100101000110100111100110101101101"
+	"1111110011101101110011101101110100001010101100100010000111011110"
+	"0111110011000111110101110111100001111111111101110111000010001011"
+	"1000010111000010111111011110100100111001011011001010110011010000"
+	"0001010001100100011000110110000100110001111011010111110101101001"
+#else
+	""
+#endif
+	);
+    number_mul(&n, &p1, &p2);
+
+    number_init_str(&e,
+#if ENC_LEVEL(128)
+	"0111101001111100100110010101111100000001011011001001000000100000"
+	"0001110001111101011010101011111001011001011110110110001001100101"
+#elif ENC_LEVEL(1024)
+	"0000010000011100101101000001011101101100000110010100010111010110"
+	"0100001000111101001111010111010001001010110001110100000111101111"
+	"0101010100111011010100101111010101100110000000100101000111010100"
+	"0101100100000000011001010011110100010101001000001000000111101000"
+	"0110010101000101111101110000001000111111110000000001101101111001"
+	"0010111111101000110111011001100101100011100011011111100101101001"
+	"0110111100011111100110110011001001100010111011010101011010011100"
+	"0011011001011110001100001000101101001100000111011100100010111100"
+	"0010111000000111111101101110101100110110110110111111000111110110"
+	"0010111000000111010011000010010001011100111110111010101001000101"
+	"0101010010000001100001011001111100001110000001100011100000001010"
+	"0101110110101100011001011010010100001000000000001000100000111110"
+	"0010010000111000010101001000011100110100000011010010101000010101"
+	"0011111010110010100111101010001100111010010011010001100000111110"
+	"0010010000010001100010001000111001011101110011110101000000011000"
+	"0111001100111100101111110110110000111001010101010111001000101001"
+#else
+	""
+#endif
+	);
+
+    p_comment("encrypting %dMB of data:", mb);
+    local_timer_start();
+    p_comment("seeding number generator...");
+    if (!(*(unsigned int*)&num_seed = number_seed_set(0)))
+    {
+	p_comment("number_seed_set()");
+	return -1;
+    }
+    number_seed_set(*(unsigned int*)&num_seed);
+    number_modular_exponentiation_montgomery(&num_seed, &num_seed, &e, &n);
+    local_timer_stop();
+    p_local_timer();
+    p_comment("encrypting...");
+    local_timer_start();
+    for (i = 0; i < max; i++)
+    {
+	u1024_t num_xor;
+
+	number_init_random(&num_xor, block_sz_u1024);
+	number_xor(&encryption, &num_xor, &data);
+    }
+    local_timer_stop();
+    p_local_timer();
+    return 0;
+}
+
+typedef struct test130_t {
     int i;
     char c;
-} test116_t;
+} test130_t;
 
-static int test120(void)
+static int test130(void)
 {
 #define FNAME_1 "f1"
 #define FNAME_2 "f2"
@@ -2488,7 +2653,7 @@ static int test120(void)
     bzero(x, 100);
     p_comment("sizeof(int) = %i", sizeof(int));
     p_comment("sizeof(char) = %i", sizeof(char));
-    p_comment("sizeof(test116_t) = %i", sizeof(test116_t));
+    p_comment("sizeof(test130_t) = %i", sizeof(test130_t));
     p_comment("sizeof(u64) = %i", sizeof(u64));
 
     i = 0;
@@ -2497,17 +2662,17 @@ static int test120(void)
     i += fwrite("nice", strlen("nice"), 1, f);
     i += fwrite("world", strlen("world"), 1, f);
     fclose(f);
-    p_comment("wrote %i test116_t", i);
+    p_comment("wrote %i test130_t", i);
 
     i = 0;
     f = fopen(FNAME_1, "r+");
     i += fread(x, strlen("hello"), 1, f);
     i += fread(x + strlen("hello"), strlen("nice"), 1, f);
     fclose(f);
-    p_comment("read %i test116_t", i);
+    p_comment("read %i test130_t", i);
 
     f = fopen(FNAME_2, "w+");
-    p_comment("wrote %i test116_t", fwrite(x, strlen(x), 1, f));
+    p_comment("wrote %i test130_t", fwrite(x, strlen(x), 1, f));
     fclose(f);
 
     remove(FNAME_1);
@@ -3244,7 +3409,7 @@ static test_t rsa_tests[] =
     {
 	description: "multiple encryption",
 	func: test116,
-#if !defined(ULLONG) && !ENC_LEVEL(128)
+#if !defined(ULLONG) || !ENC_LEVEL(128)
 	disabled: 1,
 #endif
     },
@@ -3264,11 +3429,29 @@ static test_t rsa_tests[] =
 	disabled: 1,
 #endif
     },
+    /* symmetric/asymmetric key combination */
+    {
+	description: "complete RSA + symmetric key test - key generation, "
+	    "encryption and decryption",
+	func: test120,
+#if !defined(ULLONG) || defined(TIME_FUNCTIONS)
+	disabled: 1,
+#endif
+    },
+    {
+	description: "multiple encryption using symmetric/asymmetric key "
+	    "combination",
+	func: test125,
+#if !defined(ULLONG) || (!ENC_LEVEL(128) && !ENC_LEVEL(1024))
+	disabled: 1,
+#endif
+    },
+
     /* RSA io */
     {
 	description: "test fread() and fwrite()",
 	known_issue: "wrong result for sizeof(test58_t)",
-	func: test120,
+	func: test130,
 #ifndef ULLONG
 	disabled: 1,
 #endif
@@ -3277,7 +3460,7 @@ static test_t rsa_tests[] =
     {
 	description: "encryption - decryption test, keys read from files",
 	known_issue: "missing input files",
-	func: test125,
+	func: test135,
 #ifndef ULLONG
 	disabled: 1,
 #endif
@@ -3435,6 +3618,12 @@ static int is_list_tests(int argc, char *argv[])
     return 1;
 }
 
+static void rsa_pre_test(void)
+{
+    init_reset = 1;
+    number_random_seed = 0;
+}
+
 int main(int argc, char *argv[])
 {
     test_t *t;
@@ -3477,7 +3666,7 @@ int main(int argc, char *argv[])
 	}
 	fflush(stdout);
 
-	init_reset = 1;
+	rsa_pre_test();
 
 	if ((ret = t->func()))
 	{
