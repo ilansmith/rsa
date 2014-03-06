@@ -2202,7 +2202,7 @@ static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d,
 	return -1;
     if (is_print)
     {
-	p_comment("data: `%s`", &input);
+	p_comment("data: \"%s\"", &input);
 	p_comment("encrypting...");
 	local_timer_start();
     }

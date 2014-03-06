@@ -196,7 +196,7 @@ STATIC void INLINE number_2complement(u1024_t *res, u1024_t *num)
 {
     u1024_t tmp;
     u64 *seg = NULL, *seg_max = (u64 *)&tmp + block_sz_u1024;
-    int cur_block
+    int cur_block;
 
     TIMER_START(FUNC_NUMBER_2COMPLEMENT);
     tmp = *num;
