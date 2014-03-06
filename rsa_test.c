@@ -184,8 +184,6 @@ func_t func_table[FUNC_COUNT] = {
     [ FUNC_NUMBER_INIT_RANDOM ] = {"number_init_random", 1},
     [ FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT ] = 
 	{"number_find_most_significant_set_bit ", 1},
-    [ FUNC_NUMBER_SHIFT_LEFT_ONCE ] = {"number_shift_left_once", 1},
-    [ FUNC_NUMBER_SHIFT_RIGHT_ONCE ] = {"number_shift_right_once", 1},
     [ FUNC_NUMBER_ADD ] = {"number_add", 1},
     [ FUNC_NUMBER_SMALL_DEC2NUM ] = {"func_number_small_dec2num", 1},
     [ FUNC_NUMBER_2COMPLEMENT ] = {"number_2complement", 1},
@@ -196,12 +194,7 @@ func_t func_table[FUNC_COUNT] = {
     [ FUNC_NUMBER_MODULAR_MULTIPLICATION_MONTGOMERY ] = 
 	{"number_modular_multiplication_montgomery", 1},
     [ FUNC_NUMBER_ABSOLUTE_VALUE ] = {"number_absolute_value", 1},
-    [ FUNC_NUMBER_COMPARE ] = {"number_compare", 1},
-    [ FUNC_NUMBER_IS_GREATER] = {"number_is_greater", 1},
-    [ FUNC_NUMBER_IS_GREATER_OR_EQUAL ] = {"number_is_greater_or_equal", 1},
-    [ FUNC_NUMBER_IS_EQUAL ] = {"number_is_equal", 1},
     [ FUNC_NUMBER_DEV ] = {"number_dev", 1},
-    [ FUNC_NUMBER_MOD ] = {"number_mod", 1},
     [ FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE ] = 
 	{"number_init_random_strict_range",  1},
     [ FUNC_NUMBER_EXPONENTIATION ] = {"number_exponentiation", 1},
@@ -352,12 +345,12 @@ static void p_local_timer(void)
 
 static int test001(void)
 {
-    p_comment("BIT_SZ_U64 = %d", BIT_SZ_U64);
-    p_comment("BLOCK_SZ_U1024 = %d", BLOCK_SZ_U1024);
-    p_comment("BIT_SZ_U1024 = BIT_SZ_U64*BLOCK_SZ_U1024 = %d*%d = %d", 
-	BIT_SZ_U64, BLOCK_SZ_U1024, BIT_SZ_U1024);
-    p_comment("total size = BIT_SZ_U1024+BIT_SZ_U64 = %d+%d = %d", 
-	BIT_SZ_U1024, BIT_SZ_U64, sizeof(u1024_t)<<3);
+    p_comment("bit_sz_u64 = %d", bit_sz_u64);
+    p_comment("block_sz_u1024 = %d", block_sz_u1024);
+    p_comment("bit_sz_u1024 = bit_sz_u64*block_sz_u1024 = %d*%d = %d", 
+	bit_sz_u64, block_sz_u1024, bit_sz_u1024);
+    p_comment("total size = bit_sz_u1024+bit_sz_u64 = %d+%d = %d", 
+	bit_sz_u1024, bit_sz_u64, sizeof(u1024_t)<<3);
     return 0;
 }
 
@@ -478,7 +471,7 @@ static int test011(void)
 
     for (i = 0; i < RNDM_TBL_SZ; i++)
     {
-	if (number_init_random(&number[i], BIT_SZ_U1024/2))
+	if (number_init_random(&number[i], bit_sz_u1024/2))
 	    continue;
 	for (j = 0; j < i; j++)
 	{
@@ -597,8 +590,8 @@ static int test019(void)
 {
     u1024_t a, b, c;
 
-    if (number_init_random(&a, BIT_SZ_U1024/2) || 
-	number_init_random(&b, BIT_SZ_U1024/2))
+    if (number_init_random(&a, bit_sz_u1024/2) || 
+	number_init_random(&b, bit_sz_u1024/2))
     {
 	p_comment("initializing a failed");
 	return -1;
@@ -759,7 +752,7 @@ static int test029(void)
 	"11111111"
 	"11111111"
 	) ||
-	(number_init_random(&b, BIT_SZ_U1024/2)) ||
+	(number_init_random(&b, bit_sz_u1024/2)) ||
 	(number_init_str(&res,
 	"00000001"
 	"11111111"
@@ -1664,14 +1657,14 @@ static int test072(void)
 {
     u1024_t num_n;
 
-    number_init_random(&num_n, BIT_SZ_U1024);
+    number_init_random(&num_n, bit_sz_u1024);
     *(u64 *)&num_n |= (u64)1;
     number_montgomery_factor_set(&num_n, NULL);
-    p_comment("n, is a ~%d bit sized random odd number:", BIT_SZ_U1024);
+    p_comment("n, is a ~%d bit sized random odd number:", bit_sz_u1024);
     p_u1024(&num_n);
     p_comment("");
     p_comment("n's montgomery_factor = pow(2, 2^(2*(%d+2))) %% n:", 
-	BIT_SZ_U1024);
+	bit_sz_u1024);
     p_u1024(&num_montgomery_factor);
     return 0;
 }
@@ -1802,9 +1795,9 @@ static int test086(void)
     u1024_t res, pow, two, bit_sz;
 
     number_reset(&res);
-    *((u64 *)&res + BLOCK_SZ_U1024 - 1) = MSB_PT(u64);
+    *((u64 *)&res + block_sz_u1024 - 1) = MSB_PT(u64);
     number_small_dec2num(&two, (u64)2);
-    number_small_dec2num(&bit_sz, (u64)(BIT_SZ_U1024 - 1));
+    number_small_dec2num(&bit_sz, (u64)(bit_sz_u1024 - 1));
 
     number_exponentiation(&pow, &two, &bit_sz);
     return !number_is_equal(&res, &pow);
@@ -2075,7 +2068,7 @@ static void rsa_key_generator(u1024_t *p1, u1024_t *p2, u1024_t *n, u1024_t *e,
     {
 	u64 *ptr;
 
-	for (ptr = (u64*)&min; ptr < (u64*)&min + BLOCK_SZ_U1024; ptr++)
+	for (ptr = (u64*)&min; ptr < (u64*)&min + block_sz_u1024; ptr++)
 	    *ptr = 1;
 	init = 1;
     }
@@ -2145,7 +2138,7 @@ static int rsa_pre_encrypt(u1024_t *input, u64 *multiplier, u1024_t *encryptor,
     *multiplier = *(u64*)&q;
 
     /* varify that q can be represented by a u64 */
-    number_shift_right(&q, BIT_SZ_U64);
+    number_shift_right(&q, bit_sz_u64);
     number_reset(&num_0);
     return !number_is_equal(&q, &num_0);
 }
@@ -2335,7 +2328,7 @@ static int test110(void)
 { 
 #define K (1024)
     u1024_t p1, p2, n, e, data, encryption;
-    int i, max = K/(BIT_SZ_U64>>2);
+    int i, max = K/(bit_sz_u64>>2);
     number_init_str(&data, 
 	"0000000000000000011001010111001101100001011010000111000000100000"
 	"0111010001101001011000100010000000110001001100110010000001100001");
@@ -2992,7 +2985,7 @@ static test_t rsa_tests[] =
 	disabled: 1,
 #endif
     },
-    /* setting montgomery factor: 2^(2(BIT_SZ_U1024+2)) */
+    /* setting montgomery factor: 2^(2(bit_sz_u1024+2)) */
     {
 	description: "number_montgomery_factor_set()",
 	func: test071,
@@ -3059,7 +3052,7 @@ static test_t rsa_tests[] =
 #endif
     },
     {
-	description: "2^(BIT_SZ_U1024 - 1)",
+	description: "2^(bit_sz_u1024 - 1)",
 	func: test086,
 #if !defined(ULLONG) || defined(TIME_FUNCTIONS)
 	disabled: 1,

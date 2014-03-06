@@ -10,23 +10,42 @@
 #define COPRIME_PRIME(X) ((X).prime)
 #define COPRIME_DIVISOR(X) ((X).divisor)
 
-#define FIRST
+#define number_gcd_is_1(u, v) \
+( \
+    /* algorithm \
+     * --------- \
+     * g = 0 \
+     * while u is even and v is even \
+     *   u = u/2 (right shift) \
+     *   v = v/2 \
+     *   g = g + 1 \
+     * now u or v (or both) are odd \
+     * while u > 0 \
+     *   if u is even, u = u/2 \
+     *   else if v is even, v = v/2 \
+     *   else if u >= v \
+     *     u = (u-v)/2 \
+     *   else \
+     *     v = (v-u)/2 \
+     * return v/2^k \
+     * Since radix is of the form 2^k, and n is odd, their GCD is 1 */ \
+    1 \
+)
 
-static const u1024_t NUM_0 = {.seg_00=0};
-static const u1024_t NUM_1 = {.seg_00=1};
-static const u1024_t NUM_2 = {.seg_00=2};
-static const u1024_t NUM_5 = {.seg_00=5};
-static const u1024_t NUM_10 = {.seg_00=10};
+u1024_t NUM_0 = {.seg_00=0};
+u1024_t NUM_1 = {.seg_00=1};
+u1024_t NUM_2 = {.seg_00=2};
+u1024_t NUM_5 = {.seg_00=5};
+u1024_t NUM_10 = {.seg_00=10};
+int bit_sz_u64 = BIT_SZ_U64;
+int bit_sz_u1024 = BIT_SZ_U1024;
+int block_sz_u1024 = BLOCK_SZ_U1024;
+int sizeof_u1024 = sizeof(u1024_t);
 
 typedef int (* func_modular_multiplication_t) (u1024_t *num_res, 
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n);
 
-STATIC u1024_t num_montgomery_n, num_montgomery_factor;
-
-void INLINE number_reset(u1024_t *num)
-{
-    memset(num, 0, sizeof(u1024_t));
-}
+STATIC u1024_t num_montgomery_n, num_montgomery_factor, num_res_nresidue;
 
 STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
@@ -40,7 +59,7 @@ STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 	/* bit carrying is continues into the buffer u64 to accomodate for  
 	 * number_montgomery_product()
 	 */
-	max_advance = (u64 *)&tmp_res + BLOCK_SZ_U1024 + 1;
+	max_advance = (u64 *)&tmp_res + block_sz_u1024 + 1;
 	cmask = MSB_PT(u64);
     }
 
@@ -80,37 +99,6 @@ STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
     TIMER_STOP(FUNC_NUMBER_ADD);
 }
 
-static void INLINE number_shift_right_once(u1024_t *num)
-{
-    u64 *seg;
-
-    TIMER_START(FUNC_NUMBER_SHIFT_RIGHT_ONCE);
-    /* shifting is done from the buffer u64 to accomodate for 
-     * number_montgomery_product()
-     */
-    for (seg = (u64 *)num; seg < (u64 *)num + BLOCK_SZ_U1024; seg++)
-    {
-	*seg = *seg >> 1;
-	*seg = (*(seg+1) & (u64)1) ? *seg | MSB_PT(u64) : *seg & ~MSB_PT(u64);
-    }
-    *seg = *seg >> 1;
-    TIMER_STOP(FUNC_NUMBER_SHIFT_RIGHT_ONCE);
-}
-
-static void INLINE number_shift_left_once(u1024_t *num)
-{
-    u64 *seg;
-
-    TIMER_START(FUNC_NUMBER_SHIFT_LEFT_ONCE);
-    for (seg = (u64*)num + BLOCK_SZ_U1024; seg > (u64*)num; seg--)
-    {
-	*seg = *seg << 1;
-	*seg = *(seg-1) & MSB_PT(u64) ? *seg | (u64)1 : *seg & ~(u64)1;
-    }
-    *seg = *seg << 1;
-    TIMER_STOP(FUNC_NUMBER_SHIFT_LEFT_ONCE);
-}
-
 int INLINE number_init_random(u1024_t *num, int bit_len)
 {
     int i, max, ret;
@@ -118,7 +106,7 @@ int INLINE number_init_random(u1024_t *num, int bit_len)
     u1024_t num_mask;
 
     TIMER_START(FUNC_NUMBER_INIT_RANDOM);
-    if (bit_len < 1 || bit_len > BIT_SZ_U1024)
+    if (bit_len < 1 || bit_len > bit_sz_u1024)
 	return -1;
 
     number_reset(num);
@@ -131,8 +119,8 @@ int INLINE number_init_random(u1024_t *num, int bit_len)
     }
     srandom((unsigned int)tv.tv_sec * (unsigned int)tv.tv_usec);
 
-    /* initiate a BIT_SZ_U1024 random number */
-    max = (BIT_SZ_U1024/(sizeof(long)<<3));
+    /* initiate a bit_sz_u1024 random number */
+    max = (bit_sz_u1024/(sizeof(long)<<3));
     for (i = 0; i < max; i++)
 	*((long *)num + i) |= random();
 
@@ -140,13 +128,11 @@ int INLINE number_init_random(u1024_t *num, int bit_len)
     number_reset(&num_mask);
     for (i = 0; i < bit_len; i++)
     {
-	u1024_t num_1 = NUM_1;
-
 	number_shift_left_once(&num_mask);
-	number_add(&num_mask, &num_mask, &num_1);
+	number_add(&num_mask, &num_mask, &NUM_1);
     }
     /* apply num_mask to num */
-    for (i = 0; i < BLOCK_SZ_U1024; i++)
+    for (i = 0; i < block_sz_u1024; i++)
 	*((u64 *)num + i) &= *((u64*)&num_mask + i);
 
     ret = 0;
@@ -159,7 +145,7 @@ Exit:
 STATIC int INLINE number_find_most_significant_set_bit(u1024_t *num, 
     u64 **major, u64 *minor)
 {
-    u64 *tmp_major = (u64 *)num + BLOCK_SZ_U1024 - 1;
+    u64 *tmp_major = (u64 *)num + block_sz_u1024 - 1;
     u64 tmp_minor;
     int minor_offset;
 
@@ -167,7 +153,7 @@ STATIC int INLINE number_find_most_significant_set_bit(u1024_t *num,
     while (tmp_major >= (u64 *)num)
     {
 	tmp_minor = MSB_PT(u64);
-	minor_offset = BIT_SZ_U64;
+	minor_offset = bit_sz_u64;
 
 	while (tmp_minor)
 	{
@@ -204,19 +190,18 @@ STATIC void INLINE number_small_dec2num(u1024_t *num_n, u64 dec)
 
 STATIC void INLINE number_2complement(u1024_t *res, u1024_t *num)
 {
-    u1024_t tmp, num_1;
+    u1024_t tmp;
     u64 *seg = NULL;
 
     TIMER_START(FUNC_NUMBER_2COMPLEMENT);
-    num_1 = NUM_1;
     tmp = *num;
     for (seg = (u64 *)&tmp; 
-	seg - (u64 *)&tmp <= BLOCK_SZ_U1024; seg++)
+	seg - (u64 *)&tmp <= block_sz_u1024; seg++)
     {
 	*seg = ~*seg; /* one's complement */
     }
 
-    number_add(res, &tmp, &num_1); /* two's complement */
+    number_add(res, &tmp, &NUM_1); /* two's complement */
     TIMER_STOP(FUNC_NUMBER_2COMPLEMENT);
 }
 
@@ -227,16 +212,8 @@ STATIC void INLINE number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2)
     TIMER_START(FUNC_NUMBER_SUB);
     number_2complement(&num2_2complement, num2);
     number_add(res, num1, &num2_2complement);
-    *((u64 *)res + BLOCK_SZ_U1024) = 0;
+    *((u64 *)res + block_sz_u1024) = 0;
     TIMER_STOP(FUNC_NUMBER_SUB);
-}
-
-void number_sub1(u1024_t *num)
-{
-    u1024_t num_1;
-
-    num_1 = NUM_1;
-    number_sub(num, num, &num_1);
 }
 
 void INLINE number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
@@ -246,17 +223,17 @@ void INLINE number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
 
     TIMER_START(FUNC_NUMBER_MUL);
     number_reset(&tmp_res);
-    for (i = 0; i < BLOCK_SZ_U1024; i++)
+    for (i = 0; i < block_sz_u1024; i++)
     {
 	u64 mask = 1;
 	int j;
 
-	for (j = 0; j < BIT_SZ_U64; j++)
+	for (j = 0; j < bit_sz_u64; j++)
 	{
 	    if ((*((u64 *)(&multiplier) + i)) & mask)
 		number_add(&tmp_res, &tmp_res, &multiplicand);
 	    number_shift_left_once(&multiplicand);
-	    *((u64 *)&multiplicand + BLOCK_SZ_U1024) = 0;
+	    *((u64 *)&multiplicand + block_sz_u1024) = 0;
 	    mask = mask << 1;
 	}
     }
@@ -270,56 +247,13 @@ STATIC void INLINE number_absolute_value(u1024_t *abs, u1024_t *num)
     *abs = *num;
     if (NUMBER_IS_NEGATIVE(num))
     {
-	u1024_t num_1 = NUM_1;
 	u64 *seg;
 
-	number_sub(abs, abs, &num_1);
-	for (seg = (u64 *)abs + BLOCK_SZ_U1024 - 1; seg >= (u64 *)abs; seg--)
+	number_sub(abs, abs, &NUM_1);
+	for (seg = (u64 *)abs + block_sz_u1024 - 1; seg >= (u64 *)abs; seg--)
 	    *seg = ~*seg;
     }
     TIMER_STOP(FUNC_NUMBER_ABSOLUTE_VALUE);
-}
-
-/* return: num1 > num2  or ret_on_equal if num1 == num2 */
-static int INLINE number_compare(u1024_t *num1, u1024_t *num2, int ret_on_equal)
-{
-    int ret;
-    u64 *seg1 = (u64 *)num1 + BLOCK_SZ_U1024;
-    u64 *seg2 = (u64 *)num2 + BLOCK_SZ_U1024;
-
-    TIMER_START(FUNC_NUMBER_COMPARE);
-    for (; seg1 > (u64 *)num1 && *seg1==*seg2; seg1--, seg2--);
-    ret = *seg1==*seg2 ? ret_on_equal : *seg1>*seg2;
-    TIMER_STOP(FUNC_NUMBER_COMPARE);
-    return ret;
-}
-
-/* return: num1 > num2 */
-STATIC int INLINE number_is_greater(u1024_t *num1, u1024_t *num2)
-{
-    int ret;
-
-    TIMER_START(FUNC_NUMBER_IS_GREATER);
-    ret = number_compare(num1, num2, 0);
-    TIMER_STOP(FUNC_NUMBER_IS_GREATER);
-    return ret;
-}
-
-/* return: num1 >= num2 */
-STATIC int INLINE number_is_greater_or_equal(u1024_t *num1, u1024_t *num2)
-{
-    int ret;
-
-    TIMER_START(FUNC_NUMBER_IS_GREATER_OR_EQUAL);
-    ret = number_compare(num1, num2, 1);
-    TIMER_STOP(FUNC_NUMBER_IS_GREATER_OR_EQUAL);
-    return ret;
-}
-
-/* return: num1 == num2 */
-STATIC int INLINE number_is_equal(u1024_t *num1, u1024_t *num2)
-{
-    return !memcmp(num1, num2, BIT_SZ_U1024>>3);
 }
 
 STATIC void INLINE number_dev(u1024_t *num_q, u1024_t *num_r, 
@@ -327,7 +261,7 @@ STATIC void INLINE number_dev(u1024_t *num_q, u1024_t *num_r,
 {
     u1024_t dividend = *num_dividend, divisor = *num_divisor, quotient, 
 	remainder;
-    u64 *seg_dividend = (u64 *)&dividend + BLOCK_SZ_U1024 - 1;
+    u64 *seg_dividend = (u64 *)&dividend + block_sz_u1024 - 1;
     u64 *remainder_ptr = (u64 *)&remainder, *quotient_ptr = (u64 *)&quotient;
 
     TIMER_START(FUNC_NUMBER_DEV);
@@ -340,9 +274,9 @@ STATIC void INLINE number_dev(u1024_t *num_q, u1024_t *num_r,
 	while (mask_dividend)
 	{
 	    number_shift_left_once(&remainder);
-	    *((u64 *)&remainder + BLOCK_SZ_U1024) = 0;
+	    *((u64 *)&remainder + block_sz_u1024) = 0;
 	    number_shift_left_once(&quotient);
-	    *((u64 *)&quotient + BLOCK_SZ_U1024) = 0;
+	    *((u64 *)&quotient + block_sz_u1024) = 0;
 	    *remainder_ptr = *remainder_ptr |
 		((*seg_dividend & mask_dividend) ? (u64)1 : (u64)0);
 	    if (number_is_greater_or_equal(&remainder, &divisor))
@@ -359,15 +293,6 @@ STATIC void INLINE number_dev(u1024_t *num_q, u1024_t *num_r,
     TIMER_STOP(FUNC_NUMBER_DEV);
 }
 
-STATIC void INLINE number_mod(u1024_t *r, u1024_t *a, u1024_t *n)
-{
-    u1024_t q;
-
-    TIMER_START(FUNC_NUMBER_MOD);
-    number_dev(&q, r, a, n);
-    TIMER_STOP(FUNC_NUMBER_MOD);
-}
-
 STATIC int INLINE number_modular_multiplication_naive(u1024_t *num_res, 
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n)
 {
@@ -376,7 +301,7 @@ STATIC int INLINE number_modular_multiplication_naive(u1024_t *num_res,
     TIMER_START(FUNC_NUMBER_MODULAR_MULTIPLICATION_NAIVE);
     number_mul(&tmp, num_a, num_b);
     number_mod(num_res, &tmp, num_n);
-    *((u64 *)num_res + BLOCK_SZ_U1024) = 0;
+    *((u64 *)num_res + block_sz_u1024) = 0;
     TIMER_STOP(FUNC_NUMBER_MODULAR_MULTIPLICATION_NAIVE);
     return 0;
 }
@@ -385,14 +310,13 @@ STATIC int INLINE number_modular_multiplication_naive(u1024_t *num_res,
 static void INLINE number_init_random_strict_range(u1024_t *num_n, 
     u1024_t *range)
 {
-    u1024_t num_tmp, num_range_min1, num_1;
+    u1024_t num_tmp, num_range_min1;
 
     TIMER_START(FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE);
-    num_1 = NUM_1;
-    number_sub(&num_range_min1, range, &num_1);
-    number_init_random(&num_tmp, BIT_SZ_U1024);
+    number_sub(&num_range_min1, range, &NUM_1);
+    number_init_random(&num_tmp, bit_sz_u1024);
     number_mod(&num_tmp, &num_tmp, &num_range_min1);
-    number_add(&num_tmp, &num_tmp, &num_1);
+    number_add(&num_tmp, &num_tmp, &NUM_1);
 
     *num_n = num_tmp;
     TIMER_STOP(FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE);
@@ -401,17 +325,16 @@ static void INLINE number_init_random_strict_range(u1024_t *num_n,
 STATIC void INLINE number_exponentiation(u1024_t *res, u1024_t *num_base, 
     u1024_t *num_exp)
 {
-    u1024_t num_cnt, num_1, num_tmp;
+    u1024_t num_cnt, num_tmp;
 
     TIMER_START(FUNC_NUMBER_EXPONENTIATION);
-    num_1 = NUM_1;
     num_cnt = NUM_0;
     num_tmp = NUM_1;
 
     while (!number_is_equal(&num_cnt, num_exp))
     {
 	number_mul(&num_tmp, &num_tmp, num_base);
-	number_add(&num_cnt, &num_cnt, &num_1);
+	number_add(&num_cnt, &num_cnt, &NUM_1);
     }
 
     *res = num_tmp;
@@ -421,12 +344,11 @@ STATIC void INLINE number_exponentiation(u1024_t *res, u1024_t *num_base,
 STATIC int INLINE number_modular_exponentiation_naive(u1024_t *res, u1024_t *a, 
     u1024_t *b, u1024_t *n)
 {
-    u1024_t d, num_1;
+    u1024_t d;
     u64 *seg = NULL, mask;
 
     TIMER_START(FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE);
     d = NUM_1;
-    num_1 = NUM_1;
     number_find_most_significant_set_bit(b, &seg, &mask);
     while (seg >= (u64 *)b)
     {
@@ -448,30 +370,6 @@ STATIC int INLINE number_modular_exponentiation_naive(u1024_t *res, u1024_t *a,
     *res = d;
     TIMER_STOP(FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE);
     return 0;
-}
-
-STATIC int INLINE number_gcd_is_1(u1024_t *num_a, u1024_t *num_b)
-{
-    /* algorithm
-     * ---------
-     * g = 0
-     * while u is even and v is even
-     *   u = u/2 (right shift)
-     *   v = v/2
-     *   g = g + 1
-     * now u or v (or both) are odd
-     * while u > 0
-     *   if u is even, u = u/2
-     *   else if v is even, v = v/2
-     *   else if u >= v
-     *     u = (u-v)/2
-     *   else
-     *     v = (v-u)/2
-     * return v/2^k
-     */
-
-    /* Since radix is of the form 2^k, and n is odd, their GCD is 1 */
-    return 1;
 }
 
 STATIC inline int number_is_odd(u1024_t *num)
@@ -498,15 +396,15 @@ static void INLINE number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
     u1024_t *num_b, u1024_t *num_n)
 {
     u1024_t multiplier = *num_a, num_s;
-    u64 *seg = NULL;
+    u64 *seg = NULL, *top = (u64 *)num_b + block_sz_u1024;
     int i;
 
     TIMER_START(FUNC_NUMBER_MONTGOMERY_PRODUCT);
     num_s = NUM_0;
     number_shift_left_once(&multiplier);
 
-    /* handle the first BIT_SZ_U1024 iterations */
-    for (seg = (u64 *)num_b; seg < (u64 *)num_b + BLOCK_SZ_U1024; seg++)
+    /* handle the first bit_sz_u1024 iterations */
+    for (seg = (u64 *)num_b; seg < top; seg++)
     {
 	u64 mask;
 
@@ -535,10 +433,10 @@ static void INLINE number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
     TIMER_STOP(FUNC_NUMBER_MONTGOMERY_PRODUCT);
 }
 
-/* shift left and do mod num_n 2*(BIT_SZ_U1024+2) times... */
+/* shift left and do mod num_n 2*(bit_sz_u1024+2) times... */
 void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
 {
-    u1024_t num_0, factor;
+    u1024_t factor;
     int exp, exp_max;
 
     TIMER_START(FUNC_NUMBER_MONTGOMERY_FACTOR_SET);
@@ -546,13 +444,9 @@ void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
 	return;
 
     if (num_factor)
-    {
-	num_montgomery_factor = *num_factor;
-	return;
-    }
+	goto Exit;
 
-    exp_max = 2*(BIT_SZ_U1024+2);
-    num_0 = NUM_0;
+    exp_max = 2*(bit_sz_u1024+2);
     number_small_dec2num(&factor, (u64)1);
     exp = 0;
 
@@ -570,13 +464,15 @@ void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
 
 Exit:
     num_montgomery_factor = factor;
+    number_montgomery_product(&num_res_nresidue, &num_montgomery_factor, &NUM_1,
+	num_n);
     TIMER_START(FUNC_NUMBER_MONTGOMERY_FACTOR_SET);
 }
 
 /* a: exponent
  * b: power
  * n: modulus
- * r: 2^(BIT_SZ_U1024)%n
+ * r: 2^(bit_sz_u1024)%n
  * MonPro(a, b, n) = abr^-1%n
  *
  * a * b % n = abrr^-1%n = 1abrr^-1%n = MonPro(1, abr%n, n) = 
@@ -594,16 +490,15 @@ STATIC int INLINE number_modular_multiplication_montgomery(u1024_t *num_res,
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n)
 {
     int ret;
-    u1024_t a_tmp, b_tmp, num_1;
+    u1024_t a_tmp, b_tmp;
 
     TIMER_START(FUNC_NUMBER_MODULAR_MULTIPLICATION_MONTGOMERY);
     number_montgomery_factor_set(num_n, NULL);
 
-    num_1 = NUM_1;
     number_montgomery_product(&a_tmp, num_a, &num_montgomery_factor, num_n);
     number_montgomery_product(&b_tmp, num_b, &num_montgomery_factor, num_n);
     number_montgomery_product(num_res, &a_tmp, &b_tmp, num_n);
-    number_montgomery_product(num_res, &num_1, num_res, num_n);
+    number_montgomery_product(num_res, &NUM_1, num_res, num_n);
     ret = 0;
 
     TIMER_STOP(FUNC_NUMBER_MODULAR_MULTIPLICATION_MONTGOMERY);
@@ -627,32 +522,27 @@ STATIC int INLINE number_modular_multiplication_montgomery(u1024_t *num_res,
 STATIC int INLINE number_modular_exponentiation_montgomery(u1024_t *res, 
     u1024_t *a, u1024_t *b, u1024_t *n)
 {
-    u1024_t a_nresidue, res_nresidue, num_1;
+    u1024_t a_nresidue;
     u64 *seg;
     int ret = 0;
 
     TIMER_START(FUNC_NUMBER_MODULAR_EXPONENTIATION_MONTGOMERY);
-    num_1 = NUM_1;
-
     number_montgomery_factor_set(n, NULL);
     number_montgomery_product(&a_nresidue, &num_montgomery_factor, a, n);
-    number_montgomery_product(&res_nresidue, &num_montgomery_factor, &num_1, n);
+    *res = num_res_nresidue;
 
-    for (seg = (u64 *)b; seg < (u64 *)b + BLOCK_SZ_U1024; seg++)
+    for (seg = (u64 *)b; seg < (u64 *)b + block_sz_u1024; seg++)
     {
 	u64 mask;
 
 	for (mask = (u64)1; mask; mask = mask << 1)
 	{
 	    if (*seg & mask)
-	    {
-		number_montgomery_product(&res_nresidue, &res_nresidue, 
-		    &a_nresidue, n);
-	    }
+		number_montgomery_product(res, res, &a_nresidue, n);
 	    number_montgomery_product(&a_nresidue, &a_nresidue, &a_nresidue, n);
 	}
     }
-    number_montgomery_product(res, &num_1, &res_nresidue, n);
+    number_montgomery_product(res, &NUM_1, res, n);
 
     TIMER_STOP(FUNC_NUMBER_MODULAR_EXPONENTIATION_MONTGOMERY);
     return ret;
@@ -681,7 +571,7 @@ static void INLINE number_witness_init(u1024_t *num_n_min1, u1024_t *num_u,
  */
 STATIC int INLINE number_witness(u1024_t *num_a, u1024_t *num_n)
 {
-    u1024_t num_1, num_2, num_u, num_x_prev, num_x_curr, num_n_min1;
+    u1024_t num_u, num_x_prev, num_x_curr, num_n_min1;
     int i, t, ret;
 
     TIMER_START(FUNC_NUMBER_WITNESS);
@@ -691,9 +581,7 @@ STATIC int INLINE number_witness(u1024_t *num_a, u1024_t *num_n)
 	goto Exit;
     }
 
-    num_1 = NUM_1;
-    num_2 = NUM_2;
-    number_sub(&num_n_min1, num_n, &num_1);
+    number_sub(&num_n_min1, num_n, &NUM_1);
     number_witness_init(&num_n_min1, &num_u, &t);
     if (number_modular_exponentiation_montgomery(&num_x_prev, num_a, &num_u, 
 	num_n))
@@ -710,8 +598,8 @@ STATIC int INLINE number_witness(u1024_t *num_a, u1024_t *num_n)
 	    ret = 1;
 	    goto Exit;
 	}
-	if (number_is_equal(&num_x_curr, &num_1) && 
-	    !number_is_equal(&num_x_prev, &num_1) &&
+	if (number_is_equal(&num_x_curr, &NUM_1) && 
+	    !number_is_equal(&num_x_prev, &NUM_1) &&
 	    !number_is_equal(&num_x_prev, &num_n_min1))
 	{
 	    ret = 1;
@@ -720,7 +608,7 @@ STATIC int INLINE number_witness(u1024_t *num_a, u1024_t *num_n)
 	num_x_prev = num_x_curr;
     }
 
-    if (!number_is_equal(&num_x_curr, &num_1))
+    if (!number_is_equal(&num_x_curr, &NUM_1))
     {
 	ret = 1;
 	goto Exit;
@@ -741,10 +629,9 @@ Exit:
 STATIC int INLINE number_miller_rabin(u1024_t *num_n, u1024_t *num_s)
 {
     int ret;
-    u1024_t num_j, num_a, num_1;
+    u1024_t num_j, num_a;
 
     TIMER_START(FUNC_NUMBER_MILLER_RABIN);
-    num_1 = NUM_1;
     num_j = NUM_1;
 
     while (!number_is_equal(&num_j, num_s))
@@ -755,7 +642,7 @@ STATIC int INLINE number_miller_rabin(u1024_t *num_n, u1024_t *num_s)
 	    ret = 0;
 	    goto Exit;
 	}
-	number_add(&num_j, &num_j, &num_1);
+	number_add(&num_j, &num_j, &NUM_1);
     }
     ret = 1;
 
@@ -816,7 +703,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
     u1024_t *num_increment)
 {
     int i;
-    static u1024_t num_0, num_pi, num_mod, num_jumper, num_inc;
+    static u1024_t num_pi, num_mod, num_jumper, num_inc;
     static int init;
     static small_prime_entry_t small_primes[] = {
 	{2}, {3}, {5}, {7}, {11}, {13}, {17}, {19}, {23}, {29}, {31}, {37}, {41}
@@ -852,7 +739,6 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 	/* initiate prime, exp and power_of_prime fields in all small_primes[] 
 	 * elements. generate num_inc and num_pi at the same time.
 	 */
-	num_0 = NUM_0;
 	num_pi = num_inc = NUM_1;
 	for (i = 0; i < ARRAY_SZ(small_primes); i++)
 	{
@@ -872,11 +758,11 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 
 	do
 	{
-	    number_init_random(&num_a, BIT_SZ_U1024/2);
+	    number_init_random(&num_a, bit_sz_u1024/2);
 	    number_modular_exponentiation_naive(&num_a_pow, &num_a,
 		&(small_primes[i].exp), &num_pi);
 	}
-	while (number_is_equal(&num_a_pow, &num_0));
+	while (number_is_equal(&num_a_pow, &NUM_0));
 	number_add(num_coprime, num_coprime, &num_a);
     }
 
@@ -894,9 +780,9 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
     for (i = 0; i < ARRAY_SZ(small_primes); i++)
     {
 	number_mod(&num_mod, num_coprime, &(small_primes[i].prime));
-	if (number_is_equal(&num_mod, &num_0))
+	if (number_is_equal(&num_mod, &NUM_0))
 	{
-	    number_dev(&num_jumper, &num_0, &num_jumper, 
+	    number_dev(&num_jumper, &NUM_0, &num_jumper, 
 		&(small_primes[i].prime));
 	}
     }
@@ -911,7 +797,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 STATIC void INLINE number_extended_euclid_gcd(u1024_t *gcd, u1024_t *x, 
     u1024_t *a, u1024_t *y, u1024_t *b)
 {
-    u1024_t num_x, num_x1, num_x2, num_y, num_y1, num_y2, num_0;
+    u1024_t num_x, num_x1, num_x2, num_y, num_y1, num_y2;
     u1024_t num_a, num_b, num_q, num_r;
     int change;
 
@@ -933,9 +819,8 @@ STATIC void INLINE number_extended_euclid_gcd(u1024_t *gcd, u1024_t *x,
     num_x2 = NUM_1;
     num_y1 = NUM_1;
     num_y2 = NUM_0;
-    num_0 = NUM_0;
 
-    while (number_is_greater(&num_b, &num_0))
+    while (number_is_greater(&num_b, &NUM_0))
     {
 	number_dev(&num_q, &num_r, &num_a, &num_b);
 
@@ -972,21 +857,20 @@ STATIC void INLINE number_euclid_gcd(u1024_t *gcd, u1024_t *a, u1024_t *b)
 
 void number_init_random_coprime(u1024_t *num, u1024_t *coprime)
 {
-    u1024_t num_1, num_gcd;
+    u1024_t num_gcd;
 
     TIMER_START(FUNC_NUMBER_INIT_RANDOM_COPRIME);
-    num_1 = NUM_1;
     do
     {
 	number_init_random_strict_range(num, coprime);
 	number_euclid_gcd(&num_gcd, num, coprime);
     }
-    while (!number_is_equal(&num_gcd, &num_1));
+    while (!number_is_equal(&num_gcd, &NUM_1));
     TIMER_STOP(FUNC_NUMBER_INIT_RANDOM_COPRIME);
 }
 
 /* assumtion: 0 < num < mod */
-void number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num, 
+int number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num, 
     u1024_t *mod)
 {
     u1024_t num_x, num_y, num_gcd, num_y_abs;
@@ -999,14 +883,14 @@ void number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num,
     if (!number_is_equal(&num_y_abs, &num_y))
 	number_sub(inv, mod, inv);
     TIMER_STOP(FUNC_NUMBER_MODULAR_MULTIPLICATIVE_INVERSE);
+    return !number_gcd_is_1(num, inv);
 }
 
 void number_find_prime(u1024_t *num)
 {
-    u1024_t num_candidate, num_1, num_increment;
+    u1024_t num_candidate, num_increment;
 
     TIMER_START(FUNC_NUMBER_FIND_PRIME);
-    num_1 = NUM_1;
     number_generate_coprime(&num_candidate, &num_increment);
 
     while (!(number_is_prime(&num_candidate)))
@@ -1014,7 +898,7 @@ void number_find_prime(u1024_t *num)
 	number_add(&num_candidate, &num_candidate, &num_increment);
 
 	/* highly unlikely event of rollover renderring num_candidate == 1 */
-	if (number_is_equal(&num_candidate, &num_1))
+	if (number_is_equal(&num_candidate, &NUM_1))
 	    number_generate_coprime(&num_candidate, &num_increment);
     }
 
@@ -1064,11 +948,11 @@ static int is_valid_number_str_sz(char *str)
 	goto Exit;
     }
 
-    if (strlen(str) > BIT_SZ_U1024)
+    if (strlen(str) > bit_sz_u1024)
     {
 	char *ptr = NULL;
 
-	for (ptr = str + strlen(str) - BIT_SZ_U1024 - 1 ;
+	for (ptr = str + strlen(str) - bit_sz_u1024 - 1 ;
 	    ptr >= str; ptr--)
 	{
 	    if (*ptr == '1')
@@ -1102,7 +986,7 @@ int number_init_str(u1024_t *num, char *init_str)
 	if (*ptr != '0' && *ptr != '1')
 	    return -1;
 
-	seg = number_get_seg(num, (end - ptr) / BIT_SZ_U64);
+	seg = number_get_seg(num, (end - ptr) / bit_sz_u64);
 	if (*ptr == '1')
 	    *seg = *seg | mask;
 	mask = (u64)(mask << 1) ? (u64)(mask << 1) : 1;
