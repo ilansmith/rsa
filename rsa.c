@@ -35,9 +35,11 @@ int rsa_encryption_level;
 
 static opt_t options_common[] = {
     {RSA_OPT_HELP, 'h', "help", no_argument, "print this message and exit"},
-    {RSA_OPT_SCANKEYS, 's', "scankeys", no_argument, "scan available keys"},
-    {RSA_OPT_SETKEY, 'x', "setkey", required_argument, "set rsa key"},
-    {RSA_OPT_PATH, 'p', "path", no_argument, "specify the key search "
+    {RSA_OPT_KEY_SCAN, 's', "scan", no_argument, "scan and display all "
+	"available RSA keys"},
+    {RSA_OPT_KEY_SET_ACTIVE, 'a', "active", required_argument, "set arg to be the "
+	"active RSA key"},
+    {RSA_OPT_PATH, 'p', "path", no_argument, "display the key search "
 	"directory. the key directory can be set by the RSA_KEYPATH "
 	"environment variable. if it is not set, the current working directory "
 	"is assumed"},
@@ -66,7 +68,7 @@ static int optlong_register_array(opt_t *ops_arr)
     for (cur = ops_arr; ptr < max && cur->code != RSA_OPT_MAX; cur++, ptr++)
     {
 	ptr->name = cur->long_opt;
-	ptr->has_arg = cur->arg_requirement;
+	ptr->has_arg = cur->arg_required;
 	ptr->flag = NULL;
 	ptr->val = cur->short_opt;
     }
@@ -92,7 +94,7 @@ static char *optstring_register_array_single(char *str, opt_t *cur)
     };
 
     *str = cur->short_opt;
-    rsa_strcat(str, code2str(arg_requirements, cur->arg_requirement));
+    rsa_strcat(str, code2str(arg_requirements, cur->arg_required));
     return str + strlen(str);
 }
 
@@ -158,9 +160,9 @@ static int parse_args_finalize(int *flags, rsa_handler_t *handler)
 
     if (*flags & OPT_FLAG(RSA_OPT_HELP))
 	actions++;
-    if (*flags & OPT_FLAG(RSA_OPT_SCANKEYS))
+    if (*flags & OPT_FLAG(RSA_OPT_KEY_SCAN))
 	actions++;
-    if (*flags & OPT_FLAG(RSA_OPT_SETKEY))
+    if (*flags & OPT_FLAG(RSA_OPT_KEY_SET_ACTIVE))
 	actions++;
     if (*flags & OPT_FLAG(RSA_OPT_PATH))
 	actions++;
@@ -187,12 +189,12 @@ int parse_args(int argc, char *argv[], int *flags,
 	switch (code = opt_short2code(options_common, opt))
 	{
 	case RSA_OPT_HELP:
-	case RSA_OPT_SCANKEYS:
+	case RSA_OPT_KEY_SCAN:
 	case RSA_OPT_PATH:
 	    OPT_ADD(flags, code);
 	    break;
-	case RSA_OPT_SETKEY:
-	    OPT_ADD(flags, RSA_OPT_SETKEY);
+	case RSA_OPT_KEY_SET_ACTIVE:
+	    OPT_ADD(flags, RSA_OPT_KEY_SET_ACTIVE);
 	    if (rsa_set_key_name(optarg))
 	    {
 		rsa_error_message(RSA_ERR_KEYNAME, KEY_DATA_MAX_LEN - 1);
@@ -253,8 +255,8 @@ int rsa_error(char *app)
 
 static void option_print_desc(char *desc)
 {
-#define OPTION_DESC_COLUMN 20
-#define OPTION_DESC_LINE_SZ 65
+#define OPTION_DESC_COLUMN 7
+#define OPTION_DESC_LINE_SZ 73
     char fmt[20], buf[OPTION_DESC_LINE_SZ + 1];
     int cnt, remain = strlen(desc);
 
@@ -282,11 +284,16 @@ static void option_print_desc(char *desc)
 
 static void output_option_array(opt_t *arr)
 {
+    char fmt[100];
+
+    sprintf(fmt, "  -%%c%%s, --%%s%%s\n");
     for ( ; arr->code != RSA_OPT_MAX; arr++)
     {
 	if (!arr->description)
 	    continue;
-	printf("  -%c, --%s", arr->short_opt, arr->long_opt);
+
+	printf(rsa_highlight_str(fmt, arr->short_opt, arr->arg_required ? 
+	    " arg" : "", arr->long_opt, arr->arg_required? "=arg" : ""));
 	option_print_desc(arr->description);
     }
 }
@@ -858,8 +865,8 @@ rsa_opt_t rsa_action_get(int flags, ...)
 {
     va_list va;
     rsa_opt_t new;
-    int actions = OPT_FLAG(RSA_OPT_HELP) | OPT_FLAG(RSA_OPT_SCANKEYS) | 
-	OPT_FLAG(RSA_OPT_SETKEY) | OPT_FLAG(RSA_OPT_PATH);
+    int actions = OPT_FLAG(RSA_OPT_HELP) | OPT_FLAG(RSA_OPT_KEY_SCAN) | 
+	OPT_FLAG(RSA_OPT_KEY_SET_ACTIVE) | OPT_FLAG(RSA_OPT_PATH);
 
     va_start(va, flags);
     while ((new = va_arg(va, rsa_opt_t)))
@@ -877,10 +884,10 @@ int rsa_action_handle_common(rsa_opt_t action, char *app,
     case OPT_FLAG(RSA_OPT_HELP):
 	rsa_help(app, handler->options);
 	break;
-    case OPT_FLAG(RSA_OPT_SCANKEYS):
+    case OPT_FLAG(RSA_OPT_KEY_SCAN):
 	rsa_scankeys(handler->keytype);
 	break;
-    case OPT_FLAG(RSA_OPT_SETKEY):
+    case OPT_FLAG(RSA_OPT_KEY_SET_ACTIVE):
 	rsa_setkey(handler->keytype);
 	break;
     case OPT_FLAG(RSA_OPT_PATH):

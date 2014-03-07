@@ -33,8 +33,8 @@
 typedef enum {
     /* actions */
     RSA_OPT_HELP,
-    RSA_OPT_SCANKEYS,
-    RSA_OPT_SETKEY,
+    RSA_OPT_KEY_SCAN,
+    RSA_OPT_KEY_SET_ACTIVE,
     RSA_OPT_PATH,
     RSA_OPT_QUITE,
     RSA_OPT_VERBOSE,
@@ -56,7 +56,7 @@ typedef struct opt_t {
     int code;
     char short_opt;
     char *long_opt;
-    int arg_requirement;
+    int arg_required;
     char *description;
 } opt_t;
 
