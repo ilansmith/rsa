@@ -1,3 +1,4 @@
+#include "rsa_util.h"
 #include "rsa_num.h"
 #include "unit_test.h"
 #include <stdlib.h>
@@ -23,12 +24,6 @@ enum {
 	DISABLE_ULLONG_256 | DISABLE_ULLONG_512 | DISABLE_ULLONG_1024,
     DISABLE_TIME_FUNCTIONS = 1<<8
 };
-
-typedef struct code2str_t {
-    int code;
-    char *str;
-    int disabled;
-} code2str_t;
 
 static code2str_t el2phrase[] = {
     {64, ""},
@@ -121,15 +116,7 @@ static code2str_t el2e[] = {
     {-1}
 };
 
-static unit_test_t tests;
 int init_reset;
-
-static char *code2str(code2str_t *list, int code)
-{
-    for (; list->code != -1 && list->code != code; list++);
-
-    return list->code == -1 ? "" : list->str;
-}
 
 static char *p_u64(u64 *ptr)
 {
@@ -3427,6 +3414,7 @@ static int rsa_is_disabled(int flags)
 
 int main(int argc, char *argv[])
 {
+    unit_test_t tests;
     char *comment = p_u64_type();
 
     tests.arr = rsa_tests;
