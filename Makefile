@@ -24,6 +24,10 @@
 CC=gcc
 TARGET_OBJS=rsa_num.o rsa_util.o
 CONFFILE=rsa.mk
+TARGET_RSA_TEST=rsa_test
+TARGET_RSA=rsa
+TARGET_RSA_ENC=rsa_enc
+TARGET_RSA_DEC=rsa_dec
 CYGWIN_COMPAT=echo "$1" | sed -e 's/--\|$(MAKE_MODE)//g'
 
 -include $(CONFFILE)
@@ -52,7 +56,7 @@ endif
 # set unit test configuration
 ifeq ($(TESTS),y)
 
-  TARGETS=rsa_test
+  TARGETS=$(TARGET_RSA_TEST)
   CFLAGS+=-DTESTS -g
 
   # enable/disable function timing
@@ -97,11 +101,11 @@ else # create rsa applications
   TARGET_OBJS_rsa_enc=rsa_enc.o 
   TARGET_OBJS_rsa_dec=rsa_dec.o 
   ifeq ($(MASTER),y) # master encrypter/decrypter
-    TARGETS=rsa
+    TARGETS=$(TARGET_RSA)
     CFLAGS+=-DRSA_MASTER
     TARGET_OBJS_rsa=$(TARGET_OBJS_rsa_enc) $(TARGET_OBJS_rsa_dec) rsa_main.o
   else # create separate encrypter/decrypter
-    TARGETS=rsa_enc rsa_dec
+    TARGETS=$(TARGET_RSA_ENC) $(TARGET_RSA_DEC)
     TARGET_OBJS_rsa_enc+=rsa_enc_main.o
     TARGET_OBJS_rsa_dec+=rsa_dec_main.o
   endif
@@ -115,13 +119,13 @@ endif
 .PHONY: all clean cleanapps cleantags cleanconf cleanall config
 
 all: $(TARGETS)
-rsa_test: $(TARGET_OBJS) $(TARGET_OBJS_rsa_test)
+$(TARGET_RSA_TEST): $(TARGET_OBJS) $(TARGET_OBJS_rsa_test)
 	$(CC) -o $@ $(LFLAGS) $^
-rsa: $(TARGET_OBJS) $(TARGET_OBJS_rsa)
+$(TARGET_RSA): $(TARGET_OBJS) $(TARGET_OBJS_rsa)
 	$(CC) -o $@ $(LFLAGS) $^
-rsa_enc: $(TARGET_OBJS) $(TARGET_OBJS_rsa_enc)
+$(TARGET_RSA_ENC): $(TARGET_OBJS) $(TARGET_OBJS_rsa_enc)
 	$(CC) -o $@ $(LFLAGS) $^
-rsa_dec: $(TARGET_OBJS) $(TARGET_OBJS_rsa_dec)
+$(TARGET_RSA_DEC): $(TARGET_OBJS) $(TARGET_OBJS_rsa_dec)
 	$(CC) -o $@ $(LFLAGS) $^
 
 config:
@@ -135,7 +139,7 @@ clean:
 	rm -f *.o gmon.out
 
 cleanapps:
-	file `ls` | grep executable | awk -F: '{ print $$1 }' | xargs rm -f
+	rm -f $(TARGET_RSA_TEST) $(TARGET_RSA) $(TARGET_RSA_ENC) $(TARGET_RSA_DEC)
 
 cleantags:
 	rm -f tags
