@@ -906,7 +906,10 @@ static void keyname_display(rsa_keyring_t *keyring, char keytype)
 
 static void rsa_scankeys(char keytype)
 {
-    rsa_keyring_t *keyring = keyring_gen(keytype);
+    rsa_keyring_t *keyring;
+    
+    if (!(keyring = keyring_gen(keytype)))
+	return;
 
     if (rsa_verbose_get() == V_VERBOSE)
 	keyname_display_verbose(keyring, keytype);
@@ -999,10 +1002,12 @@ static int rsa_setkey_links(rsa_keyring_t *keyring, char keytype)
 
 static void rsa_setkey(char keytype)
 {
+    rsa_keyring_t *keyring;
+
     if (!*key_data)
 	rsa_delkey_links(keytype);
-    else
-	rsa_setkey_links(keyring_gen(keytype), keytype);
+    else if ((keyring = keyring_gen(keytype)))
+	rsa_setkey_links(keyring, keytype);
 }
 
 static void rsa_show_path(void)
