@@ -4,12 +4,6 @@
 #include "rsa_num.h"
 #include "rsa_util.h"
 
-#if 0
-#define RSA_MASTER (!defined(RSA_ENC) && !defined(RSA_DEC))
-#define RSA_ENCRYPTER (!defined(RSA_DEC) && !RSA_MASTER)
-#define RSA_DECRYPTER (!defined(RSA_ENC) && !RSA_MASTER)
-#endif
-
 #define MAX_FILE_NAME_LEN 256
 #define ENCRYPTER_CHAR 'e'
 #define DECRYPTER_CHAR 'd'
