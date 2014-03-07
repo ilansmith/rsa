@@ -386,7 +386,7 @@ STATIC int INLINE number_modular_exponentiation_naive(u1024_t *res, u1024_t *a,
  *   s(-1) = 0
  *   a = 2a
  *   for i = 0 to n do
- *     q(i) = s(i-1) mod 2 (LSB of s(i-1)
+ *     q(i) = s(i-1) mod 2 (LSB of s(i-1))
  *     s(i) = (s(i-1) + q(i)n + b(i)a)/2
  *   end for
  *   return s(n)
@@ -402,7 +402,7 @@ static void INLINE number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
     num_s = NUM_0;
     number_shift_left_once(&multiplier);
 
-    /* handle the first BIT_SZ_U1024 iterations */
+    /* handle the first 'encryption_level' iterations */
     for (seg = (u64*)&num_b->arr; seg < top; seg++)
     {
 	u64 mask;
@@ -432,7 +432,7 @@ static void INLINE number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
     TIMER_STOP(FUNC_NUMBER_MONTGOMERY_PRODUCT);
 }
 
-/* shift left and do mod num_n 2*(BIT_SZ_U1024 + 2) times... */
+/* shift left and do mod num_n 2*(encryption_level + 2) times... */
 void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
 {
     u1024_t factor;
@@ -474,7 +474,7 @@ Exit:
 /* a: exponent
  * b: power
  * n: modulus
- * r: 2^(BIT_SZ_U1024)%n
+ * r: 2^(encryption_level)%n
  * MonPro(a, b, n) = abr^-1%n
  *
  * a * b % n = abrr^-1%n = 1abrr^-1%n = MonPro(1, abr%n, n) = 

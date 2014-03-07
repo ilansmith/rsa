@@ -148,7 +148,7 @@ typedef struct {
 #define MSB(X) ((X)(~((X)-1 >> 1)))
 
 #define NUMBER_IS_NEGATIVE(X) ((MSB(u64) & \
-    *((u64*)(X) + (BLOCK_SZ_U1024 - 1))) ? 1 : 0)
+    *((u64*)(X) + (block_sz_u1024 - 1))) ? 1 : 0)
 
 #define RSA_PTASK_START(FMT, ...) printf(FMT ":\n", ##__VA_ARGS__); \
     fflush(stdout)
@@ -211,7 +211,7 @@ int rsa_key_get_params(char *preffix, u1024_t *n, u1024_t *exp,
     u1024_t *montgomery_factor, int is_decrypt);
 int number_str2num(u1024_t *num, char *str);
 #if RSA_DECRYPTER || RSA_ENCRYPTER
-int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
+int rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 #endif
 
 #define number_is_odd(num) (*(u64*)&(num)->arr & (u64)1)
@@ -248,7 +248,7 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
     do { \
 	u64 *seg, *top; \
 	int is_top_can_shift = (num)->top < block_sz_u1024 ? 1 : 0; \
-	/* shifting is done from, at most, the buffer u64 */ \
+	/* shifting is done from, at most, the u64 buffer */ \
 	top = (u64*)&(num)->arr + (num)->top + is_top_can_shift; \
 	for (seg = top; seg > (u64*)&(num)->arr; seg--) \
 	{ \
@@ -293,7 +293,8 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 #define number_is_greater_or_equal(num1, num2) number_compare((num1), (num2), 1)
 
 /* return: num1 == num2 */
-#define number_is_equal(num1, num2) !memcmp((num1), (num2), encryption_level>>3)
+#define number_is_equal(num1, num2) ((num1)->top == (num2)->top && \
+    !memcmp((num1), (num2), encryption_level>>3))
 
 #define number_mod(r, a, n) { \
     do { \
