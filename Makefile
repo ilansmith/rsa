@@ -82,7 +82,7 @@ ifeq ($(TESTS),y)
   endif
 
   TARGET=test_rsa
-  TARGET_OBJS+=rsa_test.o
+  TARGET_OBJS+=unit_test.o rsa_test.o
   CFLAGS+=-g -DTESTS -D$(U64)
 else # create rsa applications
   ifeq ($(SIG),) # master encrypter/decrypter
