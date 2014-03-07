@@ -65,8 +65,8 @@ typedef struct {
 typedef int (*vio_t)(const char *format, va_list ap);
 int vio_colour(vio_t vfunc, char *colour, char *fmt, va_list va);
 int p_colour(char *colour, char *fmt, ...);
-int io_init(void);
 int p_comment(char *comment, ...);
+int p_comment_nl(char *comment, ...);
 int s_comment(char *comment, char *fmt, ...);
 int unit_test(int argc, char *argv[], unit_test_t *tests);
 extern int ask_user;
