@@ -9,27 +9,42 @@
 #include "rsa_num.h"
 
 static int key_files_generate(char *private_name, FILE **private_key, 
-    char *public_name, FILE **public_key, int name_len)
+    char *public_name, FILE **public_key, int len)
 {
-#define FILE_NAME_FOMAT "%s/%s%s.%s"
-    char prefix[KEY_ID_MAX_LEN]; 
-    char *path = key_path_get();
-    struct stat buf;
-    int i;
+    char prefix[KEY_ID_MAX_LEN], *path, *pprv, *ppub; 
+    int i, total_len, path_len;
+    struct stat st;
+
+    path = key_path_get();
+    path_len = strlen(path);
+
+    memset(private_name, 0, len);
+    sprintf(private_name, "%s/" , path);
+    pprv = private_name + path_len + 1;
+
+    memset(public_name, 0, len);
+    sprintf(public_name, "%s/" , path);
+    ppub = public_name + path_len + 1;
 
     rsa_sprintf_nows(prefix, "%s", key_id + 1);
-    sprintf(private_name, FILE_NAME_FOMAT , path, "", prefix, "prv");
-    sprintf(public_name, FILE_NAME_FOMAT , path, "", prefix, "pub");
+    total_len = path_len + 1 + strlen(prefix) + 4;
 
-    for (i = 0; !stat(private_name, &buf) || !stat(private_name, &buf); i++)
+    for (i = 0; !stat(private_name, &st) || !stat(private_name, &st); i++)
     {
-	if (strlen(private_name) == name_len)
+	if (i)
+	{
+	    sprintf(pprv++, "_");
+	    sprintf(ppub++, "_");
+	}
+
+	if (total_len + i == len)
 	{
 	    output_error_message(RSA_ERR_KEYNAME);
 	    return -1;
 	}
-	sprintf(&private_name[i],FILE_NAME_FOMAT , path, "_", prefix, "prv");
-	sprintf(&public_name[i],FILE_NAME_FOMAT , path, "_", prefix, "pub");
+
+	rsa_strcat(private_name, "%s.prv", prefix);
+	rsa_strcat(public_name, "%s.pub", prefix);
     }
 
     if (!(*private_key = fopen(private_name, "w")))
@@ -56,8 +71,8 @@ static int rsa_sign(FILE *key, char key_type, u1024_t *exp, u1024_t *n)
 	return -1;
 
     rsa_encode(&signiture, &id, exp, n);
-    if (fprintf(key, "%s", RSA_SIGNITURE) != strlen(RSA_SIGNITURE) || 
-	rsa_write_u1024(key, &signiture))
+    if (rsa_write_str(key, RSA_SIGNITURE, strlen(RSA_SIGNITURE)) || 
+	rsa_write_u1024_full(key, &signiture))
     {
 	return -1;
     }
@@ -70,8 +85,8 @@ static int insert_key(FILE *key, u1024_t *exp, u1024_t *n)
     u1024_t montgomery_factor;
 
     number_montgomery_factor_get(&montgomery_factor);
-    return rsa_write_u1024(key, n) || rsa_write_u1024(key, exp) || 
-	rsa_write_u1024(key, &montgomery_factor);
+    return rsa_write_u1024_full(key, n) || rsa_write_u1024_full(key, exp) || 
+	rsa_write_u1024_full(key, &montgomery_factor);
 }
 
 /* rsa requires that the value of a given u1024, r, must be less than n to
@@ -143,7 +158,7 @@ int rsa_keygen(void)
     FILE *private_key, *public_key;
 
     if (key_files_generate(private_name, &private_key, public_name, &public_key,
-	MAX_FILE_NAME_LEN - 1))
+	MAX_FILE_NAME_LEN))
     {
 	return -1;
     }
