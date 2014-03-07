@@ -26,7 +26,7 @@ static void rsa_encode_vendor(u1024_t *v, u1024_t *n, u1024_t *exp)
     char *sig = calloc(1, BYTES_SZ(u1024_t));
 
     number_reset(v);
-    snprintf(sig, BYTES_SZ(u1024_t) - 1, SIG);
+    snprintf(sig, BYTES_SZ(u1024_t) - 1, VENDOR);
     memcpy(v, sig, BYTES_SZ(u1024_t));
     number_modular_exponentiation_montgomery(v, v, exp, n);
     free(sig);
@@ -55,17 +55,17 @@ static int rsa_write_keys(u1024_t *n, u1024_t *exp, u1024_t *montgomery_factor,
 
 void rsa_key_generate(void)
 {
-    u1024_t n, e, d, montgomery_factor, vendor, *vptr = NULL;
+    u1024_t n, e, d, montgomery_factor, *vptr = NULL;
+    u1024_t vendor;
 
-    number_reset(&vendor);
     RSA_PTASK_START("generating RSA keys");
 
-    RSA_PSUB_TASK("generating big numbers (this will take a few minutes)");
+    RSA_PSUB_TASK("generating big numbers (please wait)");
     rsa_exp_generate(&n, &e, &d);
     RSA_PDONE;
 
     RSA_PSUB_TASK("creating montgomery convertor");
-    number_radix(&montgomery_factor, &n);
+    number_radix_get(&n, &montgomery_factor);
     RSA_PDONE;
 
     RSA_PSUB_TASK("creating private key");
@@ -101,8 +101,8 @@ int rsa_validate_key(u1024_t *n, u1024_t *exp, int is_decrypt)
 	return -1;
 
     number_modular_exponentiation_montgomery(&vendor, &vendor, exp, n);
-    snprintf(sig, BYTES_SZ(u1024_t) - 1, SIG);
-    memcpy(sig, SIG, BYTES_SZ(u1024_t) - 1);
+    snprintf(sig, BYTES_SZ(u1024_t) - 1, VENDOR);
+    memcpy(sig, VENDOR, BYTES_SZ(u1024_t) - 1);
 
     ret = memcmp(sig, &vendor, BYTES_SZ(u1024_t));
     free(sig);
@@ -110,24 +110,14 @@ int rsa_validate_key(u1024_t *n, u1024_t *exp, int is_decrypt)
 }
 #endif
 
-int rsa_function(char *file_name, int is_decrypt)
+int rsa_proccess(char *file_name, int is_decrypt)
 {
     FILE *infile, *outfile;
     u1024_t n, exp, montgomery_factor;
-    char *preffix = "master";
 
-    if (!file_name)
-    {
-	infile = stdin;
-	outfile = stdout;
-    }
-#if RSA_MASTER || RSA_DECRYPTER
-    else if (is_decrypt && !((infile = fopen(file_name, "r+")) && (outfile = 
-	rsa_open_decryption_file("./", file_name))))
-    {
+    if (rsa_io_init(NULL))
 	return -1;
-    }
-#endif
+
 #if RSA_MASTER || RSA_ENCRYPTER
     else if (!is_decrypt && !((infile = fopen(file_name, "r+")) && (outfile = 
 	rsa_open_encryption_file("./", file_name))))
@@ -135,15 +125,18 @@ int rsa_function(char *file_name, int is_decrypt)
 	return -1;
     }
 #endif
-
-#if RSA_DECRYPTER || RSA_ENCRYPTER
-    preffix = SIG;
+#if RSA_MASTER || RSA_DECRYPTER
+    else if (is_decrypt && !((infile = fopen(file_name, "r+")) && (outfile = 
+	rsa_open_decryption_file("./", file_name))))
+    {
+	return -1;
+    }
 #endif
 
-    if (rsa_key_get_params(preffix, &n, &exp, &montgomery_factor, is_decrypt))
+    if (rsa_key_get_params(VENDOR, &n, &exp, &montgomery_factor, is_decrypt))
 	return -1;
 
-    number_montgomery_factor_set(&n, &montgomery_factor);
+    number_radix_set(&n, &montgomery_factor);
 
 #if RSA_DECRYPTER || RSA_ENCRYPTER
     if (rsa_validate_key(&n, &exp, is_decrypt))
