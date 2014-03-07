@@ -337,9 +337,12 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
 static void rsa_decrypt_epilog(rsa_key_t *key, FILE *data, FILE *cipher)
 {
     rsa_key_close(key);
-    if (!is_encryption_info_only)
-	fclose(data);
     fclose(cipher);
+    if (is_encryption_info_only)
+	return;
+    fclose(data);
+    if (!keep_orig_file)
+	remove(file_name);
 }
 
 static int rsa_decrypt_quick(rsa_key_t *key, FILE *cipher, FILE *data)

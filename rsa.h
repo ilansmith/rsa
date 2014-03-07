@@ -48,6 +48,7 @@ typedef enum {
     RSA_OPT_RSAENC,
     RSA_OPT_FILE,
     RSA_OPT_ENC_INFO_ONLY,
+    RSA_OPT_ORIG_FILE,
     RSA_OPT_MAX
 } rsa_opt_t;
 
@@ -82,6 +83,7 @@ extern char newfile_name[MAX_FILE_NAME_LEN + 4];
 extern int rsa_encryption_level;
 extern int is_encryption_info_only;
 extern int file_size;
+extern int keep_orig_file;
 
 int opt_short2code(opt_t *options, int opt);
 int parse_args(int argc, char *argv[], int *flags, rsa_handler_t *handler);

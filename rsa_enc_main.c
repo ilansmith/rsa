@@ -15,6 +15,9 @@ static opt_t options_encrypter[] = {
     {RSA_OPT_KEY_SET_DYNAMIC, 'k', "key", required_argument, "set the RSA key "
 	"to be used for the current encryption. this options overides the "
 	"default key if it has been set"},
+    {RSA_OPT_ORIG_FILE, 'o', "original", no_argument, "keep the original file. "
+	"if this option is not set the file will be deleted after it has been "
+	"encrypted"},
     { RSA_OPT_MAX }
 };
 
@@ -56,6 +59,10 @@ static int parse_args_encrypter(int opt, int *flags)
 	OPT_ADD(flags, RSA_OPT_KEY_SET_DYNAMIC);
 	if (optarg && rsa_set_key_name(optarg))
 	    return -1;
+	break;
+    case RSA_OPT_ORIG_FILE:
+	OPT_ADD(flags, RSA_OPT_ORIG_FILE);
+	keep_orig_file = 1;
 	break;
     default:
 	rsa_error_message(RSA_ERR_OPTARG);

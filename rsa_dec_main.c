@@ -7,6 +7,9 @@
 static opt_t options_decrypter[] = {
     {RSA_OPT_FILE, 'f', "file", required_argument, ARG " is the input file to "
 	"decrypt"},
+    {RSA_OPT_ORIG_FILE, 'o', "original", no_argument, "keep the original file. "
+	"if this option is not set the file will be deleted after it has been "
+	"decrypted"},
     {RSA_OPT_KEYGEN, 'g', "generate", required_argument, "generate an RSA "
 	"public/private key pair. " ARG " is its name"},
     {RSA_OPT_ENC_INFO_ONLY, 'i', "info", no_argument, "get info regarding an "
@@ -48,6 +51,10 @@ static int parse_args_decrypter(int opt, int *flags)
     case RSA_OPT_ENC_INFO_ONLY:
 	OPT_ADD(flags, RSA_OPT_ENC_INFO_ONLY);
 	is_encryption_info_only = 1;
+	break;
+    case RSA_OPT_ORIG_FILE:
+	OPT_ADD(flags, RSA_OPT_ORIG_FILE);
+	keep_orig_file = 1;
 	break;
     default:
 	rsa_error_message(RSA_ERR_OPTARG);
