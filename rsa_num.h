@@ -115,34 +115,6 @@ typedef struct {
     fflush(stdout)
 #define RSA_PDONE printf("done\n"); fflush(stdout)
 
-extern u1024_t NUM_0;
-extern u1024_t NUM_1;
-extern u1024_t NUM_2;
-extern u1024_t NUM_5;
-extern u1024_t NUM_10;
-extern int bit_sz_u64;
-extern int encryption_level;
-extern int block_sz_u1024;
-
-typedef struct {
-    u64 prime_initializer;
-    u1024_t prime;
-    u1024_t exp;
-    u1024_t power_of_prime;
-} small_prime_entry_t;
-
-void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2);
-prng_seed_t number_seed_set(prng_seed_t seed);
-int number_init_random(u1024_t *num, int blocks);
-void number_init_random_coprime(u1024_t *num, u1024_t *coprime);
-void number_find_prime(u1024_t *num);
-void number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor);
-int number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num,
-    u1024_t *mod);
-int number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a,
-    u1024_t *b, u1024_t *n);
-int number_str2num(u1024_t *num, char *str);
-
 #define number_is_odd(num) (*(u64*)&(num)->arr & (u64)1)
 
 #define number_reset_buffer(num) { \
@@ -273,14 +245,48 @@ int number_str2num(u1024_t *num, char *str);
     while (0); \
 }
 
+extern u1024_t NUM_0;
+extern u1024_t NUM_1;
+extern u1024_t NUM_2;
+extern u1024_t NUM_5;
+extern u1024_t NUM_10;
+extern int bit_sz_u64;
+extern int encryption_level;
+extern int block_sz_u1024;
+extern int encryption_levels[];
+
+typedef struct {
+    u64 prime_initializer;
+    u1024_t prime;
+    u1024_t exp;
+    u1024_t power_of_prime;
+} small_prime_entry_t;
+
+int number_enclevl_set(int level);
+void number_add(u1024_t *res, u1024_t *num1, u1024_t *num2);
+void number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2);
+void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2);
+void number_dev(u1024_t *num_q, u1024_t *num_r, u1024_t *num_dividend, 
+    u1024_t *num_divisor);
+prng_seed_t number_seed_set(prng_seed_t seed);
+int number_init_random(u1024_t *num, int blocks);
+void number_init_random_coprime(u1024_t *num, u1024_t *coprime);
+void number_find_prime(u1024_t *num);
+void number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor);
+void number_montgomery_factor_get(u1024_t *num);
+int number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num,
+    u1024_t *mod);
+int number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a,
+    u1024_t *b, u1024_t *n);
+int number_str2num(u1024_t *num, char *str);
+void number_small_dec2num(u1024_t *num_n, u64 dec);
+
 #ifdef TESTS
 extern int init_reset;
-extern u1024_t num_montgomery_n, num_montgomery_factor;
+extern u1024_t num_montgomery_n;
 extern prng_seed_t number_random_seed;
 
 int number_init_str(u1024_t *num, char *init_str);
-void number_add(u1024_t *res, u1024_t *num1, u1024_t *num2);
-void number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2);
 void number_shift_left(u1024_t *num, int n);
 void number_shift_right(u1024_t *num, int n);
 int number_dec2bin(u1024_t *num_bin, char *str_dec);
@@ -291,7 +297,6 @@ int number_find_most_significant_set_bit(u1024_t *num, u64 **seg,
 int number_modular_exponentiation_naive(u1024_t *res, u1024_t *a,
     u1024_t *b, u1024_t *n);
 int number_witness(u1024_t *num_a, u1024_t *num_n);
-void number_small_dec2num(u1024_t *num_n, u64 dec);
 int number_is_prime(u1024_t *num_s);
 void number_find_prime1(u1024_t *num);
 int number_modular_multiplication_naive(u1024_t *num_res,
