@@ -4,6 +4,7 @@
 #include "rsa_num.h"
 #include "rsa_util.h"
 
+#define RSA_SIGNITURE "IASRSA"
 #define MAX_FILE_NAME_LEN 256
 #define ENCRYPTER_CHAR 'e'
 #define DECRYPTER_CHAR 'd'
@@ -23,7 +24,6 @@
 typedef enum {
     /* actions */
     RSA_OPT_HELP,
-    RSA_OPT_VENDOR,
     RSA_OPT_SCANKEY,
     RSA_OPT_SETKEY,
     RSA_OPT_QUITE,
@@ -57,7 +57,6 @@ typedef struct {
 } rsa_handler_t ;
 
 extern char key_id[KEY_ID_MAX_LEN];
-extern char vendor_id[VENDOR_ID_MAX_LEN];
 
 int opt_short2code(opt_t *options, int opt);
 rsa_errno_t parse_args(int argc, char *argv[], int *flags, 
@@ -69,7 +68,6 @@ int rsa_action_handle_common(rsa_opt_t action, char *app,
     opt_t *options_private);
 char *key_path_get(void);
 int rsa_set_key_id(char *id);
-int rsa_set_vendor_id(char *id);
 int rsa_encryption_level_set(char *optarg);
 int rsa_scankey(void);
 void rsa_encode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);
