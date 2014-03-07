@@ -244,11 +244,12 @@ int rsa_error(char *app)
 
 static void option_print_desc(char *desc)
 {
-#define OPTION_DESC_COLUMN "20"
+#define OPTION_DESC_COLUMN 20
 #define OPTION_DESC_LINE_SZ 65
-    char buf[OPTION_DESC_LINE_SZ + 1];
+    char fmt[20], buf[OPTION_DESC_LINE_SZ + 1];
     int cnt, remain = strlen(desc);
 
+    sprintf(fmt, C_INDENTATION_FMT "\n", OPTION_DESC_COLUMN);
     do {
 	cnt = MIN(snprintf(buf, OPTION_DESC_LINE_SZ, "%s", desc), 
 	    OPTION_DESC_LINE_SZ - 1);
@@ -265,7 +266,7 @@ static void option_print_desc(char *desc)
 	}
 	desc += cnt;
 	remain -= cnt;
-	printf("%s%s\n", "\E[" OPTION_DESC_COLUMN "C", buf);
+	printf(fmt, buf);
     }
     while (remain);
 }
@@ -276,7 +277,7 @@ static void output_option_array(opt_t *arr)
     {
 	if (!arr->description)
 	    continue;
-	printf("  -%c, --%s\r", arr->short_opt, arr->long_opt);
+	printf("  -%c, --%s", arr->short_opt, arr->long_opt);
 	option_print_desc(arr->description);
     }
 }
@@ -584,7 +585,7 @@ static int keyname_display_single_verbose(rsa_key_link_t *link,
     sprintf(fmt, " %%s%%s%%s");
     printf(fmt, !strcmp(link->keys[idx]->path, lnkname) ? 
 	C_HIGHLIGHT : C_NORMAL, link->name, C_NORMAL);
-    sprintf(fmt, "\r\E[%dC%%s", KEY_ID_MAX_LEN + 1);
+    sprintf(fmt, C_INDENTATION_FMT, KEY_ID_MAX_LEN + 1);
     for (key = link->keys[idx]; key; key = key->next)
 	rsa_printf(1, 1, fmt, key->path);
 
