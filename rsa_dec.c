@@ -122,7 +122,7 @@ static void rsa_infimum(u1024_t *inf)
 
 static void rsa_key_generator(u1024_t *n, u1024_t *e, u1024_t *d)
 {
-    u1024_t p1, p2, p1_sub1, p2_sub1, phi, inf;
+    u1024_t p1, p2, p1_sub1, p2_sub1, phi, inf, tmp;
     int is_first = 1;
 
     rsa_infimum(&inf);
@@ -156,6 +156,14 @@ static void rsa_key_generator(u1024_t *n, u1024_t *e, u1024_t *d)
     rsa_printf(1, 1, "calculating private key: (d, n), where d is the "
 	"multiplicative inverse of e modulo phi...");
     number_modular_multiplicative_inverse(d, e, &phi);
+
+    /* e should be less than d */
+    if (number_is_greater(d, e))
+	return;
+
+    number_assign(tmp, *e);
+    number_assign(*e, *d);
+    number_assign(*d, tmp);
 }
 
 int rsa_keygen(void)
