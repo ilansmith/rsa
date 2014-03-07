@@ -5,7 +5,7 @@
 #include <getopt.h>
 
 #ifndef RSA_MASTER
-static opt_t options_encoder[] = {
+static opt_t options_encrypter[] = {
     {RSA_OPT_FILE, 'f', "file", required_argument, "input file to encrypt"},
     {RSA_OPT_LEVEL, 'l', "level", required_argument, "set encryption level to "
 	"128, 256, 512 or 1024 (default)"},
@@ -16,7 +16,7 @@ static opt_t options_encoder[] = {
 };
 
 /* encryption task is to be performed */
-static rsa_errno_t parse_args_finalize_encoder(int *flags, int actions)
+static rsa_errno_t parse_args_finalize_encrypter(int *flags, int actions)
 {
     if (!actions)
 	*flags |= OPT_FLAG(RSA_OPT_ENCRYPT);
@@ -31,9 +31,9 @@ static rsa_errno_t parse_args_finalize_encoder(int *flags, int actions)
     return RSA_ERR_NONE;
 }
 
-static rsa_errno_t parse_args_encoder(int opt, int *flags)
+static rsa_errno_t parse_args_encrypter(int opt, int *flags)
 {
-    switch (opt_short2code(options_encoder, opt))
+    switch (opt_short2code(options_encrypter, opt))
     {
     case RSA_OPT_FILE:
 	OPT_ADD(flags, RSA_OPT_FILE, rsa_set_file_name(optarg));
@@ -54,13 +54,13 @@ static rsa_errno_t parse_args_encoder(int opt, int *flags)
 int main(int argc, char *argv[])
 {
     int err, action, flags = 0;
-    rsa_handler_t encoder_handler = {
-	.options = options_encoder,
-	.ops_handler = parse_args_encoder,
-	.ops_handler_finalize = parse_args_finalize_encoder,
+    rsa_handler_t encrypter_handler = {
+	.options = options_encrypter,
+	.ops_handler = parse_args_encrypter,
+	.ops_handler_finalize = parse_args_finalize_encrypter,
     };
 
-    if ((err = parse_args(argc, argv, &flags, &encoder_handler)) != 
+    if ((err = parse_args(argc, argv, &flags, &encrypter_handler)) != 
 	RSA_ERR_NONE)
     {
 	return rsa_error(argv[0], err);
@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
 	break;
     }
     default:
-	return rsa_action_handle_common(action, argv[0], options_encoder);
+	return rsa_action_handle_common(action, argv[0], options_encrypter);
     }
 
     return 0;

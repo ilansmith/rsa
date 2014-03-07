@@ -17,7 +17,7 @@
 #   ENC_LEVEL=1024 (default)
 #   for a non ULLONG value of U64 ENC_LEVEL=1024.
 #
-# to build signed rsa encoder and decoders compile with VENDOR='name'.
+# to build signed rsa encrypter and decrypter compile with VENDOR='name'.
 # a public key created by the rsa_enc application will contain a field with 
 # 'name' signed by the private key and the private key created by the rsa_enc
 # application will contain a field with 'name' encrypted by the public key.
@@ -92,8 +92,8 @@ else # create rsa applications
     VENDOR="IAS Master"
     CFLAGS+=-DRSA_MASTER
     TARGET_OBJS+=rsa_enc.o rsa_dec.o
-  else # create separate encoder/decoder
-    TARGETS=rsa_dec rsa_enc
+  else # create separate encrypter/decrypter
+    TARGETS=rsa_enc rsa_dec
     TARGET_OBJS+=rsa.o
   endif
 
