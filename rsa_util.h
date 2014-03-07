@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include "rsa_num.h"
+#include "mt19937_64.h"
 
 #define MAX_FILE_NAME_LEN 256
 #define MAX_LINE_LENGTH 128
@@ -16,6 +17,12 @@
 #define C_NORMAL "\033[00;00;00m"
 #define C_HIGHLIGHT "\033[01m"
 #define C_INDENTATION_FMT "\r\E[%dC%%s"
+
+#ifdef MERSENNE_TWISTER
+#define RSA_RANDOM() (u64)genrand64_int64()
+#else
+#define RSA_RANDOM() (u64)random()
+#endif
 
 typedef struct code2code_t {
     int code;
@@ -83,8 +90,8 @@ void rsa_verbose_set(verbose_t level);
 verbose_t rsa_verbose_get(void);
 int is_fwrite_enable(char *name);
 char *rsa_highlight_str(char *fmt, ...);
-int rsa_timeline_init(int len);
-void rsa_timeline(void);
+int rsa_timeline_init(int len, int write_block_sz);
+void rsa_timeline_update(void);
 void rsa_timeline_uninit(void);
 #endif
 

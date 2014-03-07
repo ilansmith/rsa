@@ -198,15 +198,11 @@ int INLINE number_init_random(u1024_t *num, int blocks)
     /* initiate the low u64 blocks of num */
     for (i = 0; i < blocks; i++)
     {
-#ifdef MERSENNE_TWISTER
-	*((u64*)&num->arr + i) = (u64)genrand64_int64();
-#else
-	*((u64*)&num->arr + i) = (u64)random();
-#ifdef ULLONG
+	*((u64*)&num->arr + i) = RSA_RANDOM();
+#if !defined(MERSENNE_TWISTER) && defined(ULLONG)
 	/* random() returns a long int so another call is required to fill
 	 * the block's higher bits */
 	*((u64*)&num->arr + i) |= (u64)random()<<(bit_sz_u64/2);
-#endif
 #endif
     }
     number_top_set(num);
