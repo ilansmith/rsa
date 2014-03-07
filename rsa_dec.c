@@ -96,8 +96,8 @@ static int insert_key(FILE *key, u1024_t *exp, u1024_t *n)
 }
 
 /* rsa requires that the value of a given u1024, r, must be less than n to
- * quailify for encryption using n. if r is greater than n then upon decryption 
- * of enc(r) what is caculated is r mod(n), which does not equal r.
+ * qualify for encryption using n. if r is greater than n then upon decryption 
+ * of enc(r) what is calculated is r mod(n), which does not equal r.
  * when encrypting data we can easily come across u1024's with values r > n.
  * to overcome the problem, we calculate x and y such that x*n + y = r and 
  * y < n. we encrypt y, and store x in enc(y)'s u64 buffer. upon decryption, we
@@ -105,7 +105,7 @@ static int insert_key(FILE *key, u1024_t *exp, u1024_t *n)
  * however, places a restriction on the minimal possible value of n as we must 
  * assert that x can be represented by a single u64. 
  * for any u1024, r, we have: r <= MAX(u1024) and for any u64, x, we have: 
- * x <= MAX(u64). we thus calculte inf (infimum):
+ * x <= MAX(u64). we thus calculate inf (infimum):
  *   inf > MAX(u1024)/MAX(u64)
  * we then require that for any generated n, n >= inf and then for any 
  * r <= MAX(u1024): x = r/n <= MAX(u1024)/inf < MAX(u64).
@@ -150,7 +150,7 @@ static void rsa_key_generator(u1024_t *n, u1024_t *e, u1024_t *d)
 	"calculating Euler phi function for n: phi=(p1-1)*(p2-1)...");
     number_mul(&phi, &p1_sub1, &p2_sub1);
 
-    rsa_printf(1, 1, "generating puglic key: (e, n), where e is coprime with "
+    rsa_printf(1, 1, "generating public key: (e, n), where e is co prime with "
 	"phi...");
     number_init_random_coprime(e, &phi);
     rsa_printf(1, 1, "calculating private key: (d, n), where d is the "

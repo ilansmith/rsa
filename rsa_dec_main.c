@@ -13,7 +13,7 @@ static opt_t options_decrypter[] = {
     {RSA_OPT_KEYGEN, 'g', "generate", required_argument, "generate an RSA "
 	"public/private key pair. " ARG " is its name"},
     {RSA_OPT_ENC_INFO_ONLY, 'i', "info", no_argument, "get info regarding an "
-	"encrypted file. this depends on posessing the required private key"},
+	"encrypted file. this depends on possessing the required private key"},
     { RSA_OPT_MAX }
 };
 
@@ -23,7 +23,7 @@ static int parse_args_finalize_decrypter(int *flags, int actions)
     if (!actions && !(*flags & OPT_FLAG(RSA_OPT_KEYGEN)))
 	*flags |= OPT_FLAG(RSA_OPT_DECRYPT);
 
-    /* test for non compatable options with encrypt/decrypt */
+    /* test for non compatible options with encrypt/decrypt */
     if ((*flags & OPT_FLAG(RSA_OPT_DECRYPT)) 
 	&& !(*flags & OPT_FLAG(RSA_OPT_FILE)))
     {

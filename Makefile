@@ -31,7 +31,7 @@ CFLAGS=-Wall -Werror
 LFLAGS=-lm
 
 # Takuji Nishimura and Makoto Matsumoto's 64-bit version of Mersenne Twister 
-# pseudorandom number generator
+# pseudo random number generator
 ifeq ($(MERSENNE_TWISTER),)
   MERSENNE_TWISTER=y
 endif

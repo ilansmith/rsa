@@ -138,7 +138,7 @@ typedef struct {
 #define number_shift_right_once(num) { \
     do { \
 	u64 *seg, *top; \
-	/* shifting is done up to, at most, the buffer u64 to accomodate for \
+	/* shifting is done up to, at most, the buffer u64 to accommodate for \
 	 * number_montgomery_product() */ \
 	top = (u64*)&(num)->arr + (num)->top; \
 	for (seg = (u64*)&(num)->arr; seg < top; seg++) \
