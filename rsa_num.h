@@ -100,10 +100,6 @@ typedef struct {
     int top;
 } u1024_t;
 
-#define BIT_SZ_U64 (sizeof(u64)<<3)
-#define BLOCK_SZ_U1024 (EL>>6)
-#define BIT_SZ_U1024 (BIT_SZ_U64 * BLOCK_SZ_U1024)
-
 #define MSB(X) ((X)(~((X)-1 >> 1)))
 
 #define NUMBER_IS_NEGATIVE(X) ((MSB(u64) & \
