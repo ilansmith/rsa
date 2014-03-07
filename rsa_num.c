@@ -479,26 +479,27 @@ void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
 
     if (num_factor)
 	goto Exit;
+    num_factor = &factor;
 
     exp_max = 2*(encryption_level+2);
-    number_small_dec2num(&factor, (u64)1);
+    number_small_dec2num(num_factor, (u64)1);
     exp = 0;
-    buffer = (u64*)&factor.arr + block_sz_u1024;
+    buffer = (u64*)num_factor->arr + block_sz_u1024;
 
     while (exp < exp_max)
     {
-	while (!*buffer && number_is_greater(num_n, &factor))
+	while (!*buffer && number_is_greater(num_n, num_factor))
 	{
 	    if (exp == exp_max)
 		goto Exit;
-	    number_shift_left_once(&factor);
+	    number_shift_left_once(num_factor);
 	    exp++;
 	}
-	number_sub(&factor, &factor, num_n);
+	number_sub(num_factor, num_factor, num_n);
     }
 
 Exit:
-    number_assign(num_montgomery_factor, factor);
+    number_assign(num_montgomery_factor, *num_factor);
     number_assign(num_montgomery_n, *num_n);
     number_montgomery_product(&num_res_nresidue, &num_montgomery_factor, &NUM_1,
 	num_n);
