@@ -5,6 +5,7 @@
 #include "rsa_util.h"
 
 #define RSA_SIGNITURE "IASRSA"
+#define RSA_KEYLINK_PREFIX "key"
 #define MAX_FILE_NAME_LEN 256
 #define RSA_KEY_TYPE_PRIVATE 1<<0
 #define RSA_KEY_TYPE_PUBLIC 1<<1

@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <unistd.h>
 #if RSA_MASTER
 #include "rsa_enc.h"
 #include "rsa_dec.h"
@@ -20,7 +21,9 @@
 
 typedef struct keyname_t {
     struct keyname_t *next;
-    char name[2][KEY_ID_MAX_LEN]; /* [PRIVATE][PUBLIC] */
+    char keyname[KEY_ID_MAX_LEN];
+    char file[2][MAX_FILE_NAME_LEN]; /* [PRIVATE][PUBLIC] */
+    int is_ambiguous[2];
 } keyname_t;
 
 static char optstring[3 * RSA_OPT_MAX];
@@ -124,7 +127,9 @@ static int optargs_init(opt_t *options_private)
 
 static int rsa_set_key_name(char *key)
 {
-    /* XXX */
+    if (strlen(key) >= KEY_ID_MAX_LEN - 2)
+	return -1;
+    sprintf(key_id, "%s", key);
     return 0;
 }
 
@@ -216,7 +221,7 @@ static char *app_name(char *path)
     return name;
 }
 
-static void output_usage(char *path)
+static void rsa_usage(char *path)
 {
     printf("usage: %s [ OPTIONS ]\n\n", app_name(path));
 
@@ -224,8 +229,8 @@ static void output_usage(char *path)
 
 int rsa_error(char *app, rsa_errno_t err)
 {
-    output_error_message(err);
-    output_usage(app);
+    rsa_error_message(err);
+    rsa_usage(app);
     printf("Try `rsa --help' for more options.\n");
     return -1;
 }
@@ -269,19 +274,19 @@ static void output_option_array(opt_t *arr)
     }
 }
 
-static void output_options(opt_t *options_private)
+static void rsa_options(opt_t *options_private)
 {
     printf("where:\n");
     output_option_array(options_common);
     output_option_array(options_private);
 }
 
-static void output_help(char *path, opt_t *options_private)
+static void rsa_help(char *path, opt_t *options_private)
 {
 #define CHAR_COPYRIGHT 169
 
-    output_usage(path);
-    output_options(options_private);
+    rsa_usage(path);
+    rsa_options(options_private);
 
     printf("\n%c IAS software, April 2005\n", CHAR_COPYRIGHT);
 }
@@ -307,9 +312,14 @@ int rsa_set_key_id(char *id)
 
 char *key_path_get(void)
 {
-    char *key_path;
+    static char key_path[MAX_FILE_NAME_LEN], *ptr;
 
-    return (key_path = getenv(RSA_KEYPATH)) ? key_path : ".";
+    if ((ptr = getenv(RSA_KEYPATH)))
+	snprintf(key_path, MAX_FILE_NAME_LEN, ptr);
+    else
+	getcwd(key_path, MAX_FILE_NAME_LEN);
+
+    return key_path;
 }
 
 int rsa_encryption_level_set(char *optarg)
@@ -343,6 +353,12 @@ static FILE *rsa_dirent2file(struct dirent *ent)
     if (!(fname = malloc(strlen(path) + 1 + strlen(ent->d_name) + 1)))
 	return NULL;
 
+    if (!strcmp(ent->d_name, RSA_KEYLINK_PREFIX ".prv") || !strcmp(ent->d_name, 
+	RSA_KEYLINK_PREFIX ".pub"))
+    {
+	goto Exit;
+    }
+
     sprintf(fname, "%s/%s", path, ent->d_name);
     if (stat(fname, &st) || st.st_size != rsa_key_size() || 
 	!(f = fopen(fname, "r")))
@@ -362,19 +378,26 @@ Exit:
     return f;
 }
 
-static int keyname_insert(keyname_t **base, char *name, char keytype)
+static int keyname_insert(keyname_t **base, char *keyname, char *fname, 
+    char keytype)
 {
-    for ( ; *base && strcmp((*base)->name[keytype==RSA_KEY_TYPE_PRIVATE], name);
-	base = &(*base)->next);
+    /* search keyname list for the opposite type of key */
+    for ( ; *base && strcmp((*base)->keyname, keyname); base = &(*base)->next);
 
     if (!*base && !(*base = calloc(1, sizeof(keyname_t))))
 	return -1;
 
-    sprintf((*base)->name[keytype == RSA_KEY_TYPE_PUBLIC], "%s", name);
+    if (!*(*base)->keyname)
+	sprintf((*base)->keyname, "%s", keyname);
+    if (!*(*base)->file[keytype==RSA_KEY_TYPE_PUBLIC])
+	sprintf((*base)->file[keytype == RSA_KEY_TYPE_PUBLIC], "%s", fname);
+    else
+	(*base)->is_ambiguous[keytype == RSA_KEY_TYPE_PUBLIC] = 1;
     return 0;
 }
 
-static void rsa_keyname(FILE *key, keyname_t **keynames, char accept)
+static void rsa_keyname(FILE *key, keyname_t **keynames, char *fname, 
+    char accept)
 {
     u1024_t scrambled_id, id, exp, n, montgomery_factor;
     char keytype;
@@ -390,43 +413,20 @@ static void rsa_keyname(FILE *key, keyname_t **keynames, char accept)
     keytype = *(char*)id.arr;
     if (!(keytype & accept))
 	return;
-    keyname_insert(keynames, (char*)id.arr + 1, keytype);
+    keyname_insert(keynames, (char*)id.arr + 1, fname, keytype);
 }
 
-static void keyname_display(keyname_t *base, char keytype)
-{
-    char fmt[10];
-
-    sprintf(fmt, "%%-%ds", KEY_ID_MAX_LEN);
-    if (keytype & RSA_KEY_TYPE_PRIVATE)
-	printf(fmt, "private keys");
-    if (keytype & RSA_KEY_TYPE_PUBLIC)
-	printf(fmt, "public keys");
-    printf("\n");
-    while (base)
-    {
-	keyname_t *cur = base;
-	base = base->next;
-
-	if (keytype & RSA_KEY_TYPE_PRIVATE)
-	    printf(fmt, cur->name[0]);
-	if (keytype & RSA_KEY_TYPE_PUBLIC)
-	    printf(fmt, cur->name[1]);
-	printf("\n");
-	free(cur);
-    }
-}
-
-static int rsa_scankeys(char keytype)
+static keyname_t *keynames_gen(char keytype)
 {
     DIR *dir;
     struct dirent *ent;
     keyname_t *keynames = NULL;
+    char *path = key_path_get();
 
-    if (!(dir = opendir(key_path_get())))
+    if (!(dir = opendir(path)))
     {
-	output_error_message(RSA_ERR_KEYPATH);
-	return -1;
+	rsa_error_message(RSA_ERR_KEYPATH, path);
+	return NULL;
     }
 
     while ((ent = readdir(dir)))
@@ -435,22 +435,176 @@ static int rsa_scankeys(char keytype)
 	
 	if (!(key = rsa_dirent2file(ent)))
 	    continue;
-	rsa_keyname(key, &keynames, keytype);
+	rsa_keyname(key, &keynames, ent->d_name, keytype);
 	fclose(key);
     }
 
-    keyname_display(keynames, keytype);
-    return closedir(dir);
+    closedir(dir);
+    return keynames;
+}
+
+static char *keyname_display_init(char *fmt, char *key, char *path, int idx)
+{
+    char lnk[MAX_FILE_NAME_LEN], *ptr;
+    struct stat st;
+    sprintf(lnk, "%s/%s", path, 
+	idx ? RSA_KEYLINK_PREFIX ".pub" : RSA_KEYLINK_PREFIX ".prv");
+    memset(key, 0, MAX_FILE_NAME_LEN);
+    ptr = !lstat(lnk, &st) && (readlink(lnk, key, MAX_FILE_NAME_LEN) != -1) ? 
+	key + strlen(path) + 1 :"";
+    printf(fmt, C_NORMAL, idx ? "public keys" : "private keys", C_NORMAL);
+    return ptr;
+}
+
+static int keyname_display_single(char *fmt, keyname_t *key, 
+    char *lnkname, int idx, int is_keytype_other)
+{
+    int do_print;
+
+    if (key->is_ambiguous[idx] || !*key->file[idx])
+    {
+	if (is_keytype_other && !key->is_ambiguous[1 - idx])
+	    printf(fmt, C_NORMAL, "", C_NORMAL);
+	do_print = 0;
+    }
+    else
+    {
+	printf(fmt, !strcmp(key->file[idx], lnkname) ? C_HIGHLIGHT : C_NORMAL, 
+	    key->keyname, C_NORMAL);
+	do_print = 1;
+    }
+
+    return do_print;
+}
+
+static void keyname_display(keyname_t *base, char keytype)
+{
+    char fmt[20], *path, *pprv, *ppub;
+    char prv[MAX_FILE_NAME_LEN], pub[MAX_FILE_NAME_LEN];
+    keyname_t *ambiguous = NULL;
+
+    path = key_path_get();
+    sprintf(fmt, "%%s%%-%ds%%s", KEY_ID_MAX_LEN);
+    if (keytype & RSA_KEY_TYPE_PRIVATE)
+	pprv = keyname_display_init(fmt, prv, path, 0);
+    if (keytype & RSA_KEY_TYPE_PUBLIC)
+	ppub = keyname_display_init(fmt, pub, path, 1);
+    printf("\n");
+    while (base)
+    {
+	int do_print = 0;
+	keyname_t *cur = base;
+
+	base = base->next;
+	if (keytype & RSA_KEY_TYPE_PRIVATE)
+	{
+	    do_print += keyname_display_single(fmt, cur, pprv, 0,
+		keytype & RSA_KEY_TYPE_PUBLIC);
+	}
+	if (keytype & RSA_KEY_TYPE_PUBLIC)
+	{
+	    do_print += keyname_display_single(fmt, cur, ppub, 1,
+		keytype & RSA_KEY_TYPE_PRIVATE);
+	}
+	if (do_print)
+	    printf("\n");
+	if (cur->is_ambiguous[0] || cur->is_ambiguous[1])
+	{
+	    cur->next = ambiguous;
+	    ambiguous = cur;
+	    continue;
+	}
+	free(cur);
+    }
+
+    if (!ambiguous)
+	return;
+
+    printf("\nthe following keys have multiple entires\n");
+    while (ambiguous)
+    {
+	keyname_t *cur = ambiguous;
+	ambiguous = ambiguous->next;
+
+	if (keytype & RSA_KEY_TYPE_PRIVATE)
+	    printf(fmt, "", cur->is_ambiguous[0] ? cur->keyname : "", "");
+	if (keytype & RSA_KEY_TYPE_PUBLIC)
+	    printf(fmt, "", cur->is_ambiguous[1] ? cur->keyname : "", "");
+	printf("\n");
+	free(cur);
+    }
+}
+
+static void rsa_scankeys(char keytype)
+{
+    keyname_display(keynames_gen(keytype), keytype);
+}
+
+static void rsa_setkey_symlink_set(char *lnkname, char *keyname, char *path, 
+    keyname_t *key, int idx)
+{
+    sprintf(keyname, "%s/%s", path, key->file[idx]);
+    sprintf(lnkname, "%s/%s", path, idx ? RSA_KEYLINK_PREFIX ".pub" : 
+	RSA_KEYLINK_PREFIX ".prv");
+    if (key->is_ambiguous[idx])
+    {
+	rsa_warning_message(RSA_ERR_KEYMULTIENTRIES, idx ? "public" : "private",
+	    C_HIGHLIGHT, key_id, C_NORMAL);
+    }
+    else if (*key->file[idx])
+    {
+	remove(lnkname);
+	symlink(keyname, lnkname);
+	printf("%s key set to: %s%s%s\n", idx ? "public" : "private", 
+	    C_HIGHLIGHT, key_id, C_NORMAL);
+    }
+}
+
+static int rsa_setkey_links(keyname_t *keynames, char keytype)
+{
+    keyname_t *key = NULL;
+    char keyname[MAX_FILE_NAME_LEN], lnkname[MAX_FILE_NAME_LEN], *path;
+    int ret;
+
+    while (keynames)
+    {
+	keyname_t *tmp = keynames;
+
+	keynames = keynames->next;
+	if (!key && !strcmp(tmp->keyname, key_id))
+	    key = tmp;
+	else
+	    free(tmp);
+    }
+    if (!key)
+    {
+	rsa_error_message(RSA_ERR_KEYNOTEXIST, C_HIGHLIGHT, key_id, C_NORMAL);
+	return -1;
+    }
+
+    path = key_path_get();
+    if (keytype & RSA_KEY_TYPE_PRIVATE)
+	rsa_setkey_symlink_set(lnkname, keyname, path, key, 0);
+    if (keytype & RSA_KEY_TYPE_PUBLIC)
+	rsa_setkey_symlink_set(lnkname, keyname, path, key, 1);
+
+    ret = key->is_ambiguous[0] || key->is_ambiguous[1];
+    free(key);
+
+    return ret;
+}
+
+static void rsa_setkey(char keytype)
+{
+    rsa_setkey_links(keynames_gen(keytype), keytype);
 }
 
 static void rsa_show_path(void)
 {
-    char *path = key_path_get();
-
-    if (!strcmp(path, "."))
-	printf("current directory\n");
+    if (!getenv(RSA_KEYPATH))
+	printf("current working directory\n");
     else
-	printf("%s/\n", path);
+	printf("%s/\n", key_path_get());
 }
 
 rsa_opt_t rsa_action_get(int flags, ...)
@@ -474,13 +628,13 @@ int rsa_action_handle_common(rsa_opt_t action, char *app,
     switch (action)
     {
     case OPT_FLAG(RSA_OPT_HELP):
-	output_help(app, handler->options);
+	rsa_help(app, handler->options);
 	break;
     case OPT_FLAG(RSA_OPT_SCANKEYS):
 	rsa_scankeys(handler->keytype);
 	break;
     case OPT_FLAG(RSA_OPT_SETKEY):
-	RSA_TBD("handle RSA_OPT_SETKEY");
+	rsa_setkey(handler->keytype);
 	break;
     case OPT_FLAG(RSA_OPT_PATH):
 	rsa_show_path();

@@ -2,10 +2,6 @@
 #include <stdarg.h>
 #include "rsa_util.h"
 
-#define C_GREY "\033[00;37m"
-#define C_NORMAL "\033[00;00;00m"
-#define C_HIGHLIGHT "\033[01m"
-
 static verbose_t is_cprintf;
 typedef int (* io_func_t)(void *ptr, int size, int nmemb, FILE *stream);
 
@@ -57,7 +53,14 @@ char *rsa_strcat(char *dest, char *fmt, ...)
     vsprintf(dest + strlen(dest), fmt, ap);
     va_end(ap);
 
-    return dest + strlen(dest);
+    return dest;
+}
+
+char *rsa_vstrcat(char *dest, char *fmt, va_list ap)
+{
+    vsprintf(dest + strlen(dest), fmt, ap);
+
+    return dest;
 }
 
 int rsa_sprintf_nows(char *str, char *fmt, ...)
@@ -77,17 +80,18 @@ int rsa_sprintf_nows(char *str, char *fmt, ...)
     return ret;
 }
 
-void output_error_message(rsa_errno_t err)
+static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 {
-    char msg[MAX_LINE_LENGTH] = "error: ";
+    char msg[MAX_LINE_LENGTH];
 
+    sprintf(msg, "%s: ", is_error ? "error" : "warning");
     switch (err)
     {
     case RSA_ERR_ARGREP:
-	rsa_strcat(msg, "option repeated");
+	rsa_vstrcat(msg, "option repeated", ap);
 	break;
     case RSA_ERR_NOACTION:
-	rsa_strcat(msg, "must specify RSA action");
+	rsa_strcat(msg, "no RSA action specified");
 	break;
     case RSA_ERR_MULTIACTION:
 	rsa_strcat(msg, "too many RSA actions");
@@ -96,34 +100,57 @@ void output_error_message(rsa_errno_t err)
 	rsa_strcat(msg, "no input file specified");
 	break;
     case RSA_ERR_FOPEN:
-	rsa_strcat(msg, "could not open file");
+	rsa_vstrcat(msg, "could not open file %s", ap);
 	break;
     case RSA_ERR_FILEIO:
 	rsa_strcat(msg, "reading/writing file");
 	break;
     case RSA_ERR_KEYPATH:
-	rsa_strcat(msg, "cannot open RSA key directory");
+	rsa_vstrcat(msg, "cannot open RSA key directory %s", ap);
 	break;
     case RSA_ERR_KEYNAME:
-	rsa_strcat(msg, "key name is too long (max %d characters)", 
-	    KEY_ID_MAX_LEN - 2);
+	rsa_vstrcat(msg, "key name is too long (max %d characters)", ap);
 	break;
     case RSA_ERR_KEYGEN:
 	rsa_strcat(msg, "key may cause loss of information, regenerating...");
 	break;
+    case RSA_ERR_KEYNOTEXIST:
+	rsa_vstrcat(msg, "key %s%s%s does not exist in the key directory", ap);
+	break;
+    case RSA_ERR_KEYMULTIENTRIES:
+	rsa_vstrcat(msg, "multiple entries for %s key %s%s%s - not setting", 
+	    ap);
+	break;
     case RSA_ERR_LEVEL:
-	rsa_strcat(msg, "invalid encryption level");
+	rsa_strcat(msg, "invalid encryption level - %s", optarg);
 	break;
     case RSA_ERR_INTERNAL:
-	rsa_strcat(msg, "internal");
+	rsa_vstrcat(msg, "internal", ap);
 	break;
     case RSA_ERR_OPTARG:
     default:
 	return;
     }
-
     rsa_strcat (msg, "\n");
     printf("%s", msg);
+}
+
+void rsa_error_message(rsa_errno_t err, ...)
+{
+    va_list ap;
+
+    va_start(ap, err);
+    rsa_message(1, err, ap);
+    va_end(ap);
+}
+
+void rsa_warning_message(rsa_errno_t err, ...)
+{
+    va_list ap;
+
+    va_start(ap, err);
+    rsa_message(0, err, ap);
+    va_end(ap);
 }
 
 static int rsa_io_u1024(FILE *file, u1024_t *num, int is_full, int is_read)
@@ -139,7 +166,7 @@ static int rsa_io_u1024(FILE *file, u1024_t *num, int is_full, int is_read)
 
     if (ret != (block_sz_u1024 + (is_full ? 2 : 0)) && ret != EOF)
     {
-	output_error_message(RSA_ERR_FILEIO);
+	rsa_error_message(RSA_ERR_FILEIO);
 	return -1;
     }
 
@@ -174,7 +201,7 @@ static int rsa_io_str(FILE *file, char *str, int len, int is_read)
     ret = io(str, sizeof(char), len, file);
     if (ret != len && ret != EOF)
     {
-	output_error_message(RSA_ERR_FILEIO);
+	rsa_error_message(RSA_ERR_FILEIO);
 	return -1;
     }
     return 0;
