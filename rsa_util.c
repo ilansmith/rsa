@@ -1,5 +1,8 @@
 #include <string.h>
 #include <stdarg.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "rsa_util.h"
 
 static verbose_t rsa_verbose;
@@ -99,6 +102,9 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
     case RSA_ERR_FNAME_LEN:
 	rsa_strcat(msg, "file name %s is too long", ap);
 	break;
+    case RSA_ERR_FILE_NOT_EXIST:
+	rsa_vstrcat(msg, "file %s does not exist", ap);
+	break;
     case RSA_ERR_NOFILE:
 	rsa_strcat(msg, "no input file specified");
 	break;
@@ -118,11 +124,10 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 	rsa_strcat(msg, "key may cause loss of information, regenerating...");
 	break;
     case RSA_ERR_KEYNOTEXIST:
-	rsa_vstrcat(msg, "key %s%s%s does not exist in the key directory", ap);
+	rsa_vstrcat(msg, "key %s does not exist in the key directory", ap);
 	break;
     case RSA_ERR_KEYMULTIENTRIES:
-	rsa_vstrcat(msg, "multiple entries for %s key %s%s%s - not setting", 
-	    ap);
+	rsa_vstrcat(msg, "multiple entries for %s key %s - not setting", ap);
 	break;
     case RSA_ERR_KEY_STAT:
 	rsa_vstrcat(msg, "could not find RSA key %s, please varify that it is "
@@ -138,8 +143,14 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 	rsa_vstrcat(msg, "%s is linked to a %s key while a %s key is required", 
 	    ap);
 	break;
+    case RSA_ERR_KEY_MISMATCH:
+	rsa_vstrcat(msg, "the file %s was not encrypted by public key: %s", ap);
+	break;
     case RSA_ERR_LEVEL:
 	rsa_vstrcat(msg, "invalid encryption level - %s", ap);
+	break;
+    case RSA_ERR_INTERNAL:
+	rsa_vstrcat(msg, "internal error in: %s: %s(), line: %s", ap);
 	break;
     case RSA_ERR_OPTARG:
 	/* fall through - error message provided by getopt_long() */
@@ -240,5 +251,46 @@ void rsa_verbose_set(verbose_t level)
 verbose_t rsa_verbose_get(void)
 {
     return rsa_verbose;
+}
+
+int is_fwrite_enable(char *name)
+{
+    char path[MAX_FILE_NAME_LEN], input[4];
+    struct stat st;
+    int ret;
+
+    if (!getcwd(path, MAX_FILE_NAME_LEN))
+	return 0;
+    rsa_strcat(path, "/%s", name);
+    if (stat(path, &st))
+	return 1; /* file does not exist - no problem */
+
+    printf("the file %s exists, do you want to overwrite it? [y/n]... ", name);
+    scanf("%s", input);
+    input[3] = 0;
+
+    if (!(ret = !strncasecmp("yes", input, strlen(input))))
+	rsa_printf(0, 0, "aborting...");
+    return ret;
+}
+
+char *rsa_highlight_str(char *fmt, ...)
+{
+    va_list ap;
+    static char highlight[MAX_HIGHLIGHT_STR] = C_HIGHLIGHT;
+    char *ret = highlight;
+
+    va_start(ap, fmt);
+    if (vsnprintf(highlight + strlen(C_HIGHLIGHT), MAX_HIGHLIGHT_STR, fmt, 
+	ap) > MAX_HIGHLIGHT_STR - strlen(C_NORMAL))
+    {
+	rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
+	ret = "";
+    }
+    else
+	strcat(highlight, C_NORMAL);
+    va_end(ap);
+
+    return ret;
 }
 

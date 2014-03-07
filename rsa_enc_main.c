@@ -38,18 +38,12 @@ static int parse_args_encrypter(int opt, int *flags)
     case RSA_OPT_FILE:
 	OPT_ADD(flags, RSA_OPT_FILE);
 	if (rsa_set_file_name(optarg))
-	{
-	    rsa_error_message(RSA_ERR_FNAME_LEN, optarg);
 	    return -1;
-	}
 	break;
     case RSA_OPT_LEVEL:
 	OPT_ADD(flags, RSA_OPT_LEVEL);
 	if (rsa_encryption_level_set(optarg))
-	{
-	    rsa_error_message(RSA_ERR_LEVEL, optarg);
 	    return -1;
-	}
 	break;
     case RSA_OPT_RSAENC:
 	OPT_ADD(flags, RSA_OPT_RSAENC);
@@ -64,7 +58,7 @@ static int parse_args_encrypter(int opt, int *flags)
 
 int main(int argc, char *argv[])
 {
-    int action, flags = 0;
+    int ret, action, flags = 0;
     rsa_handler_t encrypter_handler = {
 	.keytype = RSA_KEY_TYPE_PUBLIC,
 	.options = options_encrypter,
@@ -80,18 +74,18 @@ int main(int argc, char *argv[])
     {
     case OPT_FLAG(RSA_OPT_ENCRYPT):
     {
-	if (flags & OPT_FLAG(RSA_OPT_LEVEL))
-	    RSA_TBD("handle RSA_OPT_LEVEL");
-	if (flags & OPT_FLAG(RSA_OPT_RSAENC))
-	    RSA_TBD("handle RSA_OPT_RSAENC");
+	if (!(flags & OPT_FLAG(RSA_OPT_LEVEL)))
+	    rsa_encryption_level_set(NULL);
 
-	RSA_TBD("handle RSA_OPT_ENCRYPT");
+	ret = flags & OPT_FLAG(RSA_OPT_RSAENC) ? 
+	    rsa_encrypt_full() : rsa_encrypt_quick();
 	break;
     }
     default:
-	return rsa_action_handle_common(action, argv[0], &encrypter_handler);
+	ret = rsa_action_handle_common(action, argv[0], &encrypter_handler);
+	break;
     }
 
-    return 0;
+    return ret;
 }
 
