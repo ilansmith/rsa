@@ -2,7 +2,7 @@
 #include <stdarg.h>
 #include "rsa_util.h"
 
-static verbose_t is_cprintf;
+static verbose_t rsa_verbose;
 typedef int (* io_func_t)(void *ptr, int size, int nmemb, FILE *stream);
 
 int code2code(code2code_t *list, int code)
@@ -25,7 +25,7 @@ int rsa_printf(int is_verbose, int ind, char *fmt, ...)
     int ret = 0;
     char fmt_eol[MAX_LINE_LENGTH];
 
-    if (is_cprintf == V_QUIET || (is_verbose && is_cprintf == V_NORMAL))
+    if (rsa_verbose == V_QUIET || (is_verbose && rsa_verbose == V_NORMAL))
 	goto Exit;
 
     if (ind + strlen(fmt) + 1 >= MAX_LINE_LENGTH)
@@ -96,6 +96,9 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
     case RSA_ERR_MULTIACTION:
 	rsa_strcat(msg, "too many RSA actions");
 	break;
+    case RSA_ERR_FNAME_LEN:
+	rsa_strcat(msg, "file name %s is too long", ap);
+	break;
     case RSA_ERR_NOFILE:
 	rsa_strcat(msg, "no input file specified");
 	break;
@@ -121,13 +124,25 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 	rsa_vstrcat(msg, "multiple entries for %s key %s%s%s - not setting", 
 	    ap);
 	break;
-    case RSA_ERR_LEVEL:
-	rsa_strcat(msg, "invalid encryption level - %s", optarg);
+    case RSA_ERR_KEY_STAT:
+	rsa_vstrcat(msg, "could not find RSA key %s, please varify that it is "
+	    "set", ap);
 	break;
-    case RSA_ERR_INTERNAL:
-	rsa_vstrcat(msg, "internal", ap);
+    case RSA_ERR_KEY_CORRUPT:
+	rsa_vstrcat(msg, "RSA key %s is corrupt", ap);
+	break;
+    case RSA_ERR_KEY_OPEN:
+	rsa_vstrcat(msg, "unable to open %s", ap);
+	break;
+    case RSA_ERR_KEY_TYPE:
+	rsa_vstrcat(msg, "%s is linked to a %s key while a %s key is required", 
+	    ap);
+	break;
+    case RSA_ERR_LEVEL:
+	rsa_vstrcat(msg, "invalid encryption level - %s", ap);
 	break;
     case RSA_ERR_OPTARG:
+	/* fall through - error message provided by getopt_long()*/
     default:
 	return;
     }
@@ -219,6 +234,11 @@ int rsa_write_str(FILE *file, char *str, int len)
 
 void rsa_verbose_set(verbose_t level)
 {
-    is_cprintf = level;
+    rsa_verbose = level;
+}
+
+verbose_t rsa_verbose_get(void)
+{
+    return rsa_verbose;
 }
 
