@@ -254,7 +254,7 @@ static void rsa_usage(char *path)
 int rsa_error(char *app)
 {
     rsa_usage(app);
-    printf("Try `rsa --help' for more options.\n");
+    printf("Try `%s --help' for more options.\n", app);
     return -1;
 }
 
