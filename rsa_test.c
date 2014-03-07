@@ -100,7 +100,6 @@ func_t func_table[FUNC_COUNT] = {
     [ FUNC_NUMBER_MONTGOMERY_PRODUCT] = {"number_montgomery_product", 1},
     [ FUNC_NUMBER_MODULAR_EXPONENTIATION_MONTGOMERY ] = 
 	{"number_modular_exponentiation_montgomery", 1},
-    [ FUNC_NUMBER_IS_ODD ] = {"number_is_odd", 1},
     [ FUNC_NUMBER_WITNESS_INIT ] = {"number_witness_init", 1},
     [ FUNC_NUMBER_WITNESS ] = {"number_witness", 1},
     [ FUNC_NUMBER_MILLER_RABIN ] = {"number_miller_rabin", 1},
@@ -1700,7 +1699,7 @@ static int test086(void)
     u1024_t res, pow, two, bit_sz;
 
     number_reset(&res);
-    *((u64*)&res + block_sz_u1024 - 1) = MSB_PT(u64);
+    *((u64*)&res + block_sz_u1024 - 1) = MSB(u64);
     number_small_dec2num(&two, (u64)2);
     number_small_dec2num(&bit_sz, (u64)(encryption_level - 1));
 
