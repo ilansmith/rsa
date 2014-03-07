@@ -1,4 +1,4 @@
-#include "rsa.h"
+#include "rsa_num.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
