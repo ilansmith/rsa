@@ -120,13 +120,13 @@ endif
 
 all: $(TARGETS)
 $(TARGET_RSA_TEST): $(TARGET_OBJS) $(TARGET_OBJS_rsa_test)
-	$(CC) -o $@ $(LFLAGS) $^
+	$(CC) -o $@ $^ $(LFLAGS)
 $(TARGET_RSA): $(TARGET_OBJS) $(TARGET_OBJS_rsa)
-	$(CC) -o $@ $(LFLAGS) $^
+	$(CC) -o $@ $^ $(LFLAGS)
 $(TARGET_RSA_ENC): $(TARGET_OBJS) $(TARGET_OBJS_rsa_enc)
-	$(CC) -o $@ $(LFLAGS) $^
+	$(CC) -o $@ $^ $(LFLAGS)
 $(TARGET_RSA_DEC): $(TARGET_OBJS) $(TARGET_OBJS_rsa_dec)
-	$(CC) -o $@ $(LFLAGS) $^
+	$(CC) -o $@ $^ $(LFLAGS)
 
 config:
 	@echo "doing make config"
