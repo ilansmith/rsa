@@ -41,6 +41,14 @@ ifeq ($(MERSENNE_TWISTER),y)
   CFLAGS+=-DMERSENNE_TWISTER
 endif
 
+# enable/disable output colouring (enabled by default)
+ifeq ($(RSA_COLOURS),)
+  RSA_COLOURS=y
+endif
+ifeq ($(RSA_COLOURS),y)
+  CFLAGS+=-DRSA_COLOURS
+endif
+
 # set unit test configuration
 ifeq ($(TESTS),y)
 
