@@ -226,6 +226,7 @@ static void verbose_decryption(int is_full, char *key_name, int level,
     rsa_printf(1, 0, "encryption level: %d", level);
     rsa_printf(1, 0, "decrypting: %s", cipher);
     rsa_printf(1, 0, "data file: %s", data);
+    fflush(stdout);
 }
 
 static rsa_key_t *rsa_key_open_decrypt(void)
@@ -389,6 +390,7 @@ static int rsa_decrypt_full(rsa_key_t *key, FILE *cipher, FILE *data)
     num_sz = number_size(rsa_encryption_level);
     num_buf_len = BUF_LEN_UNIT_FULL * num_sz;
     len = 0;
+    rsa_timeline_init(total_length);
     do
     {
 	char buf[data_buf_len];
@@ -402,10 +404,12 @@ static int rsa_decrypt_full(rsa_key_t *key, FILE *cipher, FILE *data)
 	    rsa_decode(&nums[i], &nums[i], &key->exp, &key->n);
 	    len += fwrite(&nums[i].arr, sizeof(char), 
 		MIN(data_sz, total_length - len), data);
+	    rsa_timeline();
 	}
 	len += fread(buf, sizeof(char), data_buf_len, cipher);
     }
     while (len < total_length);
+    rsa_timeline_uninit();
     return 0;
 }
 

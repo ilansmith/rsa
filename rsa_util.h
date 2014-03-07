@@ -79,5 +79,8 @@ void rsa_verbose_set(verbose_t level);
 verbose_t rsa_verbose_get(void);
 int is_fwrite_enable(char *name);
 char *rsa_highlight_str(char *fmt, ...);
+int rsa_timeline_init(int len);
+void rsa_timeline(void);
+void rsa_timeline_uninit(void);
 #endif
 
