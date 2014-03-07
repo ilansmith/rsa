@@ -10,6 +10,7 @@
 #
 # - RSA encryption level can be set if U64 is set to ULLONG. This is done as
 #   follows: 
+#   ENC_LEVEL=64 (not yet implemented)
 #   ENC_LEVEL=128
 #   ENC_LEVEL=256
 #   ENC_LEVEL=512
@@ -29,7 +30,7 @@ CONFFILE=rsa.mk
 
 -include $(CONFFILE)
 
-CFLAGS=-Wall -Werror 
+CFLAGS=-Wall -Werror
 LFLAGS=-lm
 
 # Takuji Nishimura and Makoto Matsumoto's 64-bit version of Mersenne Twister 
@@ -42,20 +43,11 @@ ifeq ($(MERSENNE_TWISTER),y)
   CFLAGS+=-DMERSENNE_TWISTER
 endif
 
-# set encryption level
-ENC_LEVEL_VALUES=128 256 512 1024
-ifeq ($(ENC_LEVEL),)
-  ENC_LEVEL=1024
-else
-  ifeq ($(filter $(ENC_LEVEL_VALUES),$(ENC_LEVEL)),)
-    $(error ENC_LEVEL possible values = {$(ENC_LEVEL_VALUES)}) # error!
-  endif
-endif
-
-CFLAGS+=-DEL=$(ENC_LEVEL)
 
 # set unit test configuration
 ifeq ($(TESTS),y)
+
+  CFLAGS+=-DTESTS -g
 
   # enable/disable function timing
   ifeq ($(TIME_FUNCTIONS),y)
@@ -76,16 +68,24 @@ ifeq ($(TESTS),y)
     endif
   endif
 
-  # assert U64/ENC_LEVEL compatability
-  ifneq ($(ENC_LEVEL),1024)
-    ifneq ($(U64),ULLONG)
-      $(error (for ENC_LEVEL=$(ENC_LEVEL) U64 must be ULLONG)) # error!
+  CFLAGS+=-D$(U64)
+
+  # set encryption level
+  ifeq ($(U64),ULLONG)
+    ENC_LEVEL_VALUES=128 256 512 1024 # 64:not yet implemented
+    ifeq ($(ENC_LEVEL),)
+      ENC_LEVEL=1024
+    else
+      ifeq ($(filter $(ENC_LEVEL_VALUES),$(ENC_LEVEL)),)
+        $(error ENC_LEVEL possible values = {$(ENC_LEVEL_VALUES)}) # error!
+      endif
     endif
+
+    CFLAGS+=-DENC_LEVEL=$(ENC_LEVEL)
   endif
 
   TARGET=test_rsa
   TARGET_OBJS+=unit_test.o rsa_test.o
-  CFLAGS+=-g -DTESTS -D$(U64)
 else # create rsa applications
   ifeq ($(SIG),) # master encrypter/decrypter
 %.o: %.c rsa.h
