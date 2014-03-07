@@ -106,6 +106,9 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
     case RSA_ERR_FNAME_LEN:
 	rsa_strcat(msg, "file name %s is too long", ap);
 	break;
+    case RSA_ERR_FILE_TOO_LARGE:
+	rsa_vstrcat(msg, "LFS not supported, file %s is too large %s", ap);
+	break;
     case RSA_ERR_FILE_NOT_EXIST:
 	rsa_vstrcat(msg, "file %s does not exist", ap);
 	break;
