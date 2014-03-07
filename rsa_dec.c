@@ -9,8 +9,6 @@
 #include "rsa_util.h"
 #include "rsa_num.h"
 
-int is_encryption_info_only;
-
 static int key_files_generate(char *private_name, FILE **private_key, 
     char *public_name, FILE **public_key, int len)
 {
