@@ -6,7 +6,7 @@
 #include "rsa.h"
 
 static opt_t options_master[] = {
-    {RSA_OPT_FILE, 'f', "file", required_argument, "arg is the input file to "
+    {RSA_OPT_FILE, 'f', "file", required_argument, ARG " is the input file to "
 	"encrypt/decrypt"},
     {RSA_OPT_ENCRYPT, 'e', "encrypt", no_argument, "encrypt the data file "
 	"stated by --file"},
@@ -16,19 +16,26 @@ static opt_t options_master[] = {
 	"flag is not set, encryption/decryption will be done using a symmetric "
 	"key and only it will be RSA encrypted/decrypted. this switch implies "
 	"encryption"},
+    {RSA_OPT_KEY_SET_DYNAMIC, 'k', "key", required_argument, "set the RSA key "
+	"to be used for the current encryption. this options overides the "
+	"default key if it has been set. this switch implies encryption"},
     {RSA_OPT_DECRYPT, 'd', "decrypt", no_argument, "decrypt the ciphertext "
 	"stated by --file"},
-    {RSA_OPT_KEYGEN, 'k', "keygen", required_argument, "generate an RSA public/"
-	"private key pair. arg is its name"},
+    {RSA_OPT_KEYGEN, 'g', "generate", required_argument, "generate an RSA "
+	"public/private key pair. " ARG " is its name"},
     { RSA_OPT_MAX }
 };
 
 /* either encryption or decryption task are to be performed */
 static int parse_args_finalize_master(int *flags, int actions)
 {
-    /* RSA_OPT_LEVEL and RSA_OPT_RSAENC imply RSA_OPT_ENCRYPT */
-    if (*flags & (OPT_FLAG(RSA_OPT_LEVEL) | OPT_FLAG(RSA_OPT_RSAENC)))
+    /* RSA_OPT_LEVEL, RSA_OPT_RSAENC and RSA_OPT_KEY_SET_DYNAMIC imply 
+     * RSA_OPT_ENCRYPT */
+    if (*flags & (OPT_FLAG(RSA_OPT_LEVEL) | OPT_FLAG(RSA_OPT_RSAENC) | 
+	OPT_FLAG(RSA_OPT_KEY_SET_DYNAMIC)))
+    {
 	*flags |= OPT_FLAG(RSA_OPT_ENCRYPT);
+    }
 
     if (*flags & OPT_FLAG(RSA_OPT_ENCRYPT))
 	actions++;
@@ -73,6 +80,11 @@ static int parse_args_master(int opt, int *flags)
 	break;
     case RSA_OPT_RSAENC:
 	OPT_ADD(flags, RSA_OPT_RSAENC);
+	break;
+    case RSA_OPT_KEY_SET_DYNAMIC:
+	OPT_ADD(flags, RSA_OPT_KEY_SET_DYNAMIC);
+	if (optarg && rsa_set_key_name(optarg))
+	    return -1;
 	break;
     case RSA_OPT_DECRYPT:
 	OPT_ADD(flags, RSA_OPT_DECRYPT);

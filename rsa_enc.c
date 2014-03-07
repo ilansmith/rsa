@@ -19,14 +19,6 @@ static void verbose_encryption(int is_full, char *key_name, int level,
     fflush(stdout);
 }
 
-static rsa_key_t *rsa_key_open_encrypt(int is_full)
-{
-    char keyname[MAX_FILE_NAME_LEN];
-
-    sprintf(keyname, "%s/%s.pub", key_path_get(), RSA_KEYLINK_PREFIX);
-    return rsa_key_open(keyname, RSA_KEY_TYPE_PUBLIC);
-}
-
 static int rsa_encrypt_seed(rsa_key_t *key, FILE *f)
 {
     u1024_t seed;
@@ -81,8 +73,10 @@ static int rsa_encrypt_length(rsa_key_t *key, FILE *cipher)
 static int rsa_encrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher, 
     int is_full)
 {
+    int is_enable;
+
     /* open RSA public key */
-    if (!(*key = rsa_key_open_encrypt(is_full)))
+    if (!(*key = rsa_key_open(RSA_KEY_TYPE_PUBLIC)))
 	return -1;
 
     /* open file to encrypt */
@@ -95,12 +89,13 @@ static int rsa_encrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
 
     /* open ciphertext file */
     sprintf(newfile_name, "%s.enc", file_name);
-    if (!is_fwrite_enable(newfile_name) || 
+    if (!(is_enable = is_fwrite_enable(newfile_name)) || 
 	!(*cipher = fopen(newfile_name, "w")))
     {
 	rsa_key_close(*key);
 	fclose(*data);
-	rsa_error_message(RSA_ERR_FOPEN, newfile_name);
+	if (is_enable)
+	    rsa_error_message(RSA_ERR_FOPEN, newfile_name);
 	return -1;
     }
 

@@ -5,10 +5,10 @@
 #include "rsa.h"
 
 static opt_t options_decrypter[] = {
-    {RSA_OPT_FILE, 'f', "file", required_argument, "arg is the input file to "
+    {RSA_OPT_FILE, 'f', "file", required_argument, ARG " is the input file to "
 	"decrypt"},
-    {RSA_OPT_KEYGEN, 'k', "keygen", required_argument, "generate an RSA public/"
-	"private key pair. arg is its name"},
+    {RSA_OPT_KEYGEN, 'g', "generate", required_argument, "generate an RSA "
+	"public/private key pair. " ARG " is its name"},
     { RSA_OPT_MAX }
 };
 
