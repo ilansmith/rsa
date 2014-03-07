@@ -63,6 +63,7 @@ ifeq ($(TESTS),y)
   endif
   ifeq ($(PROFILING),y)
     CFLAGS+=-pg
+    LFLAGS+=-pg
   endif
 
   # u64 type definition
