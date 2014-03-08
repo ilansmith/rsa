@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-/* unit_test.h should be included after the tested code's header files so that 
- * if it defines any of the following definitions it should get  precedence */
+/* unit_test.h should be included after the tested code's header files so that
+ * if it defines any of the following definitions it should get precedence */
 
 #ifndef C_CYAN
 #define C_CYAN "\033[01;36m"
@@ -43,23 +43,23 @@
 
 #ifndef ARRAY_SZ
 #define ARRAY_SZ(arr) (sizeof(arr) / sizeof(arr[0]))
-#endif 
+#endif
 
 typedef struct {
-    char *description;
-    char *known_issue;
-    int (* func)(void);
-    int disabled;
+	char *description;
+	char *known_issue;
+	int (* func)(void);
+	int disabled;
 } test_t;
 
 typedef struct {
-    test_t *arr;
-    int size;
-    char *list_comment;
-    char *summery_comment;
-    void (*tests_init)(int argc, char *argv[]);
-    int (*is_disabled)(int flags);
-    void (*pre_test)(void);
+	test_t *arr;
+	int size;
+	char *list_comment;
+	char *summery_comment;
+	void (*tests_init)(int argc, char *argv[]);
+	int (*is_disabled)(int flags);
+	void (*pre_test)(void);
 } unit_test_t;
 
 typedef int (*vio_t)(const char *format, va_list ap);
@@ -72,3 +72,4 @@ int unit_test(int argc, char *argv[], unit_test_t *tests);
 extern int ask_user;
 
 #endif
+

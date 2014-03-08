@@ -16,3 +16,8 @@
 *.exe
 *.out
 *.app
+
+rsa
+rsa_enc
+rsa_dec
+rsa_test
