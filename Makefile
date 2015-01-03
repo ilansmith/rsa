@@ -3,7 +3,7 @@
 # - set u64 type definition by compiling with:
 #   U64=UCHAR    for unsigned char
 #   U64=USHORT   for unsigned short
-#   U64=ULONG    for unsigned long
+#   U64=UINT     for unsigned long
 #   U64=ULLONG   for unsigned long long (default)
 # 
 # - to enable function timing feature compile with TIME_FUNCTIONS=y.
@@ -69,7 +69,7 @@ ifeq ($(TESTS),y)
   endif
 
   # u64 type definition
-  U64_VALUES=UCHAR USHORT ULONG ULLONG
+  U64_VALUES=UCHAR USHORT UINT ULLONG
   ifeq ($(U64),)
     U64=ULLONG
   else
