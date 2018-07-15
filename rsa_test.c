@@ -2387,7 +2387,7 @@ static int test116(void)
 { 
 #define K (1024)
     u1024_t p1, p2, n, e, data, encryption;
-    int i, max = K/(bit_sz_u64>>2);
+    int i, max = K/encryption_level;
     number_init_str(&data, 
 	"0000000000000000011001010111001101100001011010000111000000100000"
 	"0111010001101001011000100010000000110001001100110010000001100001");
@@ -3162,7 +3162,7 @@ static test_t rsa_tests[] =
     {
 	description: "number_is_prime() primes in [3, 999]",
 	func: test096,
-#ifndef USHORT
+#if !defined(USHORT) && !ENC_LEVEL(128)
 	disabled: 1,
 #endif
     },
@@ -3244,7 +3244,7 @@ static test_t rsa_tests[] =
     {
 	description: "multiple encryption",
 	func: test116,
-#if !defined(ULLONG) || !ENC_LEVEL(128)
+#if !defined(ULLONG) && !ENC_LEVEL(128)
 	disabled: 1,
 #endif
     },
