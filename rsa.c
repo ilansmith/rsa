@@ -19,6 +19,9 @@
 #define OPTSTR_MAX_LEN 10
 #define RSA_KEYPATH "RSA_KEYPATH"
 #define MULTIPLE_ENTRIES_STR "the following keys have multiple entries\n"
+#define KEY_DISPLAY_DEFAULT "(d)"
+#define KEY_DISPLAY_WIDTH (KEY_DATA_MAX_LEN + \
+    strlen(" " KEY_DISPLAY_DEFAULT) + 1)
 
 typedef struct rsa_keyring_t {
     struct rsa_keyring_t *next;
@@ -40,7 +43,8 @@ int keep_orig_file;
 static opt_t options_common[] = {
     {RSA_OPT_HELP, 'h', "help", no_argument, "print this message and exit"},
     {RSA_OPT_KEY_SCAN, 's', "scan", no_argument, "scan and display all "
-	"available RSA keys"},
+	"available RSA keys. the default key, if set, is marked by " 
+	KEY_DISPLAY_DEFAULT},
     {RSA_OPT_KEY_SET_DEFAULT, 'x', "default", optional_argument, "If " ARG" is "
 	"provided, set it as the default RSA key, otherwise, set no default "
 	"RSA key"},
@@ -748,7 +752,7 @@ static void keyname_display_init(char *key, int idx)
     memset(key, 0, MAX_FILE_NAME_LEN);
     if (lstat(lnk, &st) || (readlink(lnk, key, MAX_FILE_NAME_LEN) == -1))
 	*key = 0;
-    sprintf(fmt, "%%-%ds", KEY_DATA_MAX_LEN + 1);
+    sprintf(fmt, "%%-%ds", KEY_DISPLAY_WIDTH);
     printf(fmt, idx ? "public keys" : "private keys");
 }
 
@@ -769,8 +773,8 @@ static int keyname_display_single_verbose(rsa_keyring_t *kr,
 
     sprintf(fmt, " %%s");
     printf(fmt, !strcmp(kr->keys[idx]->path, lnkname) ? 
-	rsa_highlight_str(kr->name) : kr->name);
-    sprintf(fmt, C_INDENTATION_FMT, KEY_DATA_MAX_LEN + 1);
+	rsa_highlight_str("%s %s", kr->name, KEY_DISPLAY_DEFAULT) : kr->name);
+    sprintf(fmt, C_INDENTATION_FMT, KEY_DISPLAY_WIDTH);
     for (key = kr->keys[idx]; key; key = key->next)
 	rsa_printf(1, 1, fmt, key->path);
 
@@ -833,7 +837,10 @@ static int keyname_display_single(char *fmt, rsa_keyring_t *kr,
 
 	sprintf(name, " %s", kr->name);
 	if (!strcmp(kr->keys[idx]->path, lnkname))
+	{
+	    strcat(name, " " KEY_DISPLAY_DEFAULT);
 	    printf(rsa_highlight_str(fmt, name));
+	}
 	else
 	    printf(fmt, name);
 	do_print = 1;
@@ -854,7 +861,7 @@ static void keyname_display(rsa_keyring_t *keyring, char keytype)
 	keyname_display_init(pub, 1);
     printf("\n");
 
-    sprintf(fmt, "%%-%ds", KEY_DATA_MAX_LEN + 1);
+    sprintf(fmt, "%%-%ds", KEY_DISPLAY_WIDTH);
     while (keyring)
     {
 	int do_print = 0;
