@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <errno.h>
-#if RSA_MASTER
+#if CONFIG_MASTER
 #include "rsa_enc.h"
 #include "rsa_dec.h"
 #endif
