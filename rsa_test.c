@@ -141,11 +141,11 @@ static void p_u1024(u1024_t *num)
     int i = block_sz_u1024;
     u64 *ptr;
 
-    p_comment("tp: %d", num->top);
-    p_comment("bf: %s", p_u64((u64*)&num->arr + i--));
+    p_comment_nl("tp: %d", num->top);
+    p_comment_nl("bf: %s", p_u64((u64*)&num->arr + i--));
     for (ptr = (u64*)&num->arr + i; ptr >= (u64*)&num->arr; ptr--)
     {
-	p_comment("%2i: %s", i, p_u64(ptr));
+	p_comment_nl("%2i: %s", i, p_u64(ptr));
 	i--;
     }
 }
@@ -294,7 +294,7 @@ static void p_local_timer(void)
 
     total_time = (double)(timer.stop.tv_sec - timer.start.tv_sec) + 
 	((double)(timer.stop.tv_usec - timer.start.tv_usec) / 1000000);
-    p_comment(fmt, total_time);
+    p_comment_nl(fmt, total_time);
     for (i = 0; i < FUNC_COUNT; i++)
     {
 	char *ptr = buf;
@@ -306,7 +306,7 @@ static void p_local_timer(void)
 	if (!func_table[i].enabled)
 	{
 	    ptr += snprintf(ptr, REM(buf), "not timed");
-	    p_comment("%s", buf);
+	    p_comment_nl("%s", buf);
 	    continue;
 	}
 	ptr += snprintf(ptr, REM(buf), "hits: %u", func_table[i].hits);
@@ -317,12 +317,12 @@ static void p_local_timer(void)
 	    func_table[i].hits ? func_table[i].time / func_table[i].hits : -1, 
 	    total_time ? (func_table[i].time / total_time) * 100 : -1);
 	}
-	p_comment("%s", buf);
+	p_comment_nl("%s", buf);
     }
 #else
     total_time = (double)(tv2.tv_sec - tv1.tv_sec) + 
 	((double)(tv2.tv_usec - tv1.tv_usec) / 1000000);
-    p_comment(fmt, total_time);
+    p_comment_nl(fmt, total_time);
 #endif
 }
 
@@ -330,14 +330,14 @@ static void p_local_timer(void)
 
 static int test001(void)
 {
-    p_comment("bit_sz_u64 = %d", bit_sz_u64);
+    p_comment_nl("bit_sz_u64 = %d", bit_sz_u64);
 #if defined(UCHAR) || defined(USHORT) || defined(ULONG)
-    p_comment("block_sz_u1024 = %d", block_sz_u1024);
-    p_comment("encryption_level = bit_sz_u64*block_sz_u1024 = %d*%d = %d", 
+    p_comment_nl("block_sz_u1024 = %d", block_sz_u1024);
+    p_comment_nl("encryption_level = bit_sz_u64*block_sz_u1024 = %d*%d = %d", 
 	bit_sz_u64, block_sz_u1024, encryption_level);
 #else
-    p_comment("encryption_level = %d", encryption_level);
-    p_comment("block_sz_u1024 = encryption_level/bit_sz_u64 = %d/%d = %d", 
+    p_comment_nl("encryption_level = %d", encryption_level);
+    p_comment_nl("block_sz_u1024 = encryption_level/bit_sz_u64 = %d/%d = %d", 
 	encryption_level, bit_sz_u64, block_sz_u1024);
 #endif
 
@@ -490,7 +490,7 @@ static int test011(void)
 	{
 	    if (number_is_equal(&number[j], &number[i]))
 	    {
-		p_comment("number[%i] == number[%i] (out of %i):", j, i, 
+		p_comment_nl("number[%i] == number[%i] (out of %i):", j, i, 
 		    RNDM_TBL_SZ);
 		p_u1024(&number[j]);
 		return -1;
@@ -543,7 +543,7 @@ static int test016(void)
 	"00000000"
 	"00000000"))
     {
-	p_comment("initializing a failed");
+	p_comment_nl("initializing a failed");
 	return -1;
     }
 
@@ -580,7 +580,7 @@ static int test017(void)
 	"11111111"
 	) || number_init_str(&b, "1"))
     {
-	p_comment("initializing a failed");
+	p_comment_nl("initializing a failed");
 	return -1;
     }
 
@@ -608,7 +608,7 @@ static int test019(void)
     if (number_init_random(&a, block_sz_u1024/2) || 
 	number_init_random(&b, block_sz_u1024/2))
     {
-	p_comment("initializing a failed");
+	p_comment_nl("initializing a failed");
 	return -1;
     }
     number_add(&c, &a, &b);
@@ -712,7 +712,7 @@ static int test027(void)
 	"10011000"
 	))
     {
-	p_comment("initializing a failed");
+	p_comment_nl("initializing a failed");
 	return -1;
     }
 
@@ -764,7 +764,7 @@ static int test028(void)
 	"11111100"
 	))
     {
-	p_comment("initializing a failed");
+	p_comment_nl("initializing a failed");
 	return -1;
     }
 
@@ -797,7 +797,7 @@ static int test029(void)
 	"11111111"
 	"11111110")))
     {
-	p_comment("initializing a failed");
+	p_comment_nl("initializing a failed");
 	return -1;
     }
     number_shift_left(&a, 1);
@@ -817,7 +817,7 @@ static int test031(void)
 	"01000001"
 	))
     {
-	p_comment("initializing a or b failed");
+	p_comment_nl("initializing a or b failed");
 	return -1;
     }
 
@@ -836,7 +836,7 @@ static int test032(void)
 	) || number_init_str(&res,
 	"1001001001"))
     {
-	p_comment("initializing a or b failed");
+	p_comment_nl("initializing a or b failed");
 	return -1;
     }
 
@@ -888,7 +888,7 @@ static int test033(void)
 	"10100100"
 	))
     {
-	p_comment("initializing numbers failed");
+	p_comment_nl("initializing numbers failed");
 	return -1;
     }
 
@@ -1104,47 +1104,47 @@ static int test041(void)
 
     if (!number_is_greater(&num_547, &num_252))
     {
-	p_comment("!number_is_greater(&num_547, &num_252)");
+	p_comment_nl("!number_is_greater(&num_547, &num_252)");
 	res = -1;
     }
     if (number_is_greater(&num_252, &num_547))
     {
-	p_comment("number_is_greater(&num_252, &num_547)");
+	p_comment_nl("number_is_greater(&num_252, &num_547)");
 	res = -1;
     }
     if (!number_is_equal(&num_547, &num_547))
     {
-	p_comment("!number_is_equal(&num_547, &num_547)");
+	p_comment_nl("!number_is_equal(&num_547, &num_547)");
 	res = -1;
     }
     if (!number_is_equal(&num_547, &num_547_again))
     {
-	p_comment("!number_is_equal(&num_547, &num_547_again)");
+	p_comment_nl("!number_is_equal(&num_547, &num_547_again)");
 	res = -1;
     }
     if (number_is_equal(&num_252, &num_547))
     {
-	p_comment("number_is_equal(&num_252, &num_547)");
+	p_comment_nl("number_is_equal(&num_252, &num_547)");
 	res = -1;
     }
     if (!number_is_greater_or_equal(&num_547, &num_252))
     {
-	p_comment("!number_is_greater_or_equal(&num_547, &num_252)");
+	p_comment_nl("!number_is_greater_or_equal(&num_547, &num_252)");
 	res = -1;
     }
     if (!number_is_greater_or_equal(&num_547, &num_547))
     {
-	p_comment("!number_is_greater_or_equal(&num_547, &num_547)");
+	p_comment_nl("!number_is_greater_or_equal(&num_547, &num_547)");
 	res = -1;
     }
     if (!number_is_greater_or_equal(&num_547_again, &num_547))
     {
-	p_comment("!number_is_greater_or_equal(&num_547_again, &num_547)");
+	p_comment_nl("!number_is_greater_or_equal(&num_547_again, &num_547)");
 	res = -1;
     }
     if (number_is_greater_or_equal(&num_252, &num_547))
     {
-	p_comment("number_is_greater_or_equal(&num_252, &num_547)");
+	p_comment_nl("number_is_greater_or_equal(&num_252, &num_547)");
 	res = -1;
     }
 
@@ -1322,9 +1322,9 @@ static int test048(void)
     if (!is_1_gt_0 || is_min1_gt_0 || !is_abs_min1_gt_0)
 	ret = -1;
 
-    p_comment("1%s0", is_1_gt_0  ? ">" :"<");
-    p_comment("-1%s0", is_min1_gt_0  ? ">" :"<");
-    p_comment("|-1|%s0", is_abs_min1_gt_0 ? ">" : "<");
+    p_comment_nl("1%s0", is_1_gt_0  ? ">" :"<");
+    p_comment_nl("-1%s0", is_min1_gt_0  ? ">" :"<");
+    p_comment_nl("|-1|%s0", is_abs_min1_gt_0 ? ">" : "<");
 
     return ret;
 }
@@ -1433,8 +1433,8 @@ static int test055(void)
     res1 = number_is_equal(&num_mod1, &num_0);
     res2 = number_is_equal(&num_mod2, &num_0);
 
-    p_comment("co prime(%s, 5) = %s", big_num1_str, res1 ? "no" : "yes");
-    p_comment("co prime(%s, 5) = %s", big_num2_str, res2 ? "no" : "yes");
+    p_comment_nl("co prime(%s, 5) = %s", big_num1_str, res1 ? "no" : "yes");
+    p_comment_nl("co prime(%s, 5) = %s", big_num2_str, res2 ? "no" : "yes");
 
     return !(res1 && !res2);
 }
@@ -1482,7 +1482,7 @@ static int test056(void)
 	    ret = -1;
 	}
 
-	p_comment("x = %s"FMT_SZ", a = "FMT_SZ", y = %s"FMT_SZ", b = "FMT_SZ
+	p_comment_nl("x = %s"FMT_SZ", a = "FMT_SZ", y = %s"FMT_SZ", b = "FMT_SZ
 	    ", gcd = "FMT_SZ", xa + yb = "FMT_SZ", y mod("FMT_SZ") = "FMT_SZ"",
 	    number_is_equal(&tmp_x, &x) ? "" : "-", *(u64*)&x, *(u64*)&a, 
 	    number_is_equal(&y, &abs_y) ? "" : "-", *(u64*)&abs_y, *(u64*)&b, 
@@ -1508,7 +1508,7 @@ static int test057(void)
 	number_small_dec2num(&a, (u64)i);
 	number_modular_multiplicative_inverse(&b, &a, &n);
 	number_modular_multiplication_montgomery(&axb, &a, &b, &n);
-	p_comment("%2.llu^(-1)mod(%llu) = %2.llu, %2.llux%llu mod(%llu) = %llu",
+	p_comment_nl("%2.llu^(-1)mod(%llu) = %2.llu, %2.llux%llu mod(%llu) = %llu",
 	    *(u64*)&a, prime, *(u64*)&b, *(u64*)&a, *(u64*)&b, prime, 
 	    *(u64*)&axb);
 	if (!number_is_equal(&axb, &num_1))
@@ -1694,10 +1694,10 @@ static int test072(void)
     number_init_random(&num_n, block_sz_u1024);
     *(u64*)&num_n |= (u64)1;
     number_montgomery_factor_set(&num_n, NULL);
-    p_comment("n, is a ~%d bit sized random odd number:", encryption_level);
+    p_comment_nl("n, is a ~%d bit sized random odd number:", encryption_level);
     p_u1024(&num_n);
-    p_comment("");
-    p_comment("n's montgomery_factor = pow(2, 2^(2*(%d+2))) %% n:", 
+    p_comment_nl("");
+    p_comment_nl("n's montgomery_factor = pow(2, 2^(2*(%d+2))) %% n:", 
 	encryption_level);
     number_montgomery_factor_get(&num_montgomery_factor);
     p_u1024(&num_montgomery_factor);
@@ -1882,7 +1882,7 @@ static int test093(void)
     number_dec2bin(&num_9, "9");
     if (number_is_prime(&num_9))
     {
-	p_comment("9 is non prime and was found to be prime");
+	p_comment_nl("9 is non prime and was found to be prime");
 	return -1;
     }
     return 0;
@@ -1948,14 +1948,14 @@ static int test096(void)
 	char str_num[5];
 
 	if (i == 3 || !(i % 100))
-	    p_comment("testing in [%i, %i]...", i, i == 3 ? 99 : (i + 99));
+	    p_comment_nl("testing in [%i, %i]...", i, i == 3 ? 99 : (i + 99));
 	memset(str_num, 0, sizeof(str_num));
 	sprintf(str_num, "%i", i);
 	number_dec2bin(&num_n, str_num);
 	if (number_is_prime(&num_n) != arr[i])
 	{
 	    p_colour(C_NORMAL, "\n");
-	    p_comment("%i is %sprime and was found to be %sprime", i,
+	    p_comment_nl("%i is %sprime and was found to be %sprime", i,
 		arr[i] ? "" : "non ", arr[i] ? "non " : "");
 	    return -1;
 	}
@@ -1982,7 +1982,7 @@ static int test097(void)
     number_small_dec2num(&num, p);
     p_u1024(&num);
     ret = number_is_prime(&num);
-    p_comment("1299709 is prime%s", ret ? 
+    p_comment_nl("1299709 is prime%s", ret ? 
 	"" : " and was found to be not prime");
     return !ret;
 }
@@ -1994,7 +1994,7 @@ static int test098(void)
     int is_prime;
 
     number_dec2bin(&num_n, "10726904659");
-    p_comment("%s is %sprime", prime, is_prime ? "" : "not ");
+    p_comment_nl("%s is %sprime", prime, is_prime ? "" : "not ");
     return !is_prime;
 }
 
@@ -2006,7 +2006,7 @@ static int test099(void)
 
     number_dec2bin(&num_n, prime);
     is_prime = number_is_prime(&num_n);
-    p_comment("%s is %sprime", prime, is_prime ? "" : "not ");
+    p_comment_nl("%s is %sprime", prime, is_prime ? "" : "not ");
     return !is_prime;
 }
 
@@ -2031,7 +2031,7 @@ static int is_475bit_num_prime(char lsb)
     local_timer_start();
     is_prime = number_is_prime(&num_n);
     local_timer_stop();
-    p_comment("94R(71)%c is %sprime", lsb, is_prime ? "" : "not ");
+    p_comment_nl("94R(71)%c is %sprime", lsb, is_prime ? "" : "not ");
     p_local_timer();
 
     return is_prime;
@@ -2059,7 +2059,7 @@ static int test102(void)
 
     number_dec2bin(&num_n, non_prime);
     is_prime = number_is_prime(&num_n);
-    p_comment("%s is %sprime", non_prime, is_prime ? "" : "not ");
+    p_comment_nl("%s is %sprime", non_prime, is_prime ? "" : "not ");
     return is_prime;
 }
 
@@ -2082,9 +2082,9 @@ static int test106(void)
 	number_small_dec2num(&num_primes[i], primes[i]);
     number_generate_coprime(&num_p, &num_inc);
 
-    p_comment(NUM_P":");
+    p_comment_nl(NUM_P":");
     p_u1024(&num_p);
-    p_comment(NUM_INC":");
+    p_comment_nl(NUM_INC":");
     p_u1024(&num_inc);
 
     for (i = 0; i < 13; i++)
@@ -2101,7 +2101,7 @@ static int test106(void)
 	if (res_num_p || !res_num_inc)
 	    res = 1;
 
-	p_comment("co prime("NUM_P", %llu) = %s, co prime("NUM_INC", %llu) = "
+	p_comment_nl("co prime("NUM_P", %llu) = %s, co prime("NUM_INC", %llu) = "
 	    "%s", primes[i], res_num_p ? "no" : "yes", primes[i], res_num_inc ? 
 	    " no" : "yes");
     }
@@ -2115,7 +2115,7 @@ static int test107(void)
 {
     u1024_t num_n;
 
-    p_comment("finding a large prime...");
+    p_comment_nl("finding a large prime...");
     local_timer_start();
     number_find_prime(&num_n);
     local_timer_stop();
@@ -2134,7 +2134,7 @@ static int rsa_key_generator_do(void)
 
     s_comment("do you want to perform this test? [Y/n] ", "%c",	&c);
     if (!(is_do = (c != 'n' && c != 'N')))
-	p_comment("skipping...");
+	p_comment_nl("skipping...");
     return is_do;
 }
 
@@ -2161,15 +2161,15 @@ static void rsa_key_generator(u1024_t *p1, u1024_t *p2, u1024_t *n, u1024_t *e,
 	if (is_print)
 	{
 	    local_timer_start();
-	    p_comment("finding large prime p1...");
+	    p_comment_nl("finding large prime p1...");
 	}
 	number_find_prime(p1);
 	if (is_print)
-	    p_comment("finding large prime p2...");
+	    p_comment_nl("finding large prime p2...");
 	number_find_prime(p2);
 
 	if (is_print)
-	    p_comment("calculating n = p1*p2...");
+	    p_comment_nl("calculating n = p1*p2...");
 	number_mul(n, p1, p2);
 
 	number_assign(p1_sub1, *p1);
@@ -2177,18 +2177,18 @@ static void rsa_key_generator(u1024_t *p1, u1024_t *p2, u1024_t *n, u1024_t *e,
 	number_sub1(&p1_sub1);
 	number_sub1(&p2_sub1);
 	if (is_print)
-	    p_comment("calculating phi = (p1-1)*(p2-1)...");
+	    p_comment_nl("calculating phi = (p1-1)*(p2-1)...");
 	number_mul(&phi, &p1_sub1, &p2_sub1);
 
 	if (is_print)
 	{
-	    p_comment("generating public key: (e, n) - where e is co prime "
+	    p_comment_nl("generating public key: (e, n) - where e is co prime "
 		"with phi...");
 	}
 	number_init_random_coprime(e, &phi);
 	if (is_print)
 	{
-	    p_comment("calculating private key: (d, n) - where d is the "
+	    p_comment_nl("calculating private key: (d, n) - where d is the "
 		"multiplicative inverse of e mod phi...");
 	}
 	number_modular_multiplicative_inverse(d, e, &phi);
@@ -2203,7 +2203,7 @@ static void rsa_key_generator(u1024_t *p1, u1024_t *p2, u1024_t *n, u1024_t *e,
     while (!number_is_greater_or_equal(n, &min));
 
     if (iter > 1)
-	p_comment("key generation required %d iterations", iter);
+	p_comment_nl("key generation required %d iterations", iter);
 }
 
 static int rsa_pre_encrypt(u1024_t *input, u64 *multiplier, u1024_t *encryptor,
@@ -2262,8 +2262,8 @@ static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d,
 	return -1;
     if (is_print)
     {
-	p_comment("data: \"%s\"", &input);
-	p_comment("encrypting...");
+	p_comment_nl("data: \"%s\"", &input);
+	p_comment_nl("encrypting...");
 	local_timer_start();
     }
     number_modular_exponentiation_montgomery(&encryption, &r, e, n);
@@ -2272,7 +2272,7 @@ static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d,
 	local_timer_stop();
 	p_local_timer();
 
-	p_comment("decrypting...");
+	p_comment_nl("decrypting...");
 	local_timer_start();
     }
     number_modular_exponentiation_montgomery(&decryption, &encryption, d, n);
@@ -2287,7 +2287,7 @@ static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d,
     res = !number_is_equal(&input, &output);
     if (is_print)
     {
-	p_comment("decryption of encrypted data %s data",  res ? 
+	p_comment_nl("decryption of encrypted data %s data",  res ? 
 	    "does not equal" : "equals");
     }
     return res;
@@ -2316,7 +2316,7 @@ static int test108(void)
 	"0111110011000111110101110111100001111111111101110111000010001011"
 	"1000010111000010111111011110100100111001011011001010110011010000"
 	"0001010001100100011000110110000100110001111011010111110101101001");
-    p_comment("calculating n = p1*p2...");
+    p_comment_nl("calculating n = p1*p2...");
     number_mul(&n, &p1, &p2);
 
     number_init_str(&e,
@@ -2460,7 +2460,7 @@ static int test116(void)
 	quantity = "128B";
 	break;
     default:
-	p_comment("encryption_level %d not supported by this test", 
+	p_comment_nl("encryption_level %d not supported by this test", 
 	    encryption_level);
 	return -1;
     }
@@ -2471,7 +2471,7 @@ static int test116(void)
     number_mul(&n, &p1, &p2);
     number_init_str(&e, code2str(el2e, encryption_level));
 
-    p_comment("encrypting %s of data:", quantity);
+    p_comment_nl("encrypting %s of data:", quantity);
     local_timer_start();
     for (i = 0; i < iter; i++)
 	number_modular_exponentiation_montgomery(&encryption, &data, &e, &n);
@@ -2494,8 +2494,9 @@ static int test118(void)
 #define LEN 50 
 
     u1024_t p1, p2, n, e, d;
-    int i, timeout, iter;
-    char *err = NULL;
+    int i, iter;
+    double inc, cnt;
+    char *err = NULL, fmt[50];
 
     if (!rsa_key_generator_do())
 	return 0;
@@ -2503,34 +2504,41 @@ static int test118(void)
     iter = strtol(MULTIPLE_RSA, &err, 10);
     if (*err)
     {
-	p_comment("MULTIPLE_RSA (%s) must be an integer string", MULTIPLE_RSA);
+	p_comment_nl("MULTIPLE_RSA (%s) must be an integer string", MULTIPLE_RSA);
 	return -1;
     }
-    timeout = iter/LEN;
-    io_init();
+
+    cnt = 0;
+    inc = (double)iter/LEN;
+    sprintf(fmt, "[%%%ds]\r> [", LEN);
+    p_comment(fmt, "");
+
     for (i = 1; i <= iter; i++)
     {
 	rsa_key_generator(&p1, &p2, &n, &e, &d, 0);
 	if (rsa_encryptor_decryptor(&n, &e, &d, NULL, 0))
 	    goto error;
-	if (!(i%(iter/LEN)))
+	if (i > cnt)
+	{
 	    vio_colour(vprintf, C_GREY, ".", NULL);
+	    cnt += inc;
+	}
     }
     fprintf(stdout, "\n");
     return 0;
 
 error:
     fprintf(stdout, "\n");
-    p_comment("iteration %d failed", i + 1);
-    p_comment("p1:");
+    p_comment_nl("iteration %d failed", i + 1);
+    p_comment_nl("p1:");
     p_u1024(&p1);
-    p_comment("p2:");
+    p_comment_nl("p2:");
     p_u1024(&p2);
-    p_comment("n:");
+    p_comment_nl("n:");
     p_u1024(&n);
-    p_comment("e:");
+    p_comment_nl("e:");
     p_u1024(&e);
-    p_comment("d:");
+    p_comment_nl("d:");
     p_u1024(&d);
 
     return -1;
@@ -2545,14 +2553,14 @@ static int test120(void)
     rsa_key_generator(&p1, &p2, &n, &e, &d, 1);
 
     number_str2num(&input, code2str(el2phrase, encryption_level));
-    p_comment("data: \"%s\"", &input);
+    p_comment_nl("data: \"%s\"", &input);
 
-    p_comment("encrypting...");
+    p_comment_nl("encrypting...");
     local_timer_start();
     number_reset(&seed);
     if (number_seed_set_random(&seed))
     {
-	p_comment("number_seed_set_random()");
+	p_comment_nl("number_seed_set_random()");
 	return -1;
     }
     number_modular_exponentiation_montgomery(&seed, &seed, &e, &n);
@@ -2561,12 +2569,12 @@ static int test120(void)
     local_timer_stop();
     p_local_timer();
 
-    p_comment("decrypting...");
+    p_comment_nl("decrypting...");
     local_timer_start();
     number_modular_exponentiation_montgomery(&seed, &seed, &d, &n);
     if (number_seed_set_fixed(&seed))
     {
-	p_comment("number_seed_set_fixed()");
+	p_comment_nl("number_seed_set_fixed()");
 	return -1;
     }
     number_init_random(&num_xor, block_sz_u1024);
@@ -2575,7 +2583,7 @@ static int test120(void)
     p_local_timer();
 
     res = !number_is_equal(&input, &decryption);
-    p_comment("decryption of encrypted data %s data",  res ? 
+    p_comment_nl("decryption of encrypted data %s data",  res ? 
 	"does not equal" : "equals");
     return res;
 }
@@ -2594,19 +2602,19 @@ static int test125(void)
     number_mul(&n, &p1, &p2);
     number_init_str(&e, code2str(el2e, encryption_level));
 
-    p_comment("encrypting %dMB of data:", mb);
+    p_comment_nl("encrypting %dMB of data:", mb);
     local_timer_start();
-    p_comment("seeding pseudo random number generator...");
+    p_comment_nl("seeding pseudo random number generator...");
     if (number_seed_set_random(&seed))
     {
-	p_comment("number_seed_set_random()");
+	p_comment_nl("number_seed_set_random()");
 	return -1;
     }
     number_seed_set_fixed(&seed);
     number_modular_exponentiation_montgomery(&seed, &seed, &e, &n);
     local_timer_stop();
     p_local_timer();
-    p_comment("encrypting...");
+    p_comment_nl("encrypting...");
     local_timer_start();
     for (i = 0; i < iter; i++)
     {
@@ -2635,10 +2643,10 @@ static int test130(void)
     int i;
 
     bzero(x, 100);
-    p_comment("sizeof(int) = %i", sizeof(int));
-    p_comment("sizeof(char) = %i", sizeof(char));
-    p_comment("sizeof(test130_t) = %i", sizeof(test130_t));
-    p_comment("sizeof(u64) = %i", sizeof(u64));
+    p_comment_nl("sizeof(int) = %i", sizeof(int));
+    p_comment_nl("sizeof(char) = %i", sizeof(char));
+    p_comment_nl("sizeof(test130_t) = %i", sizeof(test130_t));
+    p_comment_nl("sizeof(u64) = %i", sizeof(u64));
 
     i = 0;
     f = fopen(FNAME_1, "w+");
@@ -2646,17 +2654,17 @@ static int test130(void)
     i += fwrite("nice", strlen("nice"), 1, f);
     i += fwrite("world", strlen("world"), 1, f);
     fclose(f);
-    p_comment("wrote %i test130_t", i);
+    p_comment_nl("wrote %i test130_t", i);
 
     i = 0;
     f = fopen(FNAME_1, "r+");
     i += fread(x, strlen("hello"), 1, f);
     i += fread(x + strlen("hello"), strlen("nice"), 1, f);
     fclose(f);
-    p_comment("read %i test130_t", i);
+    p_comment_nl("read %i test130_t", i);
 
     f = fopen(FNAME_2, "w+");
-    p_comment("wrote %i test130_t", fwrite(x, strlen(x), 1, f));
+    p_comment_nl("wrote %i test130_t", fwrite(x, strlen(x), 1, f));
     fclose(f);
 
     remove(FNAME_1);
@@ -2684,12 +2692,12 @@ static int test117(void)
     if (!(fe = rsa_file_open(pub_path, "ilan", ".pub", 0, 0)) || 
 	!(fd = rsa_file_open(prv_path, "ilan", ".prv", 0, 0)))
     {
-	p_comment("couldn't open key files");
+	p_comment_nl("couldn't open key files");
 	ret = -1;
 	goto Exit;
     }
     else
-	p_comment("key files opened");
+	p_comment_nl("key files opened");
 
     rsa_file_read_u1024(fe, &ne);
     rsa_file_read_u1024(fe, &e);
@@ -2708,7 +2716,7 @@ static int test117(void)
     number_modular_exponentiation_montgomery(&buf2, &buf1, &e, &ne);
     number_modular_exponentiation_montgomery(&buf3, &buf2, &d, &nd);
 
-    p_comment("buf1 %s= buf3", memcmp(&buf1, &buf3, sizeof(u1024_t)) ? "!" : 
+    p_comment_nl("buf1 %s= buf3", memcmp(&buf1, &buf3, sizeof(u1024_t)) ? "!" : 
 	"=");
 
 Exit:

@@ -43,7 +43,7 @@ int p_colour(char *colour, char *fmt, ...)
     return ret;
 }
 
-int io_init(void)
+static int io_init(void)
 {
     int ret = 0;
 
@@ -56,15 +56,36 @@ int io_init(void)
     return ret + p_colour(C_GREY, "> ");
 }
 
+static int _p_comment(char *fmt, va_list va, int is_newline)
+{
+    int ret = io_init();
+
+    ret += vio_colour(vprintf, C_GREY, fmt, va);
+    if (is_newline)
+	ret += p_colour(C_NORMAL, "\n");
+
+    return ret;
+}
+
 int p_comment(char *comment, ...)
 {
     int ret;
     va_list va;
 
-    ret = io_init();
     va_start(va, comment);
-    ret += vio_colour(vprintf, C_GREY, comment, va);
-    ret += p_colour(C_NORMAL, "\n");
+    ret = _p_comment(comment, va, 0);
+    va_end(va);
+
+    return ret;
+}
+
+int p_comment_nl(char *comment, ...)
+{
+    int ret;
+    va_list va;
+
+    va_start(va, comment);
+    ret = _p_comment(comment, va, 1);
     va_end(va);
 
     return ret;
