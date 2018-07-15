@@ -54,7 +54,7 @@ typedef enum {
 #elif defined(USHORT)
 #define U64_TYPE unsigned short
 #elif defined(ULONG)
-#define U64_TYPE unsigned long
+#define U64_TYPE unsigned int
 #elif defined(ULLONG)
 #define U64_TYPE unsigned long long
 #if !defined(ULLONG)
