@@ -218,8 +218,6 @@ void functions_stat(void)
 
 #endif
 
-#define BYTES_SZ(X) (sizeof(X))
-#define BITS_SZ(X) (BYTES_SZ(X) * 8)
 #define IS_DIGIT(n) ((n)>='0' && (n)<='9')
 #define CHAR_2_INT(c) ((int)((c) - '0'))
 #define ARRAY_SZ(X) (sizeof(X) / sizeof((X)[0]))

@@ -24,6 +24,9 @@ typedef unsigned long long u64;
 #define STATIC static
 #endif
 
+#define BYTES_SZ(X) (sizeof(X))
+#define BITS_SZ(X) (BYTES_SZ(X) * 8)
+
 #define RSA_PTASK_START(FMT, ...) printf(FMT ":\n", ##__VA_ARGS__); \
     fflush(stdout)
 #define RSA_PSUB_TASK(FMT, ...) printf("  " FMT "... ", ##__VA_ARGS__); \
@@ -70,6 +73,12 @@ void rsa_key(void);
 
 FILE *rsa_file_open(char *preffix, int is_slink, int is_new);
 int rsa_file_close(FILE *fp);
+int rsa_file_write_u1024_hi(FILE *fptr, u1024_t *num);
+int rsa_file_read_u1024_hi(FILE *fptr, u1024_t *num);
+int rsa_file_write_u1024_low(FILE *fptr, u1024_t *num);
+int rsa_file_read_u1024_low(FILE *fptr, u1024_t *num);
+int rsa_file_write_u1024(FILE *fptr, u1024_t *num);
+int rsa_file_read_u1024(FILE *fptr, u1024_t *num);
 
 #ifdef DEBUG
 void number_reset(u1024_t *num);
