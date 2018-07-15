@@ -53,6 +53,10 @@ char *rsa_strcat(char *dest, char *fmt, ...);
 int rsa_sprintf_nows(char *str, char *fmt, ...);
 int rsa_read_u1024(FILE *file, u1024_t *num);
 int rsa_write_u1024(FILE *file, u1024_t *num);
+int rsa_read_u1024_full(FILE *file, u1024_t *num);
+int rsa_write_u1024_full(FILE *file, u1024_t *num);
+int rsa_read_str(FILE *file, char *str, int len);
+int rsa_write_str(FILE *file, char *str, int len);
 void rsa_verbose_set(verbose_t level);
 #endif
 
