@@ -138,7 +138,7 @@ static void rsa_key_generator(u1024_t *n, u1024_t *e, u1024_t *d)
 
 int rsa_keygen(void)
 {
-    int ret, *level, is_first = 0;
+    int ret, *level, is_first = 1;
     char private_name[MAX_FILE_NAME_LEN], public_name[MAX_FILE_NAME_LEN];
     FILE *private_key, *public_key;
 
