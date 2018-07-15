@@ -16,6 +16,7 @@ static void verbose_encryption(int is_full, char *key_name, int level,
     rsa_printf(1, 0, "encryption level: %d", level);
     rsa_printf(1, 0, "encrytping: %s", data);
     rsa_printf(1, 0, "ciphertext: %s", cipher);
+    fflush(stdout);
 }
 
 static rsa_key_t *rsa_key_open_encrypt(int is_full)
@@ -74,7 +75,7 @@ static int rsa_encrypt_length(rsa_key_t *key, FILE *cipher)
     if (rsa_write_u1024_full(cipher, &length))
 	return -1;
 
-    return rsa_key_enclev_set(key, rsa_encryption_level);
+    return rsa_key_enclev_set(key, rsa_encryption_level) ? -1 : st.st_size;
 }
 
 static int rsa_encrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher, 
@@ -109,15 +110,13 @@ static int rsa_encrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
     verbose_encryption(is_full, (*key)->name, rsa_encryption_level, file_name, 
 	newfile_name);
 
-    /* write common and private headers to cipher */
-    if (rsa_encrypt_header_common(*key, *cipher, is_full) || (is_full && 
-	rsa_encrypt_length(*key, *cipher)))
+    /* write common headers to cipher */
+    if (rsa_encrypt_header_common(*key, *cipher, is_full))
     {
 	rsa_key_close(*key);
 	fclose(*data);
 	fclose(*cipher);
 	unlink(newfile_name);
-	rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
 	return -1;
     }
 
@@ -167,12 +166,19 @@ int rsa_encrypt_full(void)
 
     if (rsa_encrypt_prolog(&key, &data, &cipher, 1))
 	return -1;
+    if ((len = rsa_encrypt_length(key, cipher)) < 0)
+    {
+	rsa_encrypt_epilog(key, data, cipher);
+	unlink(newfile_name);
+	return -1;
+    }
 
     /* full encryption */
     data_sz = rsa_encryption_level/sizeof(u64);
     data_buf_len = BUF_LEN_UNIT_FULL * data_sz;
     num_sz = number_size(rsa_encryption_level);
     num_buf_len = BUF_LEN_UNIT_FULL * num_sz;
+    rsa_timeline_init(len);
     do
     {
 	char buf[data_buf_len];
@@ -185,9 +191,11 @@ int rsa_encrypt_full(void)
 	    number_data2num(&nums[i], &buf[i*data_sz], data_sz);
 	    rsa_encode(&nums[i], &nums[i], &key->exp, &key->n);
 	    rsa_write_u1024_full(cipher, &nums[i]);
+	    rsa_timeline();
 	}
     }
     while (len == data_buf_len);
+    rsa_timeline_uninit();
 
     rsa_encrypt_epilog(key, data, cipher);
     return 0;
