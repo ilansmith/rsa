@@ -26,6 +26,7 @@ typedef unsigned long long u64;
 
 #define BYTES_SZ(X) (sizeof(X))
 #define BITS_SZ(X) (BYTES_SZ(X) * 8)
+#define ARRAY_SZ(X) (sizeof(X) / sizeof((X)[0]))
 
 #define RSA_PTASK_START(FMT, ...) printf(FMT ":\n", ##__VA_ARGS__); \
     fflush(stdout)
