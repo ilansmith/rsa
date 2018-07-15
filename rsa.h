@@ -20,8 +20,6 @@
 typedef enum {
     FUNC_NUMBER_INIT_RANDOM,
     FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT,
-    FUNC_NUMBER_SHIFT_LEFT_ONCE,
-    FUNC_NUMBER_SHIFT_RIGHT_ONCE,
     FUNC_NUMBER_ADD,
     FUNC_NUMBER_SMALL_DEC2NUM,
     FUNC_NUMBER_2COMPLEMENT,
@@ -29,13 +27,8 @@ typedef enum {
     FUNC_NUMBER_MUL,
     FUNC_NUMBER_MODULAR_MULTIPLICATION_NAIVE,
     FUNC_NUMBER_MODULAR_MULTIPLICATION_MONTGOMERY,
-    FUNC_NUMBER_COMPARE,
     FUNC_NUMBER_ABSOLUTE_VALUE,
-    FUNC_NUMBER_IS_GREATER,
-    FUNC_NUMBER_IS_GREATER_OR_EQUAL,
-    FUNC_NUMBER_IS_EQUAL,
     FUNC_NUMBER_DEV,
-    FUNC_NUMBER_MOD,
     FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE,
     FUNC_NUMBER_EXPONENTIATION,
     FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE,
@@ -154,6 +147,16 @@ typedef struct u1024_t {
     fflush(stdout)
 #define RSA_PDONE printf("done\n"); fflush(stdout)
 
+extern u1024_t NUM_0;
+extern u1024_t NUM_1;
+extern u1024_t NUM_2;
+extern u1024_t NUM_5;
+extern u1024_t NUM_10;
+extern int bit_sz_u64;
+extern int bit_sz_u1024;
+extern int block_sz_u1024;
+extern int sizeof_u1024;
+
 typedef struct {
     u64 prime_initializer;
     u1024_t prime;
@@ -161,14 +164,12 @@ typedef struct {
     u1024_t power_of_prime;
 } small_prime_entry_t;
 
-void number_reset(u1024_t *num);
-void number_sub1(u1024_t *num);
 void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2);
 int number_init_random(u1024_t *num, int bit_len);
 void number_init_random_coprime(u1024_t *num, u1024_t *coprime);
 void number_find_prime(u1024_t *num);
 void number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor);
-void number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num,
+int number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num,
     u1024_t *mod);
 int number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a,
     u1024_t *b, u1024_t *n);
@@ -202,6 +203,72 @@ int rsa_key_get_params(char *preffix, u1024_t *n, u1024_t *exp,
 int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 #endif
 
+#define number_reset(x) memset((x), 0, sizeof_u1024)
+
+#define number_shift_right_once(num) { \
+    do { \
+	u64 *seg, *top = (u64 *)(num) + block_sz_u1024; \
+	/* shifting is done from the buffer u64 to accomodate for \
+	 * number_montgomery_product() */ \
+	for (seg = (u64 *)(num); seg < top; seg++) \
+	{ \
+	    *seg = *seg >> 1; \
+	    *seg = (*(seg+1) & (u64)1) ? *seg | MSB_PT(u64) : \
+		*seg & ~MSB_PT(u64); \
+	} \
+	*seg = *seg >> 1; \
+    } while (0); \
+}
+
+#define number_shift_left_once(num) { \
+    do { \
+	u64 *seg; \
+	for (seg = (u64*)(num) + block_sz_u1024; seg > (u64*)(num); seg--) \
+	{ \
+	    *seg = *seg << 1; \
+	    *seg = *(seg-1) & MSB_PT(u64) ? *seg | (u64)1 : *seg & ~(u64)1; \
+	} \
+	*seg = *seg << 1; \
+    } while (0); \
+}
+
+#define number_sub1(num) { \
+    do { \
+	u1024_t num_1; \
+	num_1 = NUM_1; \
+	number_sub((num), (num), &num_1);  \
+    } while (0); \
+}
+
+/* return: num1 > num2  or ret_on_equal if num1 == num2 */
+#define number_compare(num1, num2, ret_on_equal) ({ \
+    int ret; \
+    do { \
+	u64 *seg1 = (u64 *)(num1) + BLOCK_SZ_U1024; \
+	u64 *seg2 = (u64 *)(num2) + BLOCK_SZ_U1024; \
+	for (; seg1 > (u64 *)(num1) && *seg1==*seg2; seg1--, seg2--); \
+	ret = *seg1==*seg2 ? (ret_on_equal) : *seg1>*seg2; \
+    } while (0); \
+    ret; \
+})
+
+/* return: num1 > num2 */
+#define number_is_greater(num1, num2) number_compare((num1), (num2), 0)
+
+/* return: num1 >= num2 */
+#define number_is_greater_or_equal(num1, num2) number_compare((num1), (num2), 1)
+
+/* return: num1 == num2 */
+#define number_is_equal(num1, num2) !memcmp((num1), (num2), BIT_SZ_U1024>>3)
+
+#define number_mod(r, a, n) { \
+    do { \
+	u1024_t q; \
+	number_dev(&q, (r), (a), (n)); \
+    } \
+    while (0); \
+}
+
 #ifdef TESTS
 extern int init_reset;
 extern u1024_t num_montgomery_n, num_montgomery_factor;
@@ -211,13 +278,9 @@ void number_add(u1024_t *res, u1024_t *num1, u1024_t *num2);
 void number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2);
 void number_shift_left(u1024_t *num, int n);
 void number_shift_right(u1024_t *num, int n);
-int number_is_greater(u1024_t *num1, u1024_t *num2);
-int number_is_greater_or_equal(u1024_t *num1, u1024_t *num2);
-int number_is_equal(u1024_t *num1, u1024_t *num2);
 int number_dec2bin(u1024_t *num_bin, char *str_dec);
 void number_dev(u1024_t *num_q, u1024_t *num_r, u1024_t *num_dividend,
     u1024_t *num_divisor);
-void number_mod(u1024_t *r, u1024_t *a, u1024_t *n);
 int number_find_most_significant_set_bit(u1024_t *num, u64 **seg,
     u64 *mask);
 int number_modular_exponentiation_naive(u1024_t *res, u1024_t *a,
