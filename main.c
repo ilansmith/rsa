@@ -11,15 +11,26 @@
 #define RSA_OPT_DESC(X) (options[X].description)
 
 #define RSA_OPT_ERROR -1
-#define RSA_OPT_AMBIGUOUS '?'
 
-#define RSA_OPT_HELP 0
-#define RSA_OPT_HELP_SHORT 'h'
-#define RSA_OPT_HELP_LONG "help"
+#if RSA_MASTER || RSA_ENCRYPTER
+#define RSA_OPT_ENCRYPT_SHORT 'e'
+#define RSA_OPT_ENCRYPT_LONG "encrypt"
+#endif
 
-#define RSA_OPT_GENERATE_KEY 1
+#if RSA_MASTER || RSA_DECRYPTER
+#define RSA_OPT_DECRYPT_SHORT 'd'
+#define RSA_OPT_DECRYPT_LONG "decrypt"
 #define RSA_OPT_GENERATE_KEY_SHORT 'k'
 #define RSA_OPT_GENERATE_KEY_LONG "generate-key"
+#endif
+
+#if !RSA_MASTER
+#define RSA_OPT_VENDOR_SHORT 'v'
+#define RSA_OPT_VENDOR_LONG "vendor"
+#endif
+
+#define RSA_OPT_HELP_SHORT 'h'
+#define RSA_OPT_HELP_LONG "help"
 
 typedef struct opt_t {
     char short_opt;
@@ -28,10 +39,18 @@ typedef struct opt_t {
 } opt_t;
 
 static opt_t options[] = {
-    [ RSA_OPT_HELP ] = {RSA_OPT_HELP_SHORT, RSA_OPT_HELP_LONG, "print this "
-	"message and exit"},
-    [ RSA_OPT_GENERATE_KEY ] = {RSA_OPT_GENERATE_KEY_SHORT , 
-	RSA_OPT_GENERATE_KEY_LONG, "generate RSA public and private keys"},
+#if RSA_MASTER || RSA_ENCRYPTER
+    {RSA_OPT_ENCRYPT_SHORT, RSA_OPT_ENCRYPT_LONG, "encrypt a message"},
+#endif
+#if RSA_MASTER || RSA_DECRYPTER
+    {RSA_OPT_DECRYPT_SHORT, RSA_OPT_DECRYPT_LONG, "decrypt a message"},
+    {RSA_OPT_GENERATE_KEY_SHORT, RSA_OPT_GENERATE_KEY_LONG, "generate RSA "
+	"public and private keys"},
+#endif
+#if !RSA_MASTER
+    {RSA_OPT_VENDOR_SHORT, RSA_OPT_VENDOR_LONG, "vendor owning the keys"},
+#endif
+    {RSA_OPT_HELP_SHORT, RSA_OPT_HELP_LONG, "print this message and exit"},
 };
 
 static void optstring_init(char *str, ...)
@@ -51,29 +70,52 @@ static int parse_args(int argc, char *argv[])
     int opt;
     char optstring[OPTSTR_MAX_LEN];
     struct option longopts[] = {
-	{RSA_OPT_LONG(RSA_OPT_HELP), no_argument, NULL, 
-	    RSA_OPT_SHORT(RSA_OPT_HELP)},
-	{RSA_OPT_LONG(RSA_OPT_GENERATE_KEY), no_argument, NULL, 
-	    RSA_OPT_SHORT(RSA_OPT_GENERATE_KEY)},
+#if RSA_MASTER || RSA_ENCRYPTER
+	{RSA_OPT_ENCRYPT_LONG, no_argument, NULL, RSA_OPT_ENCRYPT_SHORT},
+#endif
+#if RSA_MASTER || RSA_DECRYPTER
+	{RSA_OPT_DECRYPT_LONG, no_argument, NULL, RSA_OPT_DECRYPT_SHORT},
+	{RSA_OPT_GENERATE_KEY_LONG, no_argument, NULL, 
+	    RSA_OPT_GENERATE_KEY_SHORT},
+#endif
+#if !RSA_MASTER
+	{RSA_OPT_VENDOR_LONG, no_argument, NULL, RSA_OPT_VENDOR_SHORT},
+#endif
+	{RSA_OPT_HELP_LONG, no_argument, NULL, RSA_OPT_HELP_SHORT},
 	{0, 0, 0, 0}
     };
 
     optstring_init(optstring, 
-	    RSA_OPT_SHORT(RSA_OPT_HELP),
-	    RSA_OPT_SHORT(RSA_OPT_GENERATE_KEY),
+#if RSA_MASTER || RSA_ENCRYPTER
+	    RSA_OPT_ENCRYPT_SHORT,
+#endif
+#if RSA_MASTER || RSA_DECRYPTER
+	    RSA_OPT_DECRYPT_SHORT,
+	    RSA_OPT_GENERATE_KEY_SHORT,
+#endif
+#if !RSA_MASTER
+	    RSA_OPT_VENDOR_SHORT,
+#endif
+	    RSA_OPT_HELP_SHORT,
 	    NULL);
 
-    while ((opt = getopt_long(argc, argv, optstring, longopts, NULL)) != 
+    while ((opt = getopt_long_only(argc, argv, optstring, longopts, NULL)) != 
 	-1)
     {
 	switch (opt)
 	{
-	case RSA_OPT_HELP_SHORT:
-	    return RSA_OPT_HELP;
+#if RSA_MASTER || RSA_ENCRYPTER
+	case RSA_OPT_ENCRYPT_SHORT:
+#endif
+#if RSA_MASTER || RSA_DECRYPTER
+	case RSA_OPT_DECRYPT_SHORT:
 	case RSA_OPT_GENERATE_KEY_SHORT:
-	    return RSA_OPT_GENERATE_KEY;
-	case RSA_OPT_AMBIGUOUS:
-	    return RSA_OPT_AMBIGUOUS;
+#endif
+#if !RSA_MASTER
+	case RSA_OPT_VENDOR_SHORT:
+#endif
+	case RSA_OPT_HELP_SHORT:
+	    return opt;
 	default:
 	    break;
 	}
@@ -82,14 +124,30 @@ static int parse_args(int argc, char *argv[])
     return RSA_OPT_ERROR;
 }
 
-static void output_ambiguous(void)
+static char *app_name(char *path)
 {
-    printf("the options you have entered are ambiguous\n");
+#define MAX_APP_NAME_LEN 10
+
+    int path_len = strlen(path);
+    char *ptr = NULL;
+    static char name[MAX_APP_NAME_LEN];
+
+    for (ptr = path + path_len - 1; ptr >= path; ptr--)
+    {
+	if (*ptr == '/')
+	{
+	    ptr++;
+	    break;
+	}
+    }
+    snprintf(name, MAX_APP_NAME_LEN, "%s", ptr);
+    return name;
 }
 
-static void output_usage(void)
+static void output_usage(char *path)
 {
-    printf("usage: rsa [ OPTIONS ]\n\n");
+    printf("usage: %s [ OPTIONS ]\n\n", app_name(path));
+
 }
 
 static void output_error(void)
@@ -114,30 +172,62 @@ static void output_options(void)
     }
 }
 
-static void output_help(void)
+#if !RSA_MASTER
+static void rsa_vendor(void)
+{
+    printf("rsa vendor: %s\n", SIG);
+}
+#endif
+
+static void output_help(char *path)
 {
 #define CHAR_COPYRIGHT 169
 
-    printf("RSA encoder/decoder\n");
-    output_usage();
+    printf("RSA ");
+#if RSA_MASTER || RSA_ENCRYPTER
+    printf("encrypter");
+#endif
+#if RSA_MASTER
+    printf("/");
+#endif
+#if RSA_MASTER || RSA_DECRYPTER
+    printf("decrypter");
+#endif
+    printf("\n");
+    output_usage(path);
     output_options();
+
     printf("\n%c IAS software, April 2005\n", CHAR_COPYRIGHT);
 }
 
 int main(int argc, char *argv[])
 {
+    if (rsa_io_init())
+	return -1;
+
     switch (parse_args(argc, argv))
     {
-    case RSA_OPT_HELP:
-	output_help();
+#if RSA_MASTER || RSA_ENCRYPTER
+    case RSA_OPT_ENCRYPT_SHORT:
 	break;
-    case RSA_OPT_GENERATE_KEY:
-	rsa_key();
+#endif
+#if RSA_MASTER || RSA_DECRYPTER
+    case RSA_OPT_DECRYPT_SHORT:
 	break;
-    case RSA_OPT_AMBIGUOUS:
-	output_ambiguous();
+    case RSA_OPT_GENERATE_KEY_SHORT:
+	rsa_key_generate();
+	break;
+#endif
+#if !RSA_MASTER
+    case RSA_OPT_VENDOR_SHORT:
+	rsa_vendor();
+	break;
+#endif
+    case RSA_OPT_HELP_SHORT:
+	output_help(argv[0]);
+	break;
     case RSA_OPT_ERROR:
-	output_usage();
+	output_usage(argv[0]);
 	output_error();
     default:
 	break;

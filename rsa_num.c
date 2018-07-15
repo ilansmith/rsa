@@ -228,7 +228,7 @@ void functions_stat(void)
 typedef void (* func_modular_multiplication_t) (u1024_t *num_res, 
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n);
 
-STATIC void number_reset(u1024_t *num)
+void number_reset(u1024_t *num)
 {
     u64 *seg = NULL;
 
@@ -551,6 +551,7 @@ static void number_shift_left_once(u1024_t *num)
 #endif
 }
 
+#ifdef DEBUG
 STATIC void number_shift_left(u1024_t *num, int n)
 {
     int i;
@@ -566,6 +567,7 @@ STATIC void number_shift_left(u1024_t *num, int n)
     timer_stop(FUNC_NUMBER_SHIFT_LEFT);
 #endif
 }
+#endif
 
 static void number_shift_right_once(u1024_t *num)
 {
@@ -593,6 +595,7 @@ static void number_shift_right_once(u1024_t *num)
 #endif
 }
 
+#ifdef DEBUG
 STATIC void number_shift_right(u1024_t *num, int n)
 {
     int i;
@@ -608,6 +611,7 @@ STATIC void number_shift_right(u1024_t *num, int n)
     timer_stop(FUNC_NUMBER_SHIFT_RIGHT);
 #endif
 }
+#endif
 
 STATIC void number_small_dec2num(u1024_t *num_n, u64 dec)
 {
@@ -1136,7 +1140,7 @@ STATIC void number_modular_multiplication_montgomery(u1024_t *num_res,
 #endif
 }
 
-STATIC void number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a, 
+void number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a, 
     u1024_t *b, u1024_t *n)
 {
 
