@@ -23,6 +23,8 @@ static opt_t options_master[] = {
 	"stated by --file"},
     {RSA_OPT_KEYGEN, 'g', "generate", required_argument, "generate an RSA "
 	"public/private key pair. " ARG " is its name"},
+    {RSA_OPT_ENC_INFO_ONLY, 'i', "info", no_argument, "get info regarding an "
+	"encrypted file. this depends on posessing the required private key"},
     { RSA_OPT_MAX }
 };
 
@@ -36,6 +38,9 @@ static int parse_args_finalize_master(int *flags, int actions)
     {
 	*flags |= OPT_FLAG(RSA_OPT_ENCRYPT);
     }
+
+    if (*flags & (OPT_FLAG(RSA_OPT_ENC_INFO_ONLY)))
+	*flags |= OPT_FLAG(RSA_OPT_DECRYPT);
 
     if (*flags & OPT_FLAG(RSA_OPT_ENCRYPT))
 	actions++;
@@ -93,6 +98,10 @@ static int parse_args_master(int opt, int *flags)
 	OPT_ADD(flags, RSA_OPT_KEYGEN);
 	if (rsa_set_key_data(optarg))
 	    return -1;
+	break;
+    case RSA_OPT_ENC_INFO_ONLY:
+	OPT_ADD(flags, RSA_OPT_ENC_INFO_ONLY);
+	is_encryption_info_only = 1;
 	break;
     default:
 	rsa_error_message(RSA_ERR_OPTARG);
