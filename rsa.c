@@ -712,7 +712,7 @@ int rsa_key_enclev_set(rsa_key_t *key, int new_level)
     int offset, *level, ret;
     u1024_t montgomery_factor;
 
-    /* rsa signiture */
+    /* rsa signature */
     offset = strlen(RSA_SIGNITURE);
 
     /* rsa key data */
@@ -914,6 +914,12 @@ static void rsa_scankeys(char keytype)
 	keyname_display(keyring, keytype);
 }
 
+static void key_set_display(char *type)
+{
+    rsa_printf(0, 0, "default %s key: %s", type, *key_data ? 
+	rsa_highlight_str(key_data) : "not set");
+}
+
 static void rsa_setkey_symlink_set(rsa_keyring_t *kr, int idx)
 {
     char lnkname[MAX_FILE_NAME_LEN]; 
@@ -929,8 +935,7 @@ static void rsa_setkey_symlink_set(rsa_keyring_t *kr, int idx)
     {
 	unlink(lnkname);
 	symlink(kr->keys[idx]->path, lnkname);
-	printf("%s key set to: %s\n", idx ? "public" : "private", 
-	    rsa_highlight_str(key_data));
+	key_set_display(idx ? "public" : "private");
     }
 
     if (rsa_verbose_get() == V_VERBOSE)
@@ -948,13 +953,13 @@ static void rsa_delkey_links(char keytype)
     
     if (keytype & RSA_KEY_TYPE_PRIVATE)
     {
-	rsa_printf(1, 0, "resetting default private key");
+	key_set_display("private");
 	sprintf(lnkname, "%s/%s", key_path_get(), RSA_KEYLINK_PREFIX ".prv");
 	unlink(lnkname);
     }
     if (keytype & RSA_KEY_TYPE_PUBLIC)
     {
-	rsa_printf(1, 0, "resetting default public key");
+	key_set_display("public");
 	sprintf(lnkname, "%s/%s", key_path_get(), RSA_KEYLINK_PREFIX ".pub");
 	unlink(lnkname);
     }

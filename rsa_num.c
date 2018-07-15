@@ -180,7 +180,7 @@ int number_seed_set_fixed(u1024_t *seed)
     return number_seed_set(*(prng_seed_t*)&seed->arr) ? 0 : -1;
 }
 
-/* initiates the first low (u64) blocks of num with random valules */
+/* initiates the first low (u64) blocks of num with random values */
 int INLINE number_init_random(u1024_t *num, int blocks)
 {
     int i, ret;
@@ -637,8 +637,8 @@ static void INLINE number_witness_init(u1024_t *num_n_min1, u1024_t *num_u,
 }
 
 /* witness method used by the miller-rabin algorithm. attempt to use num_a as a
- * witness of num_n's compositness:
- * if number_witness(num_a, num_n) is true, then num_n is composit
+ * witness of num_n's compositeness:
+ * if number_witness(num_a, num_n) is true, then num_n is composite
  */
 STATIC int INLINE number_witness(u1024_t *num_a, u1024_t *num_n)
 {
@@ -694,7 +694,7 @@ Exit:
 /* miller-rabin algorithm
  * num_n is an odd integer greater than 2 
  * return:
- * 0 - if num_n is composit
+ * 0 - if num_n is composite
  * 1 - if num_n is almost surely prime
  */
 STATIC int INLINE number_miller_rabin(u1024_t *num_n, u1024_t *num_s)
@@ -749,7 +749,7 @@ static void INLINE number_small_prime_init(small_prime_entry_t *entry,
     /* initiate the entry's exponent */
     number_small_dec2num(&(entry->exp), exp_initializer);
 
-    /* rase the entry's prime to the required power */
+    /* raise the entry's prime to the required power */
     number_exponentiation(&(entry->power_of_prime), &(entry->prime), 
 	&(entry->exp));
 
@@ -767,7 +767,7 @@ static void INLINE number_small_prime_init(small_prime_entry_t *entry,
  *   13 primes raised to the respective power, exp, in small_primes[]. it is a 
  *   512 bit number
  * retuned value: num_coprime is a large number such that 
- *   gcd(num_coprime, num_increment) == 1, that is, it does not devided by any 
+ *   gcd(num_coprime, num_increment) == 1, that is, it does not divided by any 
  *   of the first 13 primes
  */
 STATIC void INLINE number_generate_coprime(u1024_t *num_coprime, 
@@ -862,7 +862,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
     TIMER_STOP(FUNC_NUMBER_GENERATE_COPRIME);
 }
 
-/* determin x, y and gcd according to a and b such that:
+/* determine x, y and gcd according to a and b such that:
  * ax+by == gcd(a, b)
  * NOTE: a is assumed to be >= b */
 STATIC void INLINE number_extended_euclid_gcd(u1024_t *gcd, u1024_t *x, 
@@ -940,7 +940,7 @@ void number_init_random_coprime(u1024_t *num, u1024_t *coprime)
     TIMER_STOP(FUNC_NUMBER_INIT_RANDOM_COPRIME);
 }
 
-/* assumtion: 0 < num < mod */
+/* assumption: 0 < num < mod */
 int number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num, 
     u1024_t *mod)
 {
@@ -968,7 +968,7 @@ void number_find_prime(u1024_t *num)
     {
 	number_add(&num_candidate, &num_candidate, &num_increment);
 
-	/* highly unlikely event of rollover renderring num_candidate == 1 */
+	/* highly unlikely event of rollover rendering num_candidate == 1 */
 	if (number_is_equal(&num_candidate, &NUM_1))
 	    number_generate_coprime(&num_candidate, &num_increment);
     }

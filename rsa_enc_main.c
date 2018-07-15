@@ -13,7 +13,7 @@ static opt_t options_encrypter[] = {
 	"flag is not set, encryption will be done using a symmetric "
 	"key and only it will be RSA encrypted"},
     {RSA_OPT_KEY_SET_DYNAMIC, 'k', "key", required_argument, "set the RSA key "
-	"to be used for the current encryption. this options overides the "
+	"to be used for the current encryption. this options overrides the "
 	"default key if it has been set"},
     {RSA_OPT_ORIG_FILE, 'o', "original", no_argument, "keep the original file. "
 	"if this option is not set the file will be deleted after it has been "
@@ -27,7 +27,7 @@ static int parse_args_finalize_encrypter(int *flags, int actions)
     if (!actions)
 	*flags |= OPT_FLAG(RSA_OPT_ENCRYPT);
 
-    /* test for non compatable options with encrypt */
+    /* test for non compatible options with encrypt */
     if ((*flags & OPT_FLAG(RSA_OPT_ENCRYPT)) && 
 	!(*flags & OPT_FLAG(RSA_OPT_FILE)))
     {
