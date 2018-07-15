@@ -382,13 +382,14 @@ static int keyname_insert(keyname_t **base, char *keyname, char *fname,
     char keytype)
 {
     /* search keyname list for the opposite type of key */
-    for ( ; *base && strcmp((*base)->keyname, keyname); base = &(*base)->next);
+    for ( ; *base && strcmp((*base)->keyname + 1, keyname); 
+	base = &(*base)->next);
 
     if (!*base && !(*base = calloc(1, sizeof(keyname_t))))
 	return -1;
 
     if (!*(*base)->keyname)
-	sprintf((*base)->keyname, "%s", keyname);
+	sprintf((*base)->keyname, " " "%s", keyname);
     if (!*(*base)->file[keytype==RSA_KEY_TYPE_PUBLIC])
 	sprintf((*base)->file[keytype == RSA_KEY_TYPE_PUBLIC], "%s", fname);
     else
@@ -571,7 +572,7 @@ static int rsa_setkey_links(keyname_t *keynames, char keytype)
 	keyname_t *tmp = keynames;
 
 	keynames = keynames->next;
-	if (!key && !strcmp(tmp->keyname, key_id))
+	if (!key && !strcmp(tmp->keyname + 1, key_id))
 	    key = tmp;
 	else
 	    free(tmp);
