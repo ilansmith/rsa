@@ -57,7 +57,7 @@ endif
 ifeq ($(TESTS),y)
 
   TARGETS=$(TARGET_RSA_TEST)
-  CFLAGS+=-DTESTS -g
+  CFLAGS+=-DTESTS
 
   # enable/disable function timing
   ifeq ($(TIME_FUNCTIONS),y)
@@ -94,6 +94,13 @@ ifeq ($(TESTS),y)
     CFLAGS+=-DENC_LEVEL=$(ENC_LEVEL)
   endif
 
+  # enable/disable debug mode (disabled by default)
+  ifeq ($(DEBUG),y)
+    CFLAGS+=-O0 -g
+  else
+    CFLAGS+=-O3
+  endif
+
   TARGET_OBJS_rsa_test+=unit_test.o rsa_test.o
 
 else # create rsa applications
@@ -110,7 +117,7 @@ else # create rsa applications
     TARGET_OBJS_rsa_dec+=rsa_dec_main.o
   endif
 
-  CFLAGS+=-DULLONG
+  CFLAGS+=-DULLONG -O3
 endif
 
 %.o: %.c
@@ -197,6 +204,7 @@ help:
 	@printf "\n"
 	$(call help_print_tool,"TIME_FUNCTIONS=y","time functions for profiling)"
 	$(call help_print_tool,"PROFILING=y","build unit tests for profling with gprof(1)")
+	$(call help_print_tool,"DEBUG=y","build without optimizations and generate debug symbos")
 	@printf "\n"
 	@printf "Enhanced colour output is enabled by default or explicitly if $(call hl,RSA_COLOURS=y) is set.\n"
 	@printf "To build without enhanced colour output use $(call hl,RSA_COLOURS=n).\n"
