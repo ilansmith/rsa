@@ -47,6 +47,7 @@ typedef int (* func_modular_multiplication_t) (u1024_t *num_res,
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n);
 
 STATIC u1024_t num_montgomery_n, num_montgomery_factor, num_res_nresidue;
+STATIC unsigned int number_random_seed;
 
 STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
@@ -116,43 +117,48 @@ STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
     TIMER_STOP(FUNC_NUMBER_ADD);
 }
 
-int INLINE number_init_random(u1024_t *num, int bit_len)
+unsigned int number_seed_set(unsigned int seed)
 {
-    int i, max, ret;
-    struct timeval tv;
-    u1024_t num_mask;
+    if (!(number_random_seed = seed))
+    {
+	struct timeval tv;
+
+	tv.tv_sec = tv.tv_usec = 0;
+	if (gettimeofday(&tv, NULL))
+	    return 0;
+	number_random_seed = (unsigned int)tv.tv_sec * (unsigned int)tv.tv_usec;
+    }
+
+    srandom(number_random_seed);
+    return number_random_seed;
+}
+
+/* initiates the first low (u64) blocks of num with random valules */
+int INLINE number_init_random(u1024_t *num, int blocks)
+{
+    int i, ret;
 
     TIMER_START(FUNC_NUMBER_INIT_RANDOM);
-    if (bit_len < 1 || bit_len > encryption_level)
-	return -1;
-
-    number_reset(num);
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
-    if (gettimeofday(&tv, NULL))
+    if (blocks < 1 || blocks > block_sz_u1024 || (!number_random_seed && 
+	!number_seed_set(0)))
     {
 	ret = -1;
 	goto Exit;
     }
-    srandom((unsigned int)tv.tv_sec * (unsigned int)tv.tv_usec);
 
-    /* initiate a BIT_SZ_U1024 random number */
-    max = (encryption_level/(sizeof(long)<<3));
-    for (i = 0; i < max; i++)
-	*((long *)num + i) |= random();
+    number_reset(num);
 
-    /* create bit mask according to bit_len */
-    number_reset(&num_mask);
-    for (i = 0; i < bit_len; i++)
+    /* initiate the low u64 blocks of num */
+    for (i = 0; i < blocks; i++)
     {
-	number_shift_left_once(&num_mask);
-	number_add(&num_mask, &num_mask, &NUM_1);
+	*((u64*)num + i) = (u64)random();
+#ifdef ULLONG
+	/* random() returns a long int so another call is required to fill
+	 * the block's higher bits */
+	*((u64*)num + i) |= (u64)random()<<(bit_sz_u64/2);
+#endif
     }
-    /* apply num_mask to num */
-    for (i = 0; i < block_sz_u1024; i++)
-	*((u64 *)num + i) &= *((u64*)&num_mask + i);
     number_top_set(num);
-
     ret = 0;
 
 Exit:
@@ -320,7 +326,7 @@ static void INLINE number_init_random_strict_range(u1024_t *num_n,
 
     TIMER_START(FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE);
     number_sub(&num_range_min1, range, &NUM_1);
-    number_init_random(&num_tmp, encryption_level);
+    number_init_random(&num_tmp, block_sz_u1024);
     number_mod(&num_tmp, &num_tmp, &num_range_min1);
     number_add(&num_tmp, &num_tmp, &NUM_1);
 
@@ -765,7 +771,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 
 	do
 	{
-	    number_init_random(&num_a, encryption_level>>1);
+	    number_init_random(&num_a, block_sz_u1024/2);
 	    number_modular_exponentiation_naive(&num_a_pow, &num_a,
 		&(small_primes[i].exp), &num_pi);
 	}
