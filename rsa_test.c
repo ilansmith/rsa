@@ -1678,17 +1678,18 @@ static int test069(void)
 
 static int test071(void)
 {
-    u1024_t num_n, res;
+    u1024_t num_n, res, num_montgomery_factor;
 
     number_small_dec2num(&num_n, 163);
     number_small_dec2num(&res, 58);
     number_montgomery_factor_set(&num_n, NULL);
+    number_montgomery_factor_get(&num_montgomery_factor);
     return !number_is_equal(&num_montgomery_factor, &res);
 }
 
 static int test072(void)
 {
-    u1024_t num_n;
+    u1024_t num_n, num_montgomery_factor;
 
     number_init_random(&num_n, block_sz_u1024);
     *(u64*)&num_n |= (u64)1;
@@ -1698,6 +1699,7 @@ static int test072(void)
     p_comment("");
     p_comment("n's montgomery_factor = pow(2, 2^(2*(%d+2))) %% n:", 
 	encryption_level);
+    number_montgomery_factor_get(&num_montgomery_factor);
     p_u1024(&num_montgomery_factor);
     return 0;
 }
@@ -2154,8 +2156,8 @@ static void rsa_key_generator(u1024_t *p1, u1024_t *p2, u1024_t *n, u1024_t *e,
 	    p_comment("calculating n = p1*p2...");
 	number_mul(n, p1, p2);
 
-	p1_sub1 = *p1;
-	p2_sub1 = *p2;
+	number_assign(p1_sub1, *p1);
+	number_assign(p2_sub1, *p2);
 	number_sub1(&p1_sub1);
 	number_sub1(&p2_sub1);
 	if (is_print)
@@ -3370,8 +3372,7 @@ static void rsa_tests_init(int argc, char *argv[])
     block_sz_u1024 = 16;
     encryption_level = bit_sz_u64 * block_sz_u1024;
 #else
-    encryption_level = ENC_LEVEL;
-    block_sz_u1024 = encryption_level / bit_sz_u64;
+    number_enclevl_set(ENC_LEVEL);
 #endif
 }
 

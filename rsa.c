@@ -1,26 +1,37 @@
-#include "rsa_util.h"
-#include "rsa_num.h"
-#include "rsa.h"
+#include <stdlib.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <dirent.h>
+#if RSA_MASTER
+#include "rsa_enc.h"
+#include "rsa_dec.h"
+#endif
+#include "rsa.h"
 
 #define OPTSTR_MAX_LEN 10
+#define RSA_KEYPATH "RSA_KEYPATH"
+
 #define  MIN(x, y) ((x) < (y) ? (x) : (y))
-#define IS_WHITESPACE(c) ((c) == ' ' || (c) == '\t')
 
 static char optstring[3 * RSA_OPT_MAX];
 static struct option longopts[RSA_OPT_MAX];
-static char input_file_name[256];
+static char file_name[MAX_FILE_NAME_LEN];
+
+char key_id[KEY_ID_MAX_LEN];
+char vendor_id[VENDOR_ID_MAX_LEN];
 
 static opt_t options_common[] = {
     {RSA_OPT_HELP, 'h', "help", no_argument, "print this message and exit"},
-    {RSA_OPT_VENDOR, 'v', "vendor", no_argument, "vendor owning the rsa "
+    {RSA_OPT_VENDOR, 'o', "vendor", no_argument, "vendor owning the rsa "
 	"utility"},
     {RSA_OPT_SCANKEY, 's', "scankeys", no_argument, "scan available keys"},
     {RSA_OPT_SETKEY, 'x', "setkey", required_argument, "set rsa key"},
+    {RSA_OPT_QUITE, 'q', "quite", no_argument, "set quite output"},
+    {RSA_OPT_VERBOSE, 'v', "verbose", no_argument, "set verbose output"},
 #if 0
     {RSA_OPT_PATH, 'p', "path", no_argument, "specify key directory"},
     {RSA_OPT_STDIN , 'i', "stdin", required_argument, "recieve input from "
@@ -71,7 +82,7 @@ static char *optstring_register_array_single(char *str, opt_t *cur)
     };
 
     *str = cur->short_opt;
-    strcat(str, code2str(arg_requirements, cur->arg_requirement));
+    rsa_strcat(str, code2str(arg_requirements, cur->arg_requirement));
     return str + strlen(str);
 }
 
@@ -113,10 +124,10 @@ static int rsa_set_key_name(char *key)
 
 int rsa_set_file_name(char *name)
 {
-    if (strlen(name) >= sizeof(input_file_name))
+    if (strlen(name) >= sizeof(file_name))
 	return -1;
 
-    sprintf(input_file_name, "%s", optarg);
+    sprintf(file_name, "%s", optarg);
     return 0;
 }
 
@@ -150,10 +161,16 @@ rsa_errno_t parse_args(int argc, char *argv[], int *flags,
 	case RSA_OPT_HELP:
 	case RSA_OPT_VENDOR:
 	case RSA_OPT_SCANKEY:
-	case RSA_OPT_SETKEY:
 	    OPT_ADD(flags, code)
-	    if (code == RSA_OPT_SETKEY)
-		rsa_set_key_name(optarg);
+	    break;
+	case RSA_OPT_SETKEY:
+	    OPT_ADD(flags, RSA_OPT_SETKEY)
+	    rsa_set_key_name(optarg);
+	    break;
+	case RSA_OPT_QUITE:
+	case RSA_OPT_VERBOSE:
+	    OPT_ADD(flags, code)
+	    rsa_verbose_set(code == RSA_OPT_VERBOSE ? V_VERBOSE : V_QUIET);
 	    break;
 	default:
 	    {
@@ -187,36 +204,6 @@ static char *app_name(char *path)
     }
     snprintf(name, MAX_APP_NAME_LEN, "%s", ptr);
     return name;
-}
-
-static void output_error_message(rsa_errno_t err)
-{
-    char msg[128] = "error: ";
-
-    switch (err)
-    {
-    case RSA_ERR_ARGREP:
-	strcat(msg, "option repeated");
-	break;
-    case RSA_ERR_NOACTION:
-	strcat(msg, "must specify RSA action");
-	break;
-    case RSA_ERR_MULTIACTION:
-	strcat(msg, "too many RSA actions");
-	break;
-    case RSA_ERR_NOFILE:
-	strcat(msg, "no input file specified");
-	break;
-    case RSA_ERR_INTERNAL:
-	strcat(msg, "internal");
-	break;
-    case RSA_ERR_OPTARG:
-    default:
-	return;
-    }
-
-    strcat (msg, "\n");
-    printf("%s", msg);
 }
 
 static void output_usage(char *path)
@@ -294,6 +281,66 @@ static void output_help(char *path, opt_t *options_private)
     printf("\n%c IAS software, April 2005\n", CHAR_COPYRIGHT);
 }
 
+static int rsa_set_key_param(char *str, char *param, int len, char *fmt, ...)
+{
+    va_list ap;
+
+    if (strlen(param) > len)
+	return -1;
+    va_start(ap, fmt);
+    vsprintf(str, fmt, ap);
+    va_end(ap);
+    return 0;
+}
+
+int rsa_set_key_id(char *id)
+{
+    /* key_id[0] is reserved for the e and d characters marking the key as
+     * public or private respectively */
+    return rsa_set_key_param(key_id, id, KEY_ID_MAX_LEN - 2, "%c%s", '*', id);
+}
+
+int rsa_set_vendor_id(char *id)
+{
+    return rsa_set_key_param(vendor_id, id, VENDOR_ID_MAX_LEN - 1, "%s", id);
+}
+
+char *key_path_get(void)
+{
+    char *key_path;
+
+    return (key_path = getenv(RSA_KEYPATH)) ? key_path : ".";
+}
+
+int rsa_encryption_level_set(char *optarg)
+{
+    char *err;
+    int level;
+
+    level = strtol(optarg, &err, 10);
+    return (*err) ? -1 : number_enclevl_set(level);
+}
+
+int rsa_scankey(void)
+{
+    DIR *dir;
+    struct dirent *ent;
+
+    RSA_TBD("handle RSA_OPT_SCANKEY");
+    if (!(dir = opendir(key_path_get())))
+    {
+	output_error_message(RSA_ERR_KEYPATH);
+	return -1;
+    }
+
+    while ((ent = readdir(dir)))
+    {
+	/* scan keys */
+    }
+
+    return closedir(dir);
+}
+
 rsa_opt_t rsa_action_get(int flags, ...)
 {
     va_list va;
@@ -321,7 +368,7 @@ int rsa_action_handle_common(rsa_opt_t action, char *app,
 	rsa_vendor();
 	break;
     case OPT_FLAG(RSA_OPT_SCANKEY):
-	RSA_TBD("handle RSA_OPT_SCANKEY");
+	rsa_scankey();
 	break;
     case OPT_FLAG(RSA_OPT_SETKEY):
 	RSA_TBD("handle RSA_OPT_SETKEY");
@@ -331,6 +378,48 @@ int rsa_action_handle_common(rsa_opt_t action, char *app,
     }
 
     return 0;
+}
+
+void rsa_encode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n)
+{
+    u64 q;
+    u1024_t r;
+
+    if (!number_is_greater_or_equal(data, n))
+    {
+	number_assign(r, *data);
+	q = (u64)0;
+    }
+    else
+    {
+	u1024_t num_q;
+
+	number_dev(&num_q, &r, data, n);
+	q = *(u64*)&num_q;
+    }
+
+    number_modular_exponentiation_montgomery(res, &r, exp, n);
+    res->arr[block_sz_u1024] = q;
+}
+
+void rsa_decode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n)
+{
+    u64 q;
+    u1024_t r;
+
+    q = data->arr[block_sz_u1024];
+    number_assign(r, *data);
+    r.arr[block_sz_u1024] = 0;
+    number_modular_exponentiation_montgomery(res, &r, exp, n);
+
+    if (q)
+    {
+	u1024_t num_q;
+
+	number_small_dec2num(&num_q, q);
+	number_mul(&num_q, &num_q, n);
+	number_add(res, res, &num_q);
+    }
 }
 
 #ifdef RSA_MASTER
@@ -344,7 +433,7 @@ static opt_t options_master[] = {
 	"flag is not set, encryption/decryption will be done using a symmetric "
 	"key and only it will be RSA encrypted/decrypted (implies encryption)"},
     {RSA_OPT_DECRYPT, 'd', "decrypt", no_argument, "decrypt ciphertext"},
-    {RSA_OPT_KEYGEN, 'k', "keygen", no_argument, "generate RSA public "
+    {RSA_OPT_KEYGEN, 'k', "keygen", required_argument, "generate RSA public "
 	"and private keys"},
     { RSA_OPT_MAX }
 };
@@ -387,6 +476,8 @@ static rsa_errno_t parse_args_master(int opt, int *flags)
 	break;
     case RSA_OPT_LEVEL:
 	OPT_ADD(flags, RSA_OPT_LEVEL);
+	if (rsa_encryption_level_set(optarg))
+	    return RSA_ERR_LEVEL;
 	break;
     case RSA_OPT_RSAENC:
 	OPT_ADD(flags, RSA_OPT_RSAENC);
@@ -396,6 +487,9 @@ static rsa_errno_t parse_args_master(int opt, int *flags)
 	break;
     case RSA_OPT_KEYGEN:
 	OPT_ADD(flags, RSA_OPT_KEYGEN);
+	if (rsa_set_key_id(optarg))
+	    return RSA_ERR_KEYNAME;
+	rsa_set_vendor_id(VENDOR);
 	break;
     default:
 	return RSA_ERR_OPTARG;
@@ -416,7 +510,8 @@ int main(int argc, char *argv[])
     if ((err = parse_args(argc, argv, &flags, &master_handler)) != RSA_ERR_NONE)
 	return rsa_error(argv[0], err);
 
-    action = rsa_action_get(flags, RSA_OPT_ENCRYPT, RSA_OPT_DECRYPT, NULL);
+    action = rsa_action_get(flags, RSA_OPT_ENCRYPT, RSA_OPT_DECRYPT, 
+	RSA_OPT_KEYGEN, NULL);
     switch (action)
     {
     case OPT_FLAG(RSA_OPT_ENCRYPT):
@@ -427,17 +522,13 @@ int main(int argc, char *argv[])
 	    RSA_TBD("handle RSA_OPT_RSAENC");
 
 	RSA_TBD("handle RSA_OPT_ENCRYPT");
-	//rsa_proccess(input_file_name, 0);
 	break;
     }
     case OPT_FLAG(RSA_OPT_DECRYPT):
 	RSA_TBD("handle RSA_OPT_DECRYPT");
-	//rsa_proccess(input_file_name, 1);
 	break;
     case OPT_FLAG(RSA_OPT_KEYGEN):
-	RSA_TBD("handle RSA_OPT_KEYGEN");
-	//rsa_key_generate();
-	break;
+	return rsa_keygen();
     default:
 	return rsa_action_handle_common(action, argv[0], options_master);
     }

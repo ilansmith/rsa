@@ -1,8 +1,9 @@
-#include "rsa.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <getopt.h>
+#include "rsa.h"
+#include "rsa_num.h"
 
 #ifndef RSA_MASTER
 static opt_t options_encrypter[] = {
@@ -40,6 +41,8 @@ static rsa_errno_t parse_args_encrypter(int opt, int *flags)
 	break;
     case RSA_OPT_LEVEL:
 	OPT_ADD(flags, RSA_OPT_LEVEL);
+	if (rsa_encryption_level_set(optarg))
+	    return RSA_ERR_LEVEL;
 	break;
     case RSA_OPT_RSAENC:
 	OPT_ADD(flags, RSA_OPT_RSAENC);
@@ -77,7 +80,6 @@ int main(int argc, char *argv[])
 	    RSA_TBD("handle RSA_OPT_RSAENC");
 
 	RSA_TBD("handle RSA_OPT_ENCRYPT");
-	//rsa_proccess(input_file_name, 0);
 	break;
     }
     default:
