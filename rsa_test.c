@@ -1508,8 +1508,8 @@ static int test057(void)
 	number_small_dec2num(&a, (u64)i);
 	number_modular_multiplicative_inverse(&b, &a, &n);
 	number_modular_multiplication_montgomery(&axb, &a, &b, &n);
-	p_comment_nl("%2.llu^(-1)mod(%llu) = %2.llu, %2.llux%llu mod(%llu) = %llu",
-	    *(u64*)&a, prime, *(u64*)&b, *(u64*)&a, *(u64*)&b, prime, 
+	p_comment_nl("%2.llu^(-1)mod(%llu) = %2.llu, %2.llux%llu mod(%llu) = "
+	    "%llu", *(u64*)&a, prime, *(u64*)&b, *(u64*)&a, *(u64*)&b, prime, 
 	    *(u64*)&axb);
 	if (!number_is_equal(&axb, &num_1))
 	    return -1;
@@ -2101,9 +2101,9 @@ static int test106(void)
 	if (res_num_p || !res_num_inc)
 	    res = 1;
 
-	p_comment_nl("co prime("NUM_P", %llu) = %s, co prime("NUM_INC", %llu) = "
-	    "%s", primes[i], res_num_p ? "no" : "yes", primes[i], res_num_inc ? 
-	    " no" : "yes");
+	p_comment_nl("co prime("NUM_P", %llu) = %s, co prime("NUM_INC", %llu) "
+	    "= %s", primes[i], res_num_p ? "no" : "yes", primes[i], 
+	    res_num_inc ? " no" : "yes");
     }
     return res;
 
@@ -2504,7 +2504,8 @@ static int test118(void)
     iter = strtol(MULTIPLE_RSA, &err, 10);
     if (*err)
     {
-	p_comment_nl("MULTIPLE_RSA (%s) must be an integer string", MULTIPLE_RSA);
+	p_comment_nl("MULTIPLE_RSA (%s) must be an integer string", 
+	    MULTIPLE_RSA);
 	return -1;
     }
 
@@ -2627,271 +2628,6 @@ static int test125(void)
     p_local_timer();
     return 0;
 }
-
-typedef struct test130_t {
-    int i;
-    char c;
-} test130_t;
-
-static int test130(void)
-{
-#define FNAME_1 "f1"
-#define FNAME_2 "f2"
-
-    char x[100];
-    FILE *f;
-    int i;
-
-    bzero(x, 100);
-    p_comment_nl("sizeof(int) = %i", sizeof(int));
-    p_comment_nl("sizeof(char) = %i", sizeof(char));
-    p_comment_nl("sizeof(test130_t) = %i", sizeof(test130_t));
-    p_comment_nl("sizeof(u64) = %i", sizeof(u64));
-
-    i = 0;
-    f = fopen(FNAME_1, "w+");
-    i += fwrite("hello", strlen("hello"), 1, f);
-    i += fwrite("nice", strlen("nice"), 1, f);
-    i += fwrite("world", strlen("world"), 1, f);
-    fclose(f);
-    p_comment_nl("wrote %i test130_t", i);
-
-    i = 0;
-    f = fopen(FNAME_1, "r+");
-    i += fread(x, strlen("hello"), 1, f);
-    i += fread(x + strlen("hello"), strlen("nice"), 1, f);
-    fclose(f);
-    p_comment_nl("read %i test130_t", i);
-
-    f = fopen(FNAME_2, "w+");
-    p_comment_nl("wrote %i test130_t", fwrite(x, strlen(x), 1, f));
-    fclose(f);
-
-    remove(FNAME_1);
-    remove(FNAME_2);
-
-    return 0;
-
-#undef FNAME_2
-#undef FNAME_1
-}
-
-#if 0
-static int test117(void)
-{
-    FILE *fe, *fd;
-    u1024_t ne, nd, e, d, mf, buf1, buf2, buf3;
-    char *vendor = "ilan";
-    char *home = getenv("HOME");
-    char pub_path[100], prv_path[100];
-    int ret = 0;
-
-    snprintf(pub_path, sizeof(pub_path), "%s/.rsa/pub/", home);
-    snprintf(prv_path, sizeof(prv_path), "%s/.rsa/prv/", home);
-
-    if (!(fe = rsa_file_open(pub_path, "ilan", ".pub", 0, 0)) || 
-	!(fd = rsa_file_open(prv_path, "ilan", ".prv", 0, 0)))
-    {
-	p_comment_nl("couldn't open key files");
-	ret = -1;
-	goto Exit;
-    }
-    else
-	p_comment_nl("key files opened");
-
-    rsa_file_read_u1024(fe, &ne);
-    rsa_file_read_u1024(fe, &e);
-    rsa_file_read_u1024(fe, &mf);
-
-    rsa_file_read_u1024(fd, &nd);
-    rsa_file_read_u1024(fd, &d);
-
-    number_reset(&buf1);
-    number_reset(&buf2);
-    number_reset(&buf3);
-
-    memcpy(&buf1, vendor, sizeof(vendor));
-//    number_small_dec2num(&buf1, (u64)5);
-
-    number_modular_exponentiation_montgomery(&buf2, &buf1, &e, &ne);
-    number_modular_exponentiation_montgomery(&buf3, &buf2, &d, &nd);
-
-    p_comment_nl("buf1 %s= buf3", memcmp(&buf1, &buf3, sizeof(u1024_t)) ? "!" : 
-	"=");
-
-Exit:
-    if (fe)
-	rsa_file_close(fe);
-    if (fd)
-	rsa_file_close(fd);
-
-    return ret;
-}
-
-void test118(void)
-{
-    u1024_t n, e, d, buf1, buf2, buf3;
-    u1024_t p1, p2, p1_sub, p2_sub, phi, tmp1, tmp2;
-    char *vendor = 
-	"ilan is a really nice guy indeed and  4 this we are all greatful";
-
-    number_find_prime(&p1);
-    number_find_prime(&p2);
-
-    /*
-	7841, 7853, 7867, 7873, 7877, 7879, 7883, 7901, 7907, 7919,
-
-    number_small_dec2num(&p1, (u64)7907);
-    number_small_dec2num(&p2, (u64)7919);
-    */
-    number_mul(&n, &p1, &p2);
-
-    p1_sub = p1;
-    p2_sub = p2;
-    number_sub1(&p1_sub);
-    number_sub1(&p2_sub);
-    number_mul(&phi, &p1_sub, &p2_sub);
-
-    number_init_random_coprime(&e, &phi);
-    number_modular_multiplicative_inverse(&d, &e, &phi);
-
-//    number_small_dec2num(&buf1, (u64)5);
-    number_reset(&buf1);
-    number_reset(&buf2);
-    number_reset(&buf3);
-    memcpy(&buf1, vendor, strlen(vendor));
-
-    number_modular_exponentiation_montgomery(&buf2, &buf1, &e, &n);
-    number_modular_exponentiation_montgomery(&buf3, &buf2, &d, &n);
-
-    /* this multiplication cannot be done correctly */
-    number_modular_multiplication_montgomery(&tmp1, &e, &d, &phi);
-    number_modular_multiplication_naive(&tmp2, &e, &d, &phi);
-    printf("buf1 %s= buf3\n", memcmp(&buf1, &buf3, sizeof(u1024_t)) ? "!" : 
-	"=");
-    return;
-}
-
-static void test119(void)
-{
-    u1024_t a, b, n, r;
-
-    number_init_str(&a,
-	    /*
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    */
-
-	    "00111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    );
-    number_init_str(&b,
-	    /*
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    */
-
-	    "00111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    "11111111"
-	    );
-    number_init_str(&n,
-	    /*
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    */
-
-	    "01000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    "00000000"
-	    );
-
-    number_modular_multiplication_montgomery(&r, &a, &b, &n);
-    return;
-}
-#endif
 
 static test_t rsa_tests[] = 
 {
@@ -3345,35 +3081,8 @@ static test_t rsa_tests[] =
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
 	    DISABLE_ULLONG_64 | DISABLE_ULLONG_256 | DISABLE_ULLONG_512,
     },
-
-    /* RSA io */
-    {
-	description: "test fread() and fwrite()",
-	known_issue: "wrong result for sizeof(test58_t)",
-	func: test130,
-	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
-    },
-#if 0
-    {
-	description: "encryption - decryption test, keys read from files",
-	known_issue: "missing input files",
-	func: test135,
-#ifndef ULLONG
-	disabled: 1,
-#endif
-    },
-#endif
     {0},
 };
-
-/*
-static test_t tests[] = 
-{
-    { "encryption - decryption test", test118, DISABLED },
-    { "montgomery multiplication of large numbers", test119, DISABLED },
-    { }
-};
-*/
 
 static char *p_u64_type(void)
 {
