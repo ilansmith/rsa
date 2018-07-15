@@ -230,18 +230,12 @@ int parse_args(int argc, char *argv[], int *flags,
     return parse_args_finalize(flags, handler);
 }
 
-static char *app_name(char *path)
+static void rsa_usage(char *path)
 {
     char *ptr;
 
     for (ptr = path + strlen(path) - 1; ptr >= path && *ptr != '/'; ptr--);
-    return ++ptr;
-}
-
-static void rsa_usage(char *path)
-{
-    printf("usage: %s [ OPTIONS ]\n\n", app_name(path));
-
+    printf("usage: %s [ OPTIONS ]\n\n", ++ptr);
 }
 
 int rsa_error(char *app)
