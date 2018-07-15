@@ -126,15 +126,53 @@ void output_error_message(rsa_errno_t err)
     printf("%s", msg);
 }
 
-static int rsa_io_u1024(u1024_t *num, FILE *file, int is_read)
+static int rsa_io_u1024(FILE *file, u1024_t *num, int is_full, int is_read)
 {
-    int ret = 0;
+    int ret;
     io_func_t io = is_read ? (io_func_t)fread : (io_func_t)fwrite;
 
-    ret += io(num->arr, sizeof(u64), block_sz_u1024 + 1, file);
-    ret += io(&num->top, sizeof(int), 1, file);
+    ret = io(num->arr, sizeof(u64), block_sz_u1024 + (is_full ? 1 : 0), file);
+    if (is_full)
+	ret += io(&num->top, sizeof(int), 1, file);
+    else if (is_read)
+	number_top_set(num)
 
-    if (ret != (block_sz_u1024 + 2))
+    if (ret != (block_sz_u1024 + (is_full ? 2 : 0)) && ret != EOF)
+    {
+	output_error_message(RSA_ERR_FILEIO);
+	return -1;
+    }
+
+    return 0;
+}
+
+int rsa_read_u1024(FILE *file, u1024_t *num)
+{
+    return rsa_io_u1024(file, num, 0, 1);
+}
+
+int rsa_write_u1024(FILE *file, u1024_t *num)
+{
+    return rsa_io_u1024(file, num, 0, 0);
+}
+
+int rsa_read_u1024_full(FILE *file, u1024_t *num)
+{
+    return rsa_io_u1024(file, num, 1, 1);
+}
+
+int rsa_write_u1024_full(FILE *file, u1024_t *num)
+{
+    return rsa_io_u1024(file, num, 1, 0);
+}
+
+static int rsa_io_str(FILE *file, char *str, int len, int is_read)
+{
+    int ret;
+    io_func_t io = is_read ? (io_func_t)fread : (io_func_t)fwrite;
+
+    ret = io(str, sizeof(char), len, file);
+    if (ret != len && ret != EOF)
     {
 	output_error_message(RSA_ERR_FILEIO);
 	return -1;
@@ -142,14 +180,14 @@ static int rsa_io_u1024(u1024_t *num, FILE *file, int is_read)
     return 0;
 }
 
-int rsa_read_u1024(FILE *file, u1024_t *num)
+int rsa_read_str(FILE *file, char *str, int len)
 {
-    return rsa_io_u1024(num, file, 1);
+    return rsa_io_str(file, str, len, 1);
 }
 
-int rsa_write_u1024(FILE *file, u1024_t *num)
+int rsa_write_str(FILE *file, char *str, int len)
 {
-    return rsa_io_u1024(num, file, 0);
+    return rsa_io_str(file, str, len, 0);
 }
 
 void rsa_verbose_set(verbose_t level)
