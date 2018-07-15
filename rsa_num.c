@@ -77,12 +77,12 @@ STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 	seg2 = (u64*)&num_small.arr; seg < top; seg++, seg1++, seg2++)
     {
 	*seg = *seg1 + *seg2 + carry;
-	if ((*seg1 & MSB_PT(u64)) && (*seg2 & MSB_PT(u64)))
+	if ((*seg1 & MSB(u64)) && (*seg2 & MSB(u64)))
 	    carry = 1;
-	else if (!(*seg1 & MSB_PT(u64)) && !(*seg2 & MSB_PT(u64)))
+	else if (!(*seg1 & MSB(u64)) && !(*seg2 & MSB(u64)))
 	    carry = 0;
 	else
-	    carry = (*seg & MSB_PT(u64)) ? 0 : 1;
+	    carry = (*seg & MSB(u64)) ? 0 : 1;
     }
 
     top_max = (u64*)&num_res.arr + block_sz_u1024;
@@ -165,7 +165,7 @@ STATIC int INLINE number_find_most_significant_set_bit(u1024_t *num,
 
     TIMER_START(FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT);
     *major = (u64*)&num->arr + num->top;
-    *minor = MSB_PT(u64);
+    *minor = MSB(u64);
     minor_offset = bit_sz_u64;
 
     while (*minor)
@@ -278,7 +278,7 @@ STATIC void INLINE number_dev(u1024_t *num_q, u1024_t *num_r,
     number_reset(&quotient);
     while (seg_dividend >= (u64 *)&dividend)
     {
-	u64 mask_dividend = MSB_PT(u64);
+	u64 mask_dividend = MSB(u64);
 
 	while (mask_dividend)
 	{
@@ -373,22 +373,12 @@ STATIC int INLINE number_modular_exponentiation_naive(u1024_t *res, u1024_t *a,
 
 	    mask = mask >> 1;
 	}
-	mask = MSB_PT(u64);
+	mask = MSB(u64);
 	seg--;
     }
     *res = d;
     TIMER_STOP(FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE);
     return 0;
-}
-
-STATIC inline int number_is_odd(u1024_t *num)
-{
-    int ret;
-
-    TIMER_START(FUNC_NUMBER_IS_ODD);
-    ret = *(u64*)&num->arr & (u64)1;
-    TIMER_STOP(FUNC_NUMBER_IS_ODD);
-    return ret;
 }
 
 /* montgomery product

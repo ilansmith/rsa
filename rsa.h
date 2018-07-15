@@ -34,7 +34,6 @@ typedef enum {
     FUNC_NUMBER_MONTGOMERY_FACTOR_SET,
     FUNC_NUMBER_MONTGOMERY_PRODUCT,
     FUNC_NUMBER_MODULAR_EXPONENTIATION_MONTGOMERY,
-    FUNC_NUMBER_IS_ODD,
     FUNC_NUMBER_WITNESS_INIT,
     FUNC_NUMBER_WITNESS,
     FUNC_NUMBER_MILLER_RABIN,
@@ -146,9 +145,9 @@ typedef struct {
 #define BIT_SZ_U1024 (BIT_SZ_U64 * BLOCK_SZ_U1024)
 
 #define ARRAY_SZ(X) (sizeof(X) / sizeof((X)[0]))
-#define MSB_PT(X) ((X)(~((X)-1 >> 1)))
+#define MSB(X) ((X)(~((X)-1 >> 1)))
 
-#define NUMBER_IS_NEGATIVE(X) ((MSB_PT(u64) & \
+#define NUMBER_IS_NEGATIVE(X) ((MSB(u64) & \
     *((u64*)(X) + (BLOCK_SZ_U1024 - 1))) ? 1 : 0)
 
 #define RSA_PTASK_START(FMT, ...) printf(FMT ":\n", ##__VA_ARGS__); \
@@ -215,6 +214,8 @@ int number_str2num(u1024_t *num, char *str);
 int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 #endif
 
+#define number_is_odd(num) (*(u64*)&(num)->arr & (u64)1)
+
 #define number_reset_buffer(num) { \
     do { \
 	*((u64*)&(num)->arr + block_sz_u1024) = 0; \
@@ -234,8 +235,8 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 	for (seg = (u64*)&(num)->arr; seg < top; seg++) \
 	{ \
 	    *seg = *seg >> 1; \
-	    *seg = (*(seg+1) & (u64)1) ? *seg | MSB_PT(u64) : \
-		*seg & ~MSB_PT(u64); \
+	    *seg = (*(seg+1) & (u64)1) ? *seg | MSB(u64) : \
+		*seg & ~MSB(u64); \
 	} \
 	*seg = *seg >> 1; \
 	if ((num)->top && !*seg) \
@@ -252,7 +253,7 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 	for (seg = top; seg > (u64*)&(num)->arr; seg--) \
 	{ \
 	    *seg = *seg << 1; \
-	    *seg = *(seg-1) & MSB_PT(u64) ? *seg | (u64)1 : *seg & ~(u64)1; \
+	    *seg = *(seg-1) & MSB(u64) ? *seg | (u64)1 : *seg & ~(u64)1; \
 	} \
 	*seg = *seg << 1; \
 	if (is_top_can_shift && *(top)) \
