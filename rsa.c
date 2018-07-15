@@ -234,19 +234,11 @@ static char *app_name(char *path)
 {
 #define MAX_APP_NAME_LEN 10
 
-    int path_len = strlen(path);
     char *ptr = NULL;
     static char name[MAX_APP_NAME_LEN];
 
-    for (ptr = path + path_len - 1; ptr >= path; ptr--)
-    {
-	if (*ptr == '/')
-	{
-	    ptr++;
-	    break;
-	}
-    }
-    snprintf(name, MAX_APP_NAME_LEN, "%s", ptr);
+    for (ptr = path + strlen(path) - 1; ptr >= path && *ptr != '/'; ptr--);
+    snprintf(name, MAX_APP_NAME_LEN, "%s", ++ptr);
     return name;
 }
 
