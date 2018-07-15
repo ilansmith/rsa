@@ -1970,6 +1970,20 @@ static int test096(void)
 
 static int test097(void)
 {
+    u1024_t num;
+    u64 p = (u64)1299709;
+    int ret;
+
+    number_small_dec2num(&num, p);
+    p_u1024(&num);
+    ret = number_is_prime(&num);
+    p_comment("1299709 is prime%s", ret ? 
+	"" : " and was found to be not prime");
+    return !ret;
+}
+
+static int test098(void)
+{
     u1024_t num_n;
     char *prime = "10726904659";
     int is_prime;
@@ -1979,7 +1993,7 @@ static int test097(void)
     return !is_prime;
 }
 
-static int test098(void)
+static int test099(void)
 {
     u1024_t num_n;
     char *prime = "55350776431903243";
@@ -2018,13 +2032,13 @@ static int is_475bit_num_prime(char lsb)
     return is_prime;
 }
 
-static int test099(void)
+static int test100(void)
 {
     /* 94R(71)7 is not prime */
     return is_475bit_num_prime(LSB_94R71_7);
 }
 
-static int test100(void)
+static int test101(void)
 {
     /* 94R(71)9 is prime */
     return !is_475bit_num_prime(LSB_94R71_9);
@@ -2032,7 +2046,7 @@ static int test100(void)
 #undef LSB_94R71_7 
 #undef LSB_94R71_9 
 
-static int test101(void)
+static int test102(void)
 {
     u1024_t num_n;
     char *non_prime = "2285760293497823444790323455592340983477";
@@ -3201,26 +3215,31 @@ static test_t rsa_tests[] =
 	    DISABLE_ULLONG_256 | DISABLE_ULLONG_512 | DISABLE_ULLONG_1024,
     },
     {
-	description: "number_is_prime(10,726,904,659) - large prime",
+	description: "number_is_primethe 100000th prime)",
 	func: test097,
+	disabled: DISABLE_UCHAR | DISABLE_USHORT
+    },
+    {
+	description: "number_is_prime(10,726,904,659) - large prime",
+	func: test098,
 	disabled: DISABLE_UCHAR,
     },
     {
 	description: "number_is_prime(55,350,776,431,903,243) - very large "
 	    "prime",
-	func: test098,
+	func: test099,
 	disabled: DISABLE_UCHAR,
     },
     {
 	description: "number_is_prime(94R(71)7) - 475 bit non prime",
-	func: test099,
+	func: test100,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
 	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
 	    DISABLE_ULLONG_512 | DISABLE_TIME_FUNCTIONS,
     },
     {
 	description: "number_is_prime(94R(71)9) - 475 bit prime",
-	func: test100,
+	func: test101,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
 	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
 	    DISABLE_ULLONG_512 | DISABLE_TIME_FUNCTIONS,
@@ -3229,7 +3248,7 @@ static test_t rsa_tests[] =
 	description: "number_is_prime("
 	    "2,285,760,293,497,823,444,790,323,455,592,340,983,477) - very "
 	    "large non prime",
-	func: test101,
+	func: test102,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
     /* RSA key generation, encryption and decryption */
