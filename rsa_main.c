@@ -6,17 +6,20 @@
 #include "rsa.h"
 
 static opt_t options_master[] = {
-    {RSA_OPT_FILE, 'f', "file", required_argument, "input file to "
+    {RSA_OPT_FILE, 'f', "file", required_argument, "arg is the input file to "
 	"encrypt/decrypt"},
-    {RSA_OPT_ENCRYPT, 'e', "encrypt", no_argument, "encrypt input file"},
+    {RSA_OPT_ENCRYPT, 'e', "encrypt", no_argument, "encrypt the data file "
+	"stated by --file"},
     {RSA_OPT_LEVEL, 'l', "level", required_argument, "set encryption level to "
-	"128, 256, 512 or 1024 (default), (implies encryption)"},
+	"128, 256, 512 or 1024(default). this  switch implies encryption"},
     {RSA_OPT_RSAENC, 'r', "rsa", no_argument, "full RSA encryption. if this "
 	"flag is not set, encryption/decryption will be done using a symmetric "
-	"key and only it will be RSA encrypted/decrypted (implies encryption)"},
-    {RSA_OPT_DECRYPT, 'd', "decrypt", no_argument, "decrypt ciphertext"},
-    {RSA_OPT_KEYGEN, 'k', "keygen", required_argument, "generate RSA public "
-	"and private keys"},
+	"key and only it will be RSA encrypted/decrypted. this switch implies "
+	"encryption"},
+    {RSA_OPT_DECRYPT, 'd', "decrypt", no_argument, "decrypt the ciphertext "
+	"stated by --file"},
+    {RSA_OPT_KEYGEN, 'k', "keygen", required_argument, "generate an RSA public/"
+	"private key pair. arg is its name"},
     { RSA_OPT_MAX }
 };
 
