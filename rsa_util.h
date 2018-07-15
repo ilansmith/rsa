@@ -31,50 +31,50 @@
 #endif
 
 typedef struct code2code_t {
-    int code;
-    int val;
-    int disabled;
+	int code;
+	int val;
+	int disabled;
 } code2code_t;
 
 typedef struct code2str_t {
-    int code;
-    char *str;
-    int disabled;
+	int code;
+	char *str;
+	int disabled;
 } code2str_t;
 
 typedef enum {
-    V_NORMAL = 0,
-    V_QUIET,
-    V_VERBOSE,
+	V_NORMAL = 0,
+	V_QUIET,
+	V_VERBOSE,
 } verbose_t;
 
 typedef enum {
-    RSA_ERR_NONE,
-    RSA_ERR_ARGREP,
-    RSA_ERR_NOACTION,
-    RSA_ERR_MULTIACTION,
-    RSA_ERR_FNAME_LEN,
-    RSA_ERR_FILE_TOO_LARGE,
-    RSA_ERR_FILE_NOT_EXIST,
-    RSA_ERR_FILE_IS_DIR,
-    RSA_ERR_FILE_NOT_REG,
-    RSA_ERR_NOFILE,
-    RSA_ERR_FOPEN,
-    RSA_ERR_FILEIO,
-    RSA_ERR_OPTARG,
-    RSA_ERR_KEYPATH,
-    RSA_ERR_KEYNAME,
-    RSA_ERR_KEYGEN,
-    RSA_ERR_KEYNOTEXIST,
-    RSA_ERR_KEYMULTIENTRIES,
-    RSA_ERR_KEY_STAT_PUB_DEF,
-    RSA_ERR_KEY_STAT_PRV_DEF,
-    RSA_ERR_KEY_STAT_PRV_DYN,
-    RSA_ERR_KEY_CORRUPT,
-    RSA_ERR_KEY_OPEN,
-    RSA_ERR_KEY_TYPE,
-    RSA_ERR_LEVEL,
-    RSA_ERR_INTERNAL,
+	RSA_ERR_NONE,
+	RSA_ERR_ARGREP,
+	RSA_ERR_NOACTION,
+	RSA_ERR_MULTIACTION,
+	RSA_ERR_FNAME_LEN,
+	RSA_ERR_FILE_TOO_LARGE,
+	RSA_ERR_FILE_NOT_EXIST,
+	RSA_ERR_FILE_IS_DIR,
+	RSA_ERR_FILE_NOT_REG,
+	RSA_ERR_NOFILE,
+	RSA_ERR_FOPEN,
+	RSA_ERR_FILEIO,
+	RSA_ERR_OPTARG,
+	RSA_ERR_KEYPATH,
+	RSA_ERR_KEYNAME,
+	RSA_ERR_KEYGEN,
+	RSA_ERR_KEYNOTEXIST,
+	RSA_ERR_KEYMULTIENTRIES,
+	RSA_ERR_KEY_STAT_PUB_DEF,
+	RSA_ERR_KEY_STAT_PRV_DEF,
+	RSA_ERR_KEY_STAT_PRV_DYN,
+	RSA_ERR_KEY_CORRUPT,
+	RSA_ERR_KEY_OPEN,
+	RSA_ERR_KEY_TYPE,
+	RSA_ERR_LEVEL,
+	RSA_ERR_INTERNAL,
 } rsa_errno_t;
 
 int code2code(code2code_t *list, int code);
