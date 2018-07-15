@@ -87,17 +87,25 @@ ifeq ($(TESTS),y)
   TARGET_OBJS+=unit_test.o
 
 else # create rsa applications
+  IAS_MASTER="IAS Master"
+  MAX_LEN=16
+
   ifeq ($(VENDOR),) # master encrypter/decrypter
     TARGETS=rsa
-    VENDOR="IAS Master"
+    VENDOR=$(IAS_MASTER)
     CFLAGS+=-DRSA_MASTER
     TARGET_OBJS+=rsa_enc.o rsa_dec.o
   else # create separate encrypter/decrypter
+    TEST_VENDOR_VAL=([ "$(VENDOR)" != $(IAS_MASTER) ] || \
+      (echo "$(IAS_MASTER) is a reserved vendor name"; false))
+    TEST_VENDOR_LEN=([ `echo $(VENDOR) | wc -c` -le $(MAX_LEN) ] || \
+      (echo "VENDOR id too long (max $$(($(MAX_LEN) - 1)) characters)"; false))
+    TEST_VENDOR=$(TEST_VENDOR_VAL) && $(TEST_VENDOR_LEN)
     TARGETS=rsa_enc rsa_dec
     TARGET_OBJS+=rsa.o
   endif
 
-  CFLAGS+=-DULLONG -DVENDOR=\"$(VENDOR)\" -g
+  CFLAGS+=-DULLONG -DVENDOR_ID_MAX_LEN=$(MAX_LEN) -DVENDOR=\"$(VENDOR)\" -g
 endif
 
 %.o: %.c
@@ -111,8 +119,10 @@ rsa_test: $(TARGET_OBJS) rsa_test.o
 rsa: $(TARGET_OBJS) rsa.o
 	$(CC) -o $@ $(LFLAGS) $^
 rsa_enc: $(TARGET_OBJS) rsa_enc.o
+	@$(TEST_VENDOR)
 	$(CC) -o $@ $(LFLAGS) $^
 rsa_dec: $(TARGET_OBJS) rsa_dec.o
+	@$(TEST_VENDOR)
 	$(CC) -o $@ $(LFLAGS) $^
 
 config:

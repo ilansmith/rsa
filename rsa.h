@@ -1,11 +1,18 @@
 #ifndef _RSA_H_
 #define _RSA_H_
 
+#include "rsa_num.h"
+#include "rsa_util.h"
+
 #if 0
 #define RSA_MASTER (!defined(RSA_ENC) && !defined(RSA_DEC))
 #define RSA_ENCRYPTER (!defined(RSA_DEC) && !RSA_MASTER)
 #define RSA_DECRYPTER (!defined(RSA_ENC) && !RSA_MASTER)
 #endif
+
+#define MAX_FILE_NAME_LEN 256
+#define ENCRYPTER_CHAR 'e'
+#define DECRYPTER_CHAR 'd'
 
 #define	RSA_TBD(msg) printf("TBD: %s\n", (msg))
 #define OPT_FLAG(OPT) (1 << (OPT))
@@ -25,6 +32,8 @@ typedef enum {
     RSA_OPT_VENDOR,
     RSA_OPT_SCANKEY,
     RSA_OPT_SETKEY,
+    RSA_OPT_QUITE,
+    RSA_OPT_VERBOSE,
     RSA_OPT_ENCRYPT,
     RSA_OPT_DECRYPT,
     RSA_OPT_KEYGEN,
@@ -38,16 +47,6 @@ typedef enum {
 #endif
     RSA_OPT_MAX
 } rsa_opt_t;
-
-typedef enum {
-    RSA_ERR_NONE,
-    RSA_ERR_ARGREP,
-    RSA_ERR_NOACTION,
-    RSA_ERR_MULTIACTION,
-    RSA_ERR_NOFILE,
-    RSA_ERR_OPTARG,
-    RSA_ERR_INTERNAL
-} rsa_errno_t;
 
 typedef struct opt_t {
     int code;
@@ -63,12 +62,22 @@ typedef struct {
     rsa_errno_t (* ops_handler_finalize)(int *flags, int actions);
 } rsa_handler_t ;
 
+extern char key_id[KEY_ID_MAX_LEN];
+extern char vendor_id[VENDOR_ID_MAX_LEN];
+
+int opt_short2code(opt_t *options, int opt);
 rsa_errno_t parse_args(int argc, char *argv[], int *flags, 
     rsa_handler_t *handler);
 int rsa_error(char *app, rsa_errno_t err);
-int opt_short2code(opt_t *options, int opt);
 int rsa_set_file_name(char *name);
 rsa_opt_t rsa_action_get(int flags, ...);
 int rsa_action_handle_common(rsa_opt_t action, char *app, 
     opt_t *options_private);
+char *key_path_get(void);
+int rsa_set_key_id(char *id);
+int rsa_set_vendor_id(char *id);
+int rsa_encryption_level_set(char *optarg);
+int rsa_scankey(void);
+void rsa_encode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);
+void rsa_decode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);
 #endif

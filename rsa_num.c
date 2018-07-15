@@ -47,6 +47,7 @@ u1024_t NUM_10 = {.arr[0]=10};
 int bit_sz_u64 = sizeof(u64)<<3;
 int encryption_level;
 int block_sz_u1024;
+int encryption_levels[] = {/* 64,*/ 128, 256, 512, 1024, 0};
 
 typedef int (* func_modular_multiplication_t) (u1024_t *num_res, 
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n);
@@ -56,8 +57,10 @@ typedef struct code2list_t {
     int disabled;
 } code2list_t;
 
-STATIC u1024_t num_montgomery_n, num_montgomery_factor, num_res_nresidue;
+STATIC u1024_t num_montgomery_n, num_res_nresidue;
+static u1024_t num_montgomery_factor;
 STATIC prng_seed_t number_random_seed;
+static int number_generate_coprime_init;
 
 static u64 *code2list(code2list_t *list, int code)
 {
@@ -66,7 +69,22 @@ static u64 *code2list(code2list_t *list, int code)
     return list->code == -1 ? NULL : list->list;
 }
 
-STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
+int number_enclevl_set(int level)
+{
+    int *ptr;
+
+    for (ptr = encryption_levels; *ptr && *ptr != level; ptr++);
+    if (!*ptr)
+	return -1;
+
+    encryption_level = level;
+    block_sz_u1024 = encryption_level / bit_sz_u64;
+    number_generate_coprime_init = 0;
+
+    return 0;
+}
+
+void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
     u1024_t num_big, num_small, num_res;
     u64 *top, *top_max, *seg = NULL, *seg1 = NULL, *seg2 = NULL, carry = 0;
@@ -192,7 +210,7 @@ STATIC int INLINE number_find_most_significant_set_bit(u1024_t *num,
     return minor_offset;
 }
 
-STATIC void INLINE number_small_dec2num(u1024_t *num_n, u64 dec)
+void INLINE number_small_dec2num(u1024_t *num_n, u64 dec)
 {
     u64 zero = (u64)0;
     u64 *ptr = &zero;
@@ -222,7 +240,7 @@ STATIC void INLINE number_2complement(u1024_t *res, u1024_t *num)
     TIMER_STOP(FUNC_NUMBER_2COMPLEMENT);
 }
 
-STATIC void INLINE number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2)
+void INLINE number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
     u1024_t num2_2complement;
 
@@ -278,8 +296,8 @@ STATIC void INLINE number_absolute_value(u1024_t *abs, u1024_t *num)
     TIMER_STOP(FUNC_NUMBER_ABSOLUTE_VALUE);
 }
 
-STATIC void INLINE number_dev(u1024_t *num_q, u1024_t *num_r, 
-    u1024_t *num_dividend, u1024_t *num_divisor)
+void INLINE number_dev(u1024_t *num_q, u1024_t *num_r, u1024_t *num_dividend, 
+    u1024_t *num_divisor)
 {
     u1024_t dividend, divisor, quotient, remainder;
     u64 *seg_dividend = (u64 *)&dividend.arr + block_sz_u1024 - 1;
@@ -485,6 +503,11 @@ Exit:
     number_montgomery_product(&num_res_nresidue, &num_montgomery_factor, &NUM_1,
 	num_n);
     TIMER_START(FUNC_NUMBER_MONTGOMERY_FACTOR_SET);
+}
+
+void INLINE number_montgomery_factor_get(u1024_t *num)
+{
+    number_assign(*num, num_montgomery_factor);
 }
 
 /* a: exponent
@@ -723,7 +746,6 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 {
     int i;
     static u1024_t num_pi, num_mod, num_jumper, num_inc;
-    static int init;
     static small_prime_entry_t small_primes[NUMBER_GENERATE_COPRIME_ARRAY_SZ] = 
     {
 	{2}, {3}, {5}, {7}, {11}, {13}, {17}, {19}, {23}, {29}, {31}, {37}, {41}
@@ -732,13 +754,13 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 #ifdef TESTS
     if (init_reset)
     {
-	init = 0;
+	number_generate_coprime_init = 0;
 	init_reset = 0;
     }
 #endif
 
     TIMER_START(FUNC_NUMBER_GENERATE_COPRIME);
-    if (!init)
+    if (!number_generate_coprime_init)
     {
 	code2list_t exponents[] = {
 	    /* encryption_level 64 is not yet implemented */
@@ -766,7 +788,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 		&num_pi, &num_inc);
 	}
 
-	init = 1;
+	number_generate_coprime_init = 1;
     }
 
     /* generate num_coprime, such that gcd(num_coprime, num_increment) == 1 */
