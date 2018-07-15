@@ -4,22 +4,37 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define EOB (-1)
+#define EOS (-1)
 
-typedef struct {
-	unsigned char *buf;
-	int length;
-	int current;
-	unsigned char mode; /* read: 1<<0, write: 1<<1 */
-} BUFFER;
+typedef void rsa_stream_t;
 
-BUFFER *bopen(const char *path, const char *mode);
-int bclose(BUFFER *bp);
+enum rsa_stream_type {
+	RSA_STREAM_TYPE_FILE,
+	RSA_STREAM_TYPE_MEMORY,
+	RSA_STREAM_TYPE_NONE,
+};
 
-size_t bread(void *ptr, size_t size, size_t nmemb, BUFFER *buffer);
-size_t bwrite(const void *ptr, size_t size, size_t nmemb, BUFFER *buffer);
-int bseek(BUFFER *buffer, long offset, int whence);
+struct rsa_stream_init {
+	enum rsa_stream_type type;
+	union {
+		/* file based parameters */
+		struct {
+			char *path;
+			char *mode;
+		} file;
+		/* memory based parameters */
+		struct {
+			unsigned char *buf;
+			int len;
+		} memory;
+	} params;
+};
 
+rsa_stream_t *sopen(struct rsa_stream_init *init);
+int sclose(rsa_stream_t *s);
 
+size_t sread(void *ptr, size_t size, size_t nmemb, rsa_stream_t *s);
+size_t swrite(void *ptr, size_t size, size_t nmemb, rsa_stream_t *s);
+int sseek(rsa_stream_t *s, long offset, int whence);
 #endif
 
