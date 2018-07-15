@@ -263,12 +263,15 @@ typedef struct {
 } small_prime_entry_t;
 
 int number_enclevl_set(int level);
+int number_data2num(u1024_t *num, void *data, int len);
+int number_size(int level);
 void number_add(u1024_t *res, u1024_t *num1, u1024_t *num2);
 void number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2);
 void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2);
 void number_dev(u1024_t *num_q, u1024_t *num_r, u1024_t *num_dividend, 
     u1024_t *num_divisor);
-prng_seed_t number_seed_set(prng_seed_t seed);
+int number_seed_set_random(u1024_t *seed);
+int number_seed_set_fixed(u1024_t *seed);
 int number_init_random(u1024_t *num, int blocks);
 void number_init_random_coprime(u1024_t *num, u1024_t *coprime);
 void number_find_prime(u1024_t *num);
