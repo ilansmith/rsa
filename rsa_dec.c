@@ -5,7 +5,7 @@
 #include <getopt.h>
 
 #ifndef RSA_MASTER
-static opt_t options_decoder[] = {
+static opt_t options_decrypter[] = {
     {RSA_OPT_FILE, 'f', "file", required_argument, "input file to decrypt"},
     {RSA_OPT_KEYGEN, 'k', "keygen", no_argument, "generate RSA public "
 	"and private keys"},
@@ -13,7 +13,7 @@ static opt_t options_decoder[] = {
 };
 
 /* either encryption or decryption task are to be performed */
-static rsa_errno_t parse_args_finalize_decoder(int *flags, int actions)
+static rsa_errno_t parse_args_finalize_decrypter(int *flags, int actions)
 {
     if (!actions)
 	*flags |= OPT_FLAG(RSA_OPT_DECRYPT);
@@ -28,9 +28,9 @@ static rsa_errno_t parse_args_finalize_decoder(int *flags, int actions)
     return RSA_ERR_NONE;
 }
 
-static rsa_errno_t parse_args_decoder(int opt, int *flags)
+static rsa_errno_t parse_args_decrypter(int opt, int *flags)
 {
-    switch (opt_short2code(options_decoder, opt))
+    switch (opt_short2code(options_decrypter, opt))
     {
     case RSA_OPT_FILE:
 	OPT_ADD(flags, RSA_OPT_FILE, rsa_set_file_name(optarg));
@@ -48,13 +48,13 @@ static rsa_errno_t parse_args_decoder(int opt, int *flags)
 int main(int argc, char *argv[])
 {
     int err, action, flags = 0;
-    rsa_handler_t decoder_handler = {
-	.options = options_decoder,
-	.ops_handler = parse_args_decoder,
-	.ops_handler_finalize = parse_args_finalize_decoder,
+    rsa_handler_t decrypter_handler = {
+	.options = options_decrypter,
+	.ops_handler = parse_args_decrypter,
+	.ops_handler_finalize = parse_args_finalize_decrypter,
     };
 
-    if ((err = parse_args(argc, argv, &flags, &decoder_handler)) != 
+    if ((err = parse_args(argc, argv, &flags, &decrypter_handler)) != 
 	RSA_ERR_NONE)
     {
 	return rsa_error(argv[0], err);
@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 	//rsa_key_generate();
 	break;
     default:
-	return rsa_action_handle_common(action, argv[0], options_decoder);
+	return rsa_action_handle_common(action, argv[0], options_decrypter);
     }
 
     return 0;
