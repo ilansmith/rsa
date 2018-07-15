@@ -14,7 +14,7 @@
 enum {
 	DISABLE_UCHAR = 1<<0,
 	DISABLE_USHORT = 1<<1,
-	DISABLE_ULONG = 1<<2,
+	DISABLE_UINT = 1<<2,
 	DISABLE_ULLONG_64 = 1<<3,
 	DISABLE_ULLONG_128 = 1<<4,
 	DISABLE_ULLONG_256 = 1<<5,
@@ -395,7 +395,7 @@ static void p_local_timer(void)
 static int test001(void)
 {
 	p_comment_nl("bit_sz_u64 = %d", bit_sz_u64);
-#if defined(UCHAR) || defined(USHORT) || defined(ULONG)
+#if defined(UCHAR) || defined(USHORT) || defined(UINT)
 	p_comment_nl("block_sz_u1024 = %d", block_sz_u1024);
 	p_comment_nl("encryption_level = bit_sz_u64*block_sz_u1024 = %d*%d = "
 		"%d", bit_sz_u64, block_sz_u1024, encryption_level);
@@ -409,7 +409,7 @@ static int test001(void)
 	return !(bit_sz_u64==8 && block_sz_u1024==16 && encryption_level==128);
 #elif defined(USHORT)
 	return !(bit_sz_u64==16 && block_sz_u1024==16 && encryption_level==256);
-#elif defined(ULONG)
+#elif defined(UINT)
 	return !(bit_sz_u64==32 && block_sz_u1024==16 && encryption_level==512);
 #else
 	switch (encryption_level)
@@ -1504,7 +1504,7 @@ static int test056(void)
 
 #if defined USHORT
 #define FMT_SZ "%hu"
-#elif defined ULONG
+#elif defined UINT
 #define FMT_SZ "%lu"
 #else
 #define FMT_SZ "%llu"
@@ -2759,22 +2759,22 @@ static test_t rsa_tests[] = {
 	{
 		description: "number_dec2bin()",
 		func: test007,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_dec2bin() - edge conditions",
 		func: test008,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_dec2bin() - max size number",
 		func: test009,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT,
 	},
 	{
 		description: "number_dec2bin() - edge conditions",
 		func: test010,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT,
 	},
 	{
 		description: "number_init_random() - compare many numbers",
@@ -2788,12 +2788,12 @@ static test_t rsa_tests[] = {
 	{
 		description: "number_add() - edge condition",
 		func: test017,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_add() - functionality",
 		func: test018,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_add() - random numbers",
@@ -2809,14 +2809,14 @@ static test_t rsa_tests[] = {
 	{
 		description: "number_shift_right_once() - basic functionality",
 		func: test025,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_256 |
 			DISABLE_ULLONG_512 | DISABLE_ULLONG_1024,
 	},
 	{
 		description: "number_shift_right()",
 		func: test026,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_shift_left() - functionality",
@@ -2825,34 +2825,34 @@ static test_t rsa_tests[] = {
 	{
 		description: "number_shift_left() - edge condition",
 		func: test028,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_shift_left() - edge conditions, "
 			"random numbers",
 		func: test029,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	/* number multiplication */
 	{
 		description: "number_mul() - multiplicand > multiplier",
 		func: test031,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_mul() - multiplicand < multiplier",
 		func: test032,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_mul() - big numbers",
 		func: test033,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "(2x3x11x13x17x19)^10 x (5x7x23x29x31x37x41)^11",
 		func: test034,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_128 |
 			DISABLE_ULLONG_256 | DISABLE_ULLONG_512,
 	},
@@ -2860,7 +2860,7 @@ static test_t rsa_tests[] = {
 		description: "multiply the first 75 primes (and again by the "
 			"4th)",
 		func: test035,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 		DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 |
 		DISABLE_ULLONG_512,
 	},
@@ -2868,73 +2868,73 @@ static test_t rsa_tests[] = {
 	{
 		description: "number_is_greater() and number_is_equal()",
 		func: test041,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_is_greater() u1024_t.arr.buffer != 0",
 		func: test042,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_128 |
 			DISABLE_ULLONG_256 | DISABLE_ULLONG_512,
 	},
 	{
 		description: "number_sub() - basic functionality",
 		func: test043,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_sub() - advanced functionality",
 		func: test044,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_sub() - subtracting from zero",
 		func: test045,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "negative numbers",
 		func: test046,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_absolute_value()",
 		func: test047,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "negative and absolute numbers",
 		func: test048,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	/* number devision */
 	{
 		description: "number_dev() - basic functionality",
 		func: test051,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_dev()",
 		func: test052,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_dev() - dividing a number by a larger "
 			"number",
 		func: test053,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "dividing a 475 bit number by 29",
 		func: test054,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_128 |
 			DISABLE_ULLONG_256 | DISABLE_ULLONG_512,
 	},
 	{
 		description: "number_mod() sanity test",
 		func: test055,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT,
 	},
 	{
 		description: "number_extended_euclid_gcd()",
@@ -2944,41 +2944,41 @@ static test_t rsa_tests[] = {
 	{
 		description: "number_modular_multiplicative_inverse()",
 		func: test057,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT,
 	},
 	/* finding most significant bit */
 	{
 		description: "number_find_most_significant_set_bit()",
 		func: test061,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_find_most_significant_set_bit()",
 		func: test062,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT,
 	},
 	/* naive modular multiplication */
 	{
 		description: "number_modular_multiplication_naive()",
 		func: test063,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "naive modular multiplication and exponentiation",
 		func: test064,
-		disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_UCHAR | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	/* naive modular exponentiation */
 	{
 		description: "number_modular_exponentiation_naive() - basic "
 			"functionality",
 		func: test066,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_modular_exponentiation_naive() - advanced",
 		func: test067,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_modular_exponentiation_naive()",
@@ -2989,13 +2989,13 @@ static test_t rsa_tests[] = {
 		description: "number_modular_exponentiation_naive() - large "
 			"power of 2",
 		func: test069,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT,
 	},
 	/* setting montgomery factor: 2^(2(encryption_level+2)) */
 	{
 		description: "number_montgomery_factor_set()",
 		func: test071,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_128 |
 			DISABLE_ULLONG_256 | DISABLE_ULLONG_512,
 	},
@@ -3045,46 +3045,46 @@ static test_t rsa_tests[] = {
 	{
 		description: "exponentiation modulo a large number",
 		func: test086,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_128 |
 			DISABLE_ULLONG_256 | DISABLE_ULLONG_512,
 	},
 	{
 		description: "2^(encryption_level - 1)",
 		func: test087,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_TIME_FUNCTIONS,
 	},
 	/* prime testing */
 	{
 		description: "number_witness() - basic functionality",
 		func: test091,
-		disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_USHORT | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_is_prime(7) - basic functionality",
 		func: test092,
-		disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_UCHAR | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_is_prime(9)",
 		func: test093,
-		disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_UCHAR | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_is_prime(17) - basic functionality",
 		func: test094,
-		disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_UCHAR | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_is_prime(99991)",
 		func: test095,
-		disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG,
+		disabled: DISABLE_UCHAR | DISABLE_UINT | DISABLE_ULLONG,
 	},
 	{
 		description: "number_is_prime() primes in [3, 999]",
 		func: test096,
-		disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG_64 |
+		disabled: DISABLE_UCHAR | DISABLE_UINT | DISABLE_ULLONG_64 |
 			DISABLE_ULLONG_256 | DISABLE_ULLONG_512 |
 			DISABLE_ULLONG_1024,
 	},
@@ -3107,7 +3107,7 @@ static test_t rsa_tests[] = {
 	{
 		description: "number_is_prime(94R(71)7) - 475 bit non prime",
 		func: test100,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_128 |
 			DISABLE_ULLONG_256 | DISABLE_ULLONG_512 |
 			DISABLE_TIME_FUNCTIONS,
@@ -3115,7 +3115,7 @@ static test_t rsa_tests[] = {
 	{
 		description: "number_is_prime(94R(71)9) - 475 bit prime",
 		func: test101,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_128 |
 			DISABLE_ULLONG_256 | DISABLE_ULLONG_512 |
 			DISABLE_TIME_FUNCTIONS,
@@ -3125,24 +3125,24 @@ static test_t rsa_tests[] = {
 			"2,285,760,293,497,823,444,790,323,455,592,340,983,"
 			"477) - very large non prime",
 		func: test102,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT,
 	},
 	/* RSA key generation, encryption and decryption */
 	{
 		description: "co prime testing",
 		func: test106,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT,
 	},
 	{
 		description: "number_find_prime()",
 		func: test107,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT,
 	},
 	{
 		description: "encryption - decryption with "
 			"length(n=p1xp2)=1024 bits",
 		func: test108,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_128 |
 			DISABLE_ULLONG_256 | DISABLE_ULLONG_512,
 	},
@@ -3150,28 +3150,28 @@ static test_t rsa_tests[] = {
 		description: "encryption - decryption: overflow during "
 			"num_montgomery_factor creation",
 		func: test109,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_256 |
 			DISABLE_ULLONG_512 | DISABLE_ULLONG_1024,
 	},
 	{
 		description: "number_str2num()",
 		func: test110,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_256 |
 			DISABLE_ULLONG_512 | DISABLE_ULLONG_1024,
 	},
 	{
 		description: "mul, add and shift",
 		func: test112,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 		DISABLE_ULLONG_64 | DISABLE_ULLONG_256 | DISABLE_ULLONG_512 |
 		DISABLE_ULLONG_1024,
 	},
 	{
 		description: "multiple encryption",
 		func: test116,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_256 |
 			DISABLE_ULLONG_512,
 	},
@@ -3179,14 +3179,14 @@ static test_t rsa_tests[] = {
 		description: "complete RSA test - key generation, encryption "
 			"and decryption",
 		func: test117,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_TIME_FUNCTIONS,
 	},
 	{
 		description: "multiple RSA key generation (" MULTIPLE_RSA
 			" iterations)",
 		func: test118,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_256 |
 			DISABLE_ULLONG_512 | DISABLE_ULLONG_1024 |
 			DISABLE_TIME_FUNCTIONS,
@@ -3196,14 +3196,14 @@ static test_t rsa_tests[] = {
 		description: "complete RSA + symmetric key test - key "
 			"generation, encryption and decryption",
 		func: test120,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_TIME_FUNCTIONS,
 	},
 	{
 		description: "multiple encryption using symmetric/asymmetric "
 			"key combination",
 		func: test125,
-		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG |
+		disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_UINT |
 			DISABLE_ULLONG_64 | DISABLE_ULLONG_256 |
 			DISABLE_ULLONG_512,
 	},
@@ -3220,7 +3220,7 @@ static char *p_u64_type(void)
 		"unsigned char"
 #elif defined USHORT
 		"unsigned short"
-#elif defined ULONG
+#elif defined UINT
 		"unsigned long"
 #else
 		"unsigned long long"
@@ -3232,7 +3232,7 @@ static char *p_u64_type(void)
 
 static void rsa_tests_init(int argc, char *argv[])
 {
-#if defined(UCHAR) || defined(USHORT) || defined(ULONG)
+#if defined(UCHAR) || defined(USHORT) || defined(UINT)
 	block_sz_u1024 = 16;
 	encryption_level = bit_sz_u64 * block_sz_u1024;
 #else
@@ -3256,8 +3256,8 @@ static int rsa_is_disabled(int flags)
 	return flags & DISABLE_UCHAR;
 #elif defined(USHORT)
 	return flags & DISABLE_USHORT;
-#elif defined(ULONG)
-	return flags & DISABLE_ULONG;
+#elif defined(UINT)
+	return flags & DISABLE_UINT;
 #else /* ULLONG */
 	switch (encryption_level)
 	{
