@@ -62,11 +62,11 @@ static int key_files_generate(char *private_name, FILE **private_key,
     return 0;
 }
 
-static int rsa_sign(FILE *key, char key_type, u1024_t *exp, u1024_t *n)
+static int rsa_sign(FILE *key, char keytype, u1024_t *exp, u1024_t *n)
 {
     u1024_t signiture, id;
 
-    *key_id = key_type;
+    *key_id = keytype;
     if (number_str2num(&id, key_id))
 	return -1;
 
@@ -175,8 +175,8 @@ int rsa_keygen(void)
 	rsa_printf(1, 2, "writing %d bit keys...", *level);
 	if (is_first)
 	{
-	    if (rsa_sign(private_key, DECRYPTER_CHAR, &e, &n) || 
-		rsa_sign(public_key, ENCRYPTER_CHAR, &d, &n))
+	    if (rsa_sign(private_key, RSA_KEY_TYPE_PRIVATE, &e, &n) || 
+		rsa_sign(public_key, RSA_KEY_TYPE_PUBLIC, &d, &n))
 	    {
 		ret = -1;
 		goto Exit;
@@ -257,6 +257,7 @@ int main(int argc, char *argv[])
 {
     int err, action, flags = 0;
     rsa_handler_t decrypter_handler = {
+	.keytype = RSA_KEY_TYPE_PRIVATE,
 	.options = options_decrypter,
 	.ops_handler = parse_args_decrypter,
 	.ops_handler_finalize = parse_args_finalize_decrypter,
@@ -277,7 +278,7 @@ int main(int argc, char *argv[])
     case OPT_FLAG(RSA_OPT_KEYGEN):
 	return rsa_keygen();
     default:
-	return rsa_action_handle_common(action, argv[0], options_decrypter);
+	return rsa_action_handle_common(action, argv[0], &decrypter_handler);
     }
 
     return 0;

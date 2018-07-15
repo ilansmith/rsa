@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #if RSA_MASTER
 #include "rsa_enc.h"
@@ -17,6 +18,11 @@
 
 #define  MIN(x, y) ((x) < (y) ? (x) : (y))
 
+typedef struct keyname_t {
+    struct keyname_t *next;
+    char name[2][KEY_ID_MAX_LEN]; /* [PRIVATE][PUBLIC] */
+} keyname_t;
+
 static char optstring[3 * RSA_OPT_MAX];
 static struct option longopts[RSA_OPT_MAX];
 static char file_name[MAX_FILE_NAME_LEN];
@@ -25,12 +31,15 @@ char key_id[KEY_ID_MAX_LEN];
 
 static opt_t options_common[] = {
     {RSA_OPT_HELP, 'h', "help", no_argument, "print this message and exit"},
-    {RSA_OPT_SCANKEY, 's', "scankeys", no_argument, "scan available keys"},
+    {RSA_OPT_SCANKEYS, 's', "scankeys", no_argument, "scan available keys"},
     {RSA_OPT_SETKEY, 'x', "setkey", required_argument, "set rsa key"},
+    {RSA_OPT_PATH, 'p', "path", no_argument, "specify the key search "
+	"directory. the key directory can be set by the RSA_KEYPATH "
+	"environment variable. if it is not set, the current working directory "
+	"is assumed"},
     {RSA_OPT_QUITE, 'q', "quite", no_argument, "set quite output"},
     {RSA_OPT_VERBOSE, 'v', "verbose", no_argument, "set verbose output"},
 #if 0
-    {RSA_OPT_PATH, 'p', "path", no_argument, "specify key directory"},
     {RSA_OPT_STDIN , 'i', "stdin", required_argument, "recieve input from "
 	"standard input rather than a file"},
 #endif
@@ -130,14 +139,19 @@ int rsa_set_file_name(char *name)
 
 static rsa_errno_t parse_args_finalize(int *flags, rsa_handler_t *handler)
 {
-    int act_help, act_scankey, act_setkey, actions;
+    int actions = 0;
 
-    act_help = *flags & OPT_FLAG(RSA_OPT_HELP) ? 1 : 0;
-    act_scankey = *flags & OPT_FLAG(RSA_OPT_SCANKEY) ? 1 : 0;
-    act_setkey = *flags & OPT_FLAG(RSA_OPT_SETKEY) ? 1 : 0;
+    if (*flags & OPT_FLAG(RSA_OPT_HELP))
+	actions++;
+    if (*flags & OPT_FLAG(RSA_OPT_SCANKEYS))
+	actions++;
+    if (*flags & OPT_FLAG(RSA_OPT_SETKEY))
+	actions++;
+    if (*flags & OPT_FLAG(RSA_OPT_PATH))
+	actions++;
 
     /* test for a single action option */
-    if ((actions = act_help + act_scankey + act_setkey) > 1)
+    if (actions > 1)
 	return RSA_ERR_MULTIACTION;
 
     return handler->ops_handler_finalize(flags, actions);
@@ -155,7 +169,8 @@ rsa_errno_t parse_args(int argc, char *argv[], int *flags,
 	switch (code = opt_short2code(options_common, opt))
 	{
 	case RSA_OPT_HELP:
-	case RSA_OPT_SCANKEY:
+	case RSA_OPT_SCANKEYS:
+	case RSA_OPT_PATH:
 	    OPT_ADD(flags, code)
 	    break;
 	case RSA_OPT_SETKEY:
@@ -306,12 +321,108 @@ int rsa_encryption_level_set(char *optarg)
     return (*err) ? -1 : number_enclevl_set(level);
 }
 
-int rsa_scankey(void)
+static int rsa_key_size(void)
+{
+#define LEN(X) (((X)+64)/sizeof(u64) + sizeof(int))
+
+    int *level, accum = 0;
+
+    for (level = encryption_levels; *level; level++)
+	accum+=LEN(*level);
+
+    return strlen(RSA_SIGNITURE) + LEN(encryption_levels[0]) + 3*accum;
+}
+
+static FILE *rsa_dirent2file(struct dirent *ent)
+{
+    struct stat st;
+    int siglen = strlen(RSA_SIGNITURE);
+    char signiture[siglen], *path = key_path_get(), *fname;
+    FILE *f = NULL;
+
+    if (!(fname = malloc(strlen(path) + 1 + strlen(ent->d_name) + 1)))
+	return NULL;
+
+    sprintf(fname, "%s/%s", path, ent->d_name);
+    if (stat(fname, &st) || st.st_size != rsa_key_size() || 
+	!(f = fopen(fname, "r")))
+    {
+	goto Exit;
+    }
+
+    if (rsa_read_str(f, signiture, siglen) || 
+	memcmp(RSA_SIGNITURE, signiture, siglen))
+    {
+	fclose(f);
+	f = NULL;
+    }
+
+Exit:
+    free(fname);
+    return f;
+}
+
+static int keyname_insert(keyname_t **base, char *name, char keytype)
+{
+    for ( ; *base && strcmp((*base)->name[keytype==RSA_KEY_TYPE_PRIVATE], name);
+	base = &(*base)->next);
+
+    if (!*base && !(*base = calloc(1, sizeof(keyname_t))))
+	return -1;
+
+    sprintf((*base)->name[keytype == RSA_KEY_TYPE_PUBLIC], "%s", name);
+    return 0;
+}
+
+static void rsa_keyname(FILE *key, keyname_t **keynames, char accept)
+{
+    u1024_t scrambled_id, id, exp, n, montgomery_factor;
+    char keytype;
+
+    number_enclevl_set(encryption_levels[0]);
+    rsa_read_u1024_full(key, &scrambled_id);
+    rsa_read_u1024_full(key, &n);
+    rsa_read_u1024_full(key, &exp);
+    rsa_read_u1024_full(key, &montgomery_factor);
+    number_montgomery_factor_set(&n, &montgomery_factor);
+
+    rsa_decode(&id, &scrambled_id, &exp, &n);
+    keytype = *(char*)id.arr;
+    if (!(keytype & accept))
+	return;
+    keyname_insert(keynames, (char*)id.arr + 1, keytype);
+}
+
+static void keyname_display(keyname_t *base, char keytype)
+{
+    char fmt[10];
+
+    sprintf(fmt, "%%-%ds", KEY_ID_MAX_LEN);
+    if (keytype & RSA_KEY_TYPE_PRIVATE)
+	printf(fmt, "private keys");
+    if (keytype & RSA_KEY_TYPE_PUBLIC)
+	printf(fmt, "public keys");
+    printf("\n");
+    while (base)
+    {
+	keyname_t *cur = base;
+	base = base->next;
+
+	if (keytype & RSA_KEY_TYPE_PRIVATE)
+	    printf(fmt, cur->name[0]);
+	if (keytype & RSA_KEY_TYPE_PUBLIC)
+	    printf(fmt, cur->name[1]);
+	printf("\n");
+	free(cur);
+    }
+}
+
+static int rsa_scankeys(char keytype)
 {
     DIR *dir;
     struct dirent *ent;
+    keyname_t *keynames = NULL;
 
-    RSA_TBD("handle RSA_OPT_SCANKEY");
     if (!(dir = opendir(key_path_get())))
     {
 	output_error_message(RSA_ERR_KEYPATH);
@@ -320,18 +431,34 @@ int rsa_scankey(void)
 
     while ((ent = readdir(dir)))
     {
-	/* scan keys */
+	FILE *key;
+	
+	if (!(key = rsa_dirent2file(ent)))
+	    continue;
+	rsa_keyname(key, &keynames, keytype);
+	fclose(key);
     }
 
+    keyname_display(keynames, keytype);
     return closedir(dir);
+}
+
+static void rsa_show_path(void)
+{
+    char *path = key_path_get();
+
+    if (!strcmp(path, "."))
+	printf("current directory\n");
+    else
+	printf("%s/\n", path);
 }
 
 rsa_opt_t rsa_action_get(int flags, ...)
 {
     va_list va;
     rsa_opt_t new;
-    int actions = OPT_FLAG(RSA_OPT_HELP) | OPT_FLAG(RSA_OPT_SCANKEY) | 
-	OPT_FLAG(RSA_OPT_SETKEY);
+    int actions = OPT_FLAG(RSA_OPT_HELP) | OPT_FLAG(RSA_OPT_SCANKEYS) | 
+	OPT_FLAG(RSA_OPT_SETKEY) | OPT_FLAG(RSA_OPT_PATH);
 
     va_start(va, flags);
     while ((new = va_arg(va, rsa_opt_t)))
@@ -342,18 +469,21 @@ rsa_opt_t rsa_action_get(int flags, ...)
 }
 
 int rsa_action_handle_common(rsa_opt_t action, char *app, 
-    opt_t *options_private)
+    rsa_handler_t *handler)
 {
     switch (action)
     {
     case OPT_FLAG(RSA_OPT_HELP):
-	output_help(app, options_private);
+	output_help(app, handler->options);
 	break;
-    case OPT_FLAG(RSA_OPT_SCANKEY):
-	rsa_scankey();
+    case OPT_FLAG(RSA_OPT_SCANKEYS):
+	rsa_scankeys(handler->keytype);
 	break;
     case OPT_FLAG(RSA_OPT_SETKEY):
 	RSA_TBD("handle RSA_OPT_SETKEY");
+	break;
+    case OPT_FLAG(RSA_OPT_PATH):
+	rsa_show_path();
 	break;
     default:
 	return rsa_error(app, RSA_ERR_INTERNAL);
@@ -423,18 +553,19 @@ static opt_t options_master[] = {
 /* either encryption or decryption task are to be performed */
 static rsa_errno_t parse_args_finalize_master(int *flags, int actions)
 {
-    int act_encrypt, act_decrypt, act_keygen;
-
     /* RSA_OPT_LEVEL and RSA_OPT_RSAENC imply RSA_OPT_ENCRYPT */
     if (*flags & (OPT_FLAG(RSA_OPT_LEVEL) | OPT_FLAG(RSA_OPT_RSAENC)))
 	*flags |= OPT_FLAG(RSA_OPT_ENCRYPT);
 
-    act_encrypt = *flags & OPT_FLAG(RSA_OPT_ENCRYPT) ? 1 : 0;
-    act_decrypt = *flags & OPT_FLAG(RSA_OPT_DECRYPT) ? 1 : 0;
-    act_keygen = *flags & OPT_FLAG(RSA_OPT_KEYGEN) ? 1 : 0;
+    if (*flags & OPT_FLAG(RSA_OPT_ENCRYPT))
+	actions++;
+    if (*flags & OPT_FLAG(RSA_OPT_DECRYPT))
+	actions++;
+    if (*flags & OPT_FLAG(RSA_OPT_KEYGEN))
+	actions++;
 
     /* test for a single action option */
-    if ((actions += act_encrypt + act_decrypt + act_keygen) != 1)
+    if (actions != 1)
 	return actions ? RSA_ERR_MULTIACTION : RSA_ERR_NOACTION;
     /* test for non compatable options with encrypt/decrypt */
     else if ((*flags & (OPT_FLAG(RSA_OPT_ENCRYPT) | OPT_FLAG(RSA_OPT_DECRYPT))) 
@@ -483,6 +614,7 @@ int main(int argc, char *argv[])
 {
     int err, action, flags = 0;
     rsa_handler_t master_handler = {
+	.keytype = RSA_KEY_TYPE_PUBLIC | RSA_KEY_TYPE_PRIVATE,
 	.options = options_master,
 	.ops_handler = parse_args_master,
 	.ops_handler_finalize = parse_args_finalize_master,
@@ -511,7 +643,7 @@ int main(int argc, char *argv[])
     case OPT_FLAG(RSA_OPT_KEYGEN):
 	return rsa_keygen();
     default:
-	return rsa_action_handle_common(action, argv[0], options_master);
+	return rsa_action_handle_common(action, argv[0], &master_handler);
     }
 
     return 0;
