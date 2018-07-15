@@ -1867,42 +1867,35 @@ static int test091(void)
     return number_witness(&a, &n);
 }
 
+static int test_is_prime(char *candidate)
+{
+    u1024_t num;
+    int is_prime;
+
+    number_dec2bin(&num, candidate);
+    is_prime = number_is_prime(&num);
+    p_comment_nl("%s is %sprime", candidate, is_prime ? "" : "not ");
+    return is_prime;
+}
+
 static int test092(void)
 {
-    u1024_t num_n;
-
-    number_dec2bin(&num_n, "7");
-    return !number_is_prime(&num_n);
+    return !test_is_prime("7");
 }
 
 static int test093(void)
 {
-    u1024_t num_9;
-
-    number_dec2bin(&num_9, "9");
-    if (number_is_prime(&num_9))
-    {
-	p_comment_nl("9 is non prime and was found to be prime");
-	return -1;
-    }
-    return 0;
+    return test_is_prime("9");
 }
 
 static int test094(void)
 {
-    u1024_t num_n;
-
-    number_small_dec2num(&num_n, (u64)17);
-    return !number_is_prime(&num_n);
+    return !test_is_prime("17");
 }
 
 static int test095(void)
 {
-    u1024_t n;
-    char *dec = "99991";
-
-    number_dec2bin(&n, dec);
-    return !number_is_prime(&n);
+    return !test_is_prime("99991");
 }
 
 static int test096(void)
@@ -1975,39 +1968,17 @@ static int test096(void)
 
 static int test097(void)
 {
-    u1024_t num;
-    u64 p = (u64)1299709;
-    int ret;
-
-    number_small_dec2num(&num, p);
-    p_u1024(&num);
-    ret = number_is_prime(&num);
-    p_comment_nl("1299709 is prime%s", ret ? 
-	"" : " and was found to be not prime");
-    return !ret;
+    return !test_is_prime("1299709");
 }
 
 static int test098(void)
 {
-    u1024_t num_n;
-    char *prime = "10726904659";
-    int is_prime;
-
-    number_dec2bin(&num_n, "10726904659");
-    p_comment_nl("%s is %sprime", prime, is_prime ? "" : "not ");
-    return !is_prime;
+    return !test_is_prime("10726904659");
 }
 
 static int test099(void)
 {
-    u1024_t num_n;
-    char *prime = "55350776431903243";
-    int is_prime;
-
-    number_dec2bin(&num_n, prime);
-    is_prime = number_is_prime(&num_n);
-    p_comment_nl("%s is %sprime", prime, is_prime ? "" : "not ");
-    return !is_prime;
+    return !test_is_prime("55350776431903243");
 }
 
 #define LSB_94R71_7 '7'
