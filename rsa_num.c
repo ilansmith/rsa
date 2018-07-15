@@ -220,7 +220,6 @@ void functions_stat(void)
 
 #define IS_DIGIT(n) ((n)>='0' && (n)<='9')
 #define CHAR_2_INT(c) ((int)((c) - '0'))
-#define ARRAY_SZ(X) (sizeof(X) / sizeof((X)[0]))
 #define COPRIME_PRIME(X) ((X).prime)
 #define COPRIME_DIVISOR(X) ((X).divisor)
 #define NUMBER_IS_NEGATIVE(X) (((u64)(~((u64)-1 >> 1)) & \
