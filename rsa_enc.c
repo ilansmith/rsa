@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <limits.h>
 #include "mt19937_64.h"
 #include "rsa.h"
 #include "rsa_num.h"
@@ -54,20 +55,54 @@ static int rsa_encrypt_header_common(rsa_key_t *key, FILE *cipher, int is_full)
 	rsa_encrypt_seed(key, cipher);
 }
 
+/* Large File System (LFS) is not supported */
+static int rsa_assert_non_lfs(int is_full)
+{
+    unsigned int length;
+
+    /* common to full and quick RSA headers: encrypted key data and seed */
+    length = number_size(encryption_levels[0]) + number_size(encryption_level);
+
+    if (is_full)
+    {
+	int arr_sz = rsa_encryption_level/sizeof(u64);
+
+	/* encrypted length of original file and number of RSA u1024_t's */
+	length += number_size(encryption_levels[0]) + 
+	    ((file_size + arr_sz - 1)/arr_sz) * number_size(encryption_level);
+    }
+    else
+    {
+	/* encrypted data has same length as original data */
+	length += file_size;
+    }
+
+    if (length > INT_MAX)
+    {
+	char desc[40];
+
+	sprintf(desc, "for %d bit %s RSA encryption", encryption_level, 
+	    is_full ? "full" : "quick");
+	rsa_error_message(RSA_ERR_FILE_TOO_LARGE, file_name, desc);
+	return -1;
+    }
+
+    return 0;
+}
+
 static int rsa_encrypt_length(rsa_key_t *key, FILE *cipher)
 {
-    struct stat st;
     u1024_t length;
 
-    if (stat(file_name, &st) || rsa_key_enclev_set(key, encryption_levels[0]))
+    if (rsa_key_enclev_set(key, encryption_levels[0]))
 	return -1;
 
-    number_data2num(&length, &st.st_size, sizeof(st.st_size));
+    number_data2num(&length, &file_size, sizeof(file_size));
     rsa_encode(&length, &length, &key->exp, &key->n);
     if (rsa_write_u1024_full(cipher, &length))
 	return -1;
 
-    return rsa_key_enclev_set(key, rsa_encryption_level) ? -1 : st.st_size;
+    return rsa_key_enclev_set(key, rsa_encryption_level) ? -1 : file_size;
 }
 
 static int rsa_encrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher, 
@@ -75,9 +110,12 @@ static int rsa_encrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
 {
     int is_enable;
 
-    /* open RSA public key */
-    if (!(*key = rsa_key_open(RSA_KEY_TYPE_PUBLIC)))
+    /* assert that resulting files will not be LFS and open RSA public key */
+    if (rsa_assert_non_lfs(is_full) || 
+	!(*key = rsa_key_open(RSA_KEY_TYPE_PUBLIC)))
+    {
 	return -1;
+    }
 
     /* open file to encrypt */
     if (!(*data = fopen(file_name, "r")))
@@ -154,7 +192,7 @@ int rsa_encrypt_full(void)
 {
     rsa_key_t *key;
     FILE *data, *cipher;
-    int len, data_buf_len, num_buf_len, data_sz, num_sz;
+    int len, data_buf_len, num_buf_len, arr_sz, num_sz;
 
     if (rsa_encrypt_prolog(&key, &data, &cipher, 1))
 	return -1;
@@ -166,8 +204,8 @@ int rsa_encrypt_full(void)
     }
 
     /* full encryption */
-    data_sz = rsa_encryption_level/sizeof(u64);
-    data_buf_len = BUF_LEN_UNIT_FULL * data_sz;
+    arr_sz = rsa_encryption_level/sizeof(u64);
+    data_buf_len = BUF_LEN_UNIT_FULL * arr_sz;
     num_sz = number_size(rsa_encryption_level);
     num_buf_len = BUF_LEN_UNIT_FULL * num_sz;
     rsa_timeline_init(len);
@@ -178,9 +216,9 @@ int rsa_encrypt_full(void)
 	int i;
 
 	len = fread(buf, sizeof(char), data_buf_len, data);
-	for (i = 0; len && i < (len-1)/data_sz + 1; i++)
+	for (i = 0; len && i < (len-1)/arr_sz + 1; i++)
 	{
-	    number_data2num(&nums[i], &buf[i*data_sz], data_sz);
+	    number_data2num(&nums[i], &buf[i*arr_sz], arr_sz);
 	    rsa_encode(&nums[i], &nums[i], &key->exp, &key->n);
 	    rsa_write_u1024_full(cipher, &nums[i]);
 	    rsa_timeline();
