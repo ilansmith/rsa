@@ -35,6 +35,7 @@ char key_data[KEY_DATA_MAX_LEN];
 int rsa_encryption_level;
 int is_encryption_info_only;
 int file_size;
+int keep_orig_file;
 
 static opt_t options_common[] = {
     {RSA_OPT_HELP, 'h', "help", no_argument, "print this message and exit"},

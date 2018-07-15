@@ -21,6 +21,9 @@ static opt_t options_master[] = {
 	"default key if it has been set. this switch implies encryption"},
     {RSA_OPT_DECRYPT, 'd', "decrypt", no_argument, "decrypt the ciphertext "
 	"stated by --file"},
+    {RSA_OPT_ORIG_FILE, 'o', "original", no_argument, "keep the original file. "
+	"if this option is not set the file will be deleted after it has been "
+	"encrypted/decrypted"},
     {RSA_OPT_KEYGEN, 'g', "generate", required_argument, "generate an RSA "
 	"public/private key pair. " ARG " is its name"},
     {RSA_OPT_ENC_INFO_ONLY, 'i', "info", no_argument, "get info regarding an "
@@ -93,6 +96,10 @@ static int parse_args_master(int opt, int *flags)
 	break;
     case RSA_OPT_DECRYPT:
 	OPT_ADD(flags, RSA_OPT_DECRYPT);
+	break;
+    case RSA_OPT_ORIG_FILE:
+	OPT_ADD(flags, RSA_OPT_ORIG_FILE);
+	keep_orig_file = 1;
 	break;
     case RSA_OPT_KEYGEN:
 	OPT_ADD(flags, RSA_OPT_KEYGEN);

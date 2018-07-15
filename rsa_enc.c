@@ -158,6 +158,8 @@ static void rsa_encrypt_epilog(rsa_key_t *key, FILE *data, FILE *cipher)
     rsa_key_close(key);
     fclose(data);
     fclose(cipher);
+    if (!keep_orig_file)
+	remove(file_name);
 }
 
 int rsa_encrypt_quick(void)
