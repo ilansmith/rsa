@@ -936,7 +936,7 @@ static void rsa_setkey_symlink_set(rsa_keyring_t *kr, int idx)
     }
     else if (kr->keys[idx])
     {
-	unlink(lnkname);
+	remove(lnkname);
 	symlink(kr->keys[idx]->path, lnkname);
 	key_set_display(idx ? "public" : "private");
     }
@@ -958,13 +958,13 @@ static void rsa_delkey_links(char keytype)
     {
 	key_set_display("private");
 	sprintf(lnkname, "%s/%s", key_path_get(), RSA_KEYLINK_PREFIX ".prv");
-	unlink(lnkname);
+	remove(lnkname);
     }
     if (keytype & RSA_KEY_TYPE_PUBLIC)
     {
 	key_set_display("public");
 	sprintf(lnkname, "%s/%s", key_path_get(), RSA_KEYLINK_PREFIX ".pub");
-	unlink(lnkname);
+	remove(lnkname);
     }
 }
 
@@ -1063,7 +1063,7 @@ static void rsa_zero_one(u1024_t *res, u1024_t *data)
 
     number_assign(*res, *data);
     for (i = 0; i < block_sz_u1024; i++)
-	res->arr[i] ^= (u64)genrand64_int64();
+	res->arr[i] ^= RSA_RANDOM();
     res->top = -1;
 }
 
