@@ -30,6 +30,7 @@ CONFFILE=rsa.mk
 -include $(CONFFILE)
 
 CFLAGS=-Wall -Werror 
+LFLAGS=-lm
 
 # Takuji Nishimura and Makoto Matsumoto's 64-bit version of Mersenne Twister 
 # pseudorandom number generator
@@ -119,7 +120,7 @@ endif
 all: $(TARGET)
 
 $(TARGET): $(TARGET_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ -lm
+	$(CC) $(LFLAGS) -o $@ $^
 
 config:
 	@echo "doing make config"
