@@ -32,6 +32,7 @@ char file_name[MAX_FILE_NAME_LEN];
 char newfile_name[MAX_FILE_NAME_LEN + 4];
 char key_data[KEY_DATA_MAX_LEN];
 int rsa_encryption_level;
+int is_encryption_info_only;
 
 static opt_t options_common[] = {
     {RSA_OPT_HELP, 'h', "help", no_argument, "print this message and exit"},
@@ -683,7 +684,7 @@ rsa_key_t *rsa_key_open(char accept)
     if (is_public && *key_data)
 	return rsa_key_open_dyn(RSA_KEY_TYPE_PUBLIC);
 
-    key = rsa_key_open_default(accept);
+    key = is_encryption_info_only ? NULL : rsa_key_open_default(accept);
 
     if (!is_public && !key)
 	key = rsa_key_open_dyn(RSA_KEY_TYPE_PRIVATE);
