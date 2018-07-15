@@ -6,9 +6,15 @@
 
 #define RSA_SIGNITURE "IASRSA"
 #define RSA_KEYLINK_PREFIX "key"
-#define MAX_FILE_NAME_LEN 256
+#define RSA_ENCRYPTION_LEVEL_DEFAULT 1024
 #define RSA_KEY_TYPE_PRIVATE 1<<0
 #define RSA_KEY_TYPE_PUBLIC 1<<1
+#define RSA_KEY_DATA_QUICK 1<<5
+#define RSA_KEY_DATA_FULL 1<<6
+#define BUF_LEN_UNIT_QUICK 1024
+#define BUF_LEN_UNIT_FULL 128
+
+#define  MIN(x, y) ((x) < (y) ? (x) : (y))
 
 #define	RSA_TBD(msg) printf("TBD: %s\n", (msg))
 #define OPT_FLAG(OPT) (1 << (OPT))
@@ -64,13 +70,17 @@ typedef struct {
 typedef struct rsa_key_t {
     struct rsa_key_t *next;
     char type;
-    char name[KEY_ID_MAX_LEN];
+    char name[KEY_DATA_MAX_LEN];
     char path[MAX_FILE_NAME_LEN];
     FILE *file;
-    int level;
+    u1024_t n;
+    u1024_t exp;
 } rsa_key_t;
 
-extern char key_id[KEY_ID_MAX_LEN];
+extern char key_data[KEY_DATA_MAX_LEN];
+extern char file_name[MAX_FILE_NAME_LEN];
+extern char newfile_name[MAX_FILE_NAME_LEN + 4];
+extern int rsa_encryption_level;
 
 int opt_short2code(opt_t *options, int opt);
 int parse_args(int argc, char *argv[], int *flags, rsa_handler_t *handler);
@@ -80,10 +90,10 @@ rsa_opt_t rsa_action_get(int flags, ...);
 int rsa_action_handle_common(rsa_opt_t action, char *app, 
     rsa_handler_t *handler);
 char *key_path_get(void);
-int rsa_set_key_id(char *id);
+int rsa_set_key_data(char *id);
 rsa_key_t *rsa_key_open(char *path, char accept);
 void rsa_key_close(rsa_key_t *key);
-char *keydata_extract(FILE *key);
+int rsa_key_enclev_set(rsa_key_t *key, int new_level);
 int rsa_encryption_level_set(char *optarg);
 void rsa_encode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);
 void rsa_decode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);

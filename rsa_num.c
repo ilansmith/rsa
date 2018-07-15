@@ -84,6 +84,21 @@ int number_enclevl_set(int level)
     return 0;
 }
 
+int number_data2num(u1024_t *num, void *data, int len)
+{
+    if (len > block_sz_u1024 * sizeof(u64))
+	return -1;
+    number_reset(num);
+    memcpy(num->arr, data, len);
+    number_top_set(num);
+    return 0;
+}
+
+int number_size(int level)
+{
+    return sizeof(int) + (level + bit_sz_u64) / sizeof(u64);
+}
+
 void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
     u1024_t num_big, num_small, num_res;
@@ -132,7 +147,7 @@ void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
     TIMER_STOP(FUNC_NUMBER_ADD);
 }
 
-prng_seed_t number_seed_set(prng_seed_t seed)
+static prng_seed_t number_seed_set(prng_seed_t seed)
 {
     if (!(number_random_seed = seed))
     {
@@ -150,6 +165,19 @@ prng_seed_t number_seed_set(prng_seed_t seed)
     srandom(number_random_seed);
 #endif
     return number_random_seed;
+}
+
+int number_seed_set_random(u1024_t *seed)
+{
+    if (!number_seed_set(0))
+	return -1;
+    number_reset(seed);
+    return number_data2num(seed, &number_random_seed, sizeof(prng_seed_t));
+}
+
+int number_seed_set_fixed(u1024_t *seed)
+{
+    return number_seed_set(*(prng_seed_t*)&seed->arr) ? 0 : -1;
 }
 
 /* initiates the first low (u64) blocks of num with random valules */
