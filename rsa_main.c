@@ -8,7 +8,7 @@
 static opt_t options_master[] = {
     {RSA_OPT_FILE, 'f', "file", required_argument, "input file to "
 	"encrypt/decrypt"},
-    {RSA_OPT_ENCRYPT, 'e', "encrypt", required_argument, "encrypt input file"},
+    {RSA_OPT_ENCRYPT, 'e', "encrypt", no_argument, "encrypt input file"},
     {RSA_OPT_LEVEL, 'l', "level", required_argument, "set encryption level to "
 	"128, 256, 512 or 1024 (default), (implies encryption)"},
     {RSA_OPT_RSAENC, 'r', "rsa", no_argument, "full RSA encryption. if this "
