@@ -568,7 +568,7 @@ static rsa_keyring_t *keyring_gen(char accept)
     while ((ent = readdir(dir)))
     {
 	rsa_key_t *key;
-	
+
 	if (!(key = rsa_dirent2key(ent, accept)))
 	    continue;
 	keyname_insert(&keyring, key);
@@ -584,7 +584,7 @@ static rsa_key_t *rsa_key_open_dyn(char accept)
     rsa_key_t *key = NULL;
     int idx;
     u1024_t data;
-    
+
     if (!(keyring = keyring_gen(accept)))
 	goto Exit;
 
@@ -950,7 +950,7 @@ static void rsa_setkey_symlink_set(rsa_keyring_t *kr, int idx)
 static void rsa_delkey_links(char keytype)
 {
     char lnkname[MAX_FILE_NAME_LEN]; 
-    
+
     if (keytype & RSA_KEY_TYPE_PRIVATE)
     {
 	key_set_display("private");
