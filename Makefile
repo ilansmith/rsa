@@ -97,7 +97,7 @@ else # create rsa applications
     TARGET_OBJS_rsa_dec+=rsa_dec_main.o
   endif
 
-  CFLAGS+=-DULLONG -g
+  CFLAGS+=-DULLONG
 endif
 
 %.o: %.c
