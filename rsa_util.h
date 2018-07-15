@@ -13,6 +13,7 @@
 #define C_GREY "\033[00;37m"
 #define C_NORMAL "\033[00;00;00m"
 #define C_HIGHLIGHT "\033[01m"
+#define C_INDENTATION_FMT "\r\E[%dC%%s"
 
 typedef struct code2code_t {
     int code;
