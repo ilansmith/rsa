@@ -1991,7 +1991,9 @@ static int test098(void)
     return !is_prime;
 }
 
-static int test099(void)
+#define LSB_94R71_7 '7'
+#define LSB_94R71_9 '9'
+static int is_475bit_num_prime(char lsb)
 {
     u1024_t num_n;
     char prime[143];
@@ -2002,7 +2004,7 @@ static int test099(void)
 	prime[i] = '9';
 	prime[i + 1] = '4';
     }
-    prime[142] = '9';
+    prime[142] = lsb;
     prime[143] = 0;
 
     /* 475 bits */
@@ -2010,12 +2012,27 @@ static int test099(void)
     local_timer_start();
     is_prime = number_is_prime(&num_n);
     local_timer_stop();
-    p_comment("94R(71)9 is %sprime", is_prime ? "" : "not ");
+    p_comment("94R(71)%c is %sprime", lsb, is_prime ? "" : "not ");
     p_local_timer();
-    return !is_prime;
+
+    return is_prime;
+}
+
+static int test099(void)
+{
+    /* 94R(71)7 is not prime */
+    return is_475bit_num_prime(LSB_94R71_7);
 }
 
 static int test100(void)
+{
+    /* 94R(71)9 is prime */
+    return !is_475bit_num_prime(LSB_94R71_9);
+}
+#undef LSB_94R71_7 
+#undef LSB_94R71_9 
+
+static int test101(void)
 {
     u1024_t num_n;
     char *non_prime = "2285760293497823444790323455592340983477";
@@ -3195,8 +3212,15 @@ static test_t rsa_tests[] =
 	disabled: DISABLE_UCHAR,
     },
     {
-	description: "number_is_prime(94R(71)9) - 475 bit prime",
+	description: "number_is_prime(94R(71)7) - 475 bit non prime",
 	func: test099,
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
+	    DISABLE_ULLONG_512 | DISABLE_TIME_FUNCTIONS,
+    },
+    {
+	description: "number_is_prime(94R(71)9) - 475 bit prime",
+	func: test100,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
 	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
 	    DISABLE_ULLONG_512 | DISABLE_TIME_FUNCTIONS,
@@ -3205,7 +3229,7 @@ static test_t rsa_tests[] =
 	description: "number_is_prime("
 	    "2,285,760,293,497,823,444,790,323,455,592,340,983,477) - very "
 	    "large non prime",
-	func: test100,
+	func: test101,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
     /* RSA key generation, encryption and decryption */
