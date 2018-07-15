@@ -26,10 +26,11 @@ static int key_files_generate(char *private_name, FILE **private_key,
     sprintf(public_name, "%s/" , path);
     ppub = public_name + path_len + 1;
 
-    rsa_sprintf_nows(prefix, "%s", key_id + 1);
+    rsa_sprintf_nows(prefix, "%s%s", !strcmp(key_id + 1, RSA_KEYLINK_PREFIX) ? 
+	"_" : "", key_id + 1);
     total_len = path_len + 1 + strlen(prefix) + 4;
 
-    for (i = 0; !stat(private_name, &st) || !stat(private_name, &st); i++)
+    for (i = 0; !stat(private_name, &st) || !stat(public_name, &st); i++)
     {
 	if (i)
 	{
@@ -39,7 +40,7 @@ static int key_files_generate(char *private_name, FILE **private_key,
 
 	if (total_len + i == len)
 	{
-	    output_error_message(RSA_ERR_KEYNAME);
+	    rsa_error_message(RSA_ERR_KEYNAME, KEY_ID_MAX_LEN - 2);
 	    return -1;
 	}
 
@@ -49,13 +50,13 @@ static int key_files_generate(char *private_name, FILE **private_key,
 
     if (!(*private_key = fopen(private_name, "w")))
     {
-	output_error_message(RSA_ERR_FOPEN);
+	rsa_error_message(RSA_ERR_FOPEN, private_name);
 	return -1;
     }
     if (!(*public_key = fopen(public_name, "w")))
     {
 	fclose(*private_key);
-	output_error_message(RSA_ERR_FOPEN);
+	rsa_error_message(RSA_ERR_FOPEN, public_name);
 	return -1;
     }
 
@@ -125,13 +126,13 @@ static void rsa_key_generator(u1024_t *n, u1024_t *e, u1024_t *d)
 	if (is_first)
 	    is_first = 0;
 	else
-	    output_error_message(RSA_ERR_KEYGEN);
+	    rsa_error_message(RSA_ERR_KEYGEN);
 
-	rsa_printf(1, 2, "finding first large prime: p1...");
+	rsa_printf(1, 1, "finding first large prime: p1...");
 	number_find_prime(&p1);
-	rsa_printf(1, 2, "finding second large prime: p2...");
+	rsa_printf(1, 1, "finding second large prime: p2...");
 	number_find_prime(&p2);
-	rsa_printf(1, 2, "calculating product: n=p1*p2...");
+	rsa_printf(1, 1, "calculating product: n=p1*p2...");
 	number_mul(n, &p1, &p2);
     }
     while (!number_is_greater_or_equal(n, &inf));
@@ -140,13 +141,13 @@ static void rsa_key_generator(u1024_t *n, u1024_t *e, u1024_t *d)
     number_assign(p2_sub1, p2);
     number_sub1(&p1_sub1);
     number_sub1(&p2_sub1);
-    rsa_printf(1, 2, "calculating Euler phi function for n: phi=(p1-1)*(p2-1)...");
+    rsa_printf(1, 1, "calculating Euler phi function for n: phi=(p1-1)*(p2-1)...");
     number_mul(&phi, &p1_sub1, &p2_sub1);
 
-    rsa_printf(1, 2, "generating puglic key: (e, n), where e is coprime with "
+    rsa_printf(1, 1, "generating puglic key: (e, n), where e is coprime with "
 	"phi...");
     number_init_random_coprime(e, &phi);
-    rsa_printf(1, 2, "calculating private key: (d, n), where d is the "
+    rsa_printf(1, 1, "calculating private key: (d, n), where d is the "
 	"multiplicative inverse of e modulo phi...");
     number_modular_multiplicative_inverse(d, e, &phi);
 }
@@ -163,16 +164,17 @@ int rsa_keygen(void)
 	return -1;
     }
 
-    rsa_printf(0, 0, "generating key: %s", key_id + 1);
+    rsa_printf(0, 0, "generating key: %s%s%s (this will take a few minutes)", 
+	C_HIGHLIGHT, key_id + 1, C_NORMAL);
     for (level = encryption_levels; *level; level++)
     {
 	u1024_t n, e, d;
 
-	rsa_printf(0, 1, "generating private and public keys: %d bits", *level);
+	rsa_printf(0, 0, "generating private and public keys: %d bits", *level);
 	number_enclevl_set(*level);
 	rsa_key_generator(&n, &e, &d);
 
-	rsa_printf(1, 2, "writing %d bit keys...", *level);
+	rsa_printf(1, 1, "writing %d bit keys...", *level);
 	if (is_first)
 	{
 	    if (rsa_sign(private_key, RSA_KEY_TYPE_PRIVATE, &e, &n) || 
