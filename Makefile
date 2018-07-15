@@ -28,6 +28,7 @@ TARGET_RSA_TEST=rsa_test
 TARGET_RSA=rsa
 TARGET_RSA_ENC=rsa_enc
 TARGET_RSA_DEC=rsa_dec
+TARGET_RSA_LICENSE=license
 CYGWIN_COMPAT=echo "$1" | sed -e 's/--\|$(MAKE_MODE)//g'
 
 -include $(CONFFILE)
@@ -108,15 +109,16 @@ else # create rsa applications
   TARGET_OBJS_rsa_enc=rsa_enc.o 
   TARGET_OBJS_rsa_dec=rsa_dec.o 
   ifeq ($(CONFIG_MASTER),y) # master encrypter/decrypter
-    TARGETS=$(TARGET_RSA)
+    TARGETS=$(TARGET_RSA) $(TARGET_RSA_LICENSE)
     CFLAGS+=-DRSA_MASTER
     TARGET_OBJS_rsa+=$(TARGET_OBJS_rsa_enc) $(TARGET_OBJS_rsa_dec) rsa_main.o
   else # create separate encrypter/decrypter
-    TARGETS=$(TARGET_RSA_ENC) $(TARGET_RSA_DEC)
+    TARGETS=$(TARGET_RSA_ENC) $(TARGET_RSA_DEC) $(TARGET_RSA_LICENSE)
     TARGET_OBJS_rsa_enc+=rsa_enc_main.o
     TARGET_OBJS_rsa_dec+=rsa_dec_main.o
   endif
 
+  TARGET_OBJS_rsa_license=rsa_license.o rsa_license_main.o
   CFLAGS+=-DULLONG -O3
 endif
 
@@ -134,6 +136,8 @@ $(TARGET_RSA_ENC): $(TARGET_OBJS) $(TARGET_OBJS_rsa) $(TARGET_OBJS_rsa_enc)
 	$(CC) -o $@ $^ $(LFLAGS)
 $(TARGET_RSA_DEC): $(TARGET_OBJS) $(TARGET_OBJS_rsa) $(TARGET_OBJS_rsa_dec)
 	$(CC) -o $@ $^ $(LFLAGS)
+$(TARGET_RSA_LICENSE): $(TARGET_OBJS) $(TARGET_OBJS_rsa_license)
+	$(CC) -o $@ $^ $(LFLAGS)
 
 config:
 	@echo "doing make config"
@@ -146,7 +150,7 @@ clean:
 	rm -f *.o gmon.out
 
 cleanapps:
-	rm -f $(TARGET_RSA_TEST) $(TARGET_RSA) $(TARGET_RSA_ENC) $(TARGET_RSA_DEC)
+	rm -f $(TARGET_RSA_TEST) $(TARGET_RSA) $(TARGET_RSA_ENC) $(TARGET_RSA_DEC) $(TARGET_RSA_LICENSE)
 
 cleantags:
 	rm -f tags
@@ -182,6 +186,7 @@ help:
 	@printf "\n"
 	@printf "If no '$(call hl,OPTIONS)' are provided then $(call hl,$(TARGET_RSA_ENC)) and $(call hl,$(TARGET_RSA_DEC)) are built.\n"
 	@printf "If $(call hl,CONFIG_MASTER=y), then a master utility is built (enc/dec combined in one).\n"
+	@printf "In both cases $(call hl,$(TARGET_RSA_LICENSE)) is also built.\n"
 	@printf "\n"
 	@printf "Set $(call hl,CONFIG_MERSENNE_TWISTER=y) (default) to use Takuji Nishimura and Makoto\n"
 	@printf "Matsumoto's 64-bit version Mersenne Twister PRNG (Pseudorandom Number Generator).\n"
