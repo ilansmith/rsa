@@ -745,6 +745,14 @@ static void rsa_setkey_symlink_set(rsa_key_link_t *link, int idx)
 	printf("%s key set to: %s%s%s\n", idx ? "public" : "private", 
 	    C_HIGHLIGHT, key_id, C_NORMAL);
     }
+
+    if (rsa_verbose_get() == V_VERBOSE)
+    {
+	rsa_key_t *key;
+
+	for (key = link->keys[idx]; key; key = key->next)
+	    rsa_printf(1, 1, "%s", key->path);
+    }
 }
 
 static int rsa_setkey_links(rsa_key_link_t *list, char keytype)
