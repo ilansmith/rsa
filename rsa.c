@@ -311,7 +311,7 @@ static void rsa_help(char *path, opt_t *options_private)
     rsa_usage(path);
     rsa_options(options_private);
 
-    printf("\n%c IAS software, April 2005\n", CHAR_COPYRIGHT);
+    printf("\n%c IAS, February 2007\n", CHAR_COPYRIGHT);
 }
 
 int rsa_set_key_data(char *name)
