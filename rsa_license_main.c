@@ -1,10 +1,12 @@
 #include <time.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <libgen.h>
 #include "rsa_license.h"
 
 #define FILE_FORMAT_VERSION 1
 #define VENDOR_NAME_MAX_LENGTH 64
+#define VENDOR_NAME_DEFAULT "Mellanox"
 #define FILE_NAME_MAX_LENGTH 256
 #define ROUND_UP(val, multiple) ((((val) + (multiple) - 1) / (multiple)) * \
 		(multiple))
@@ -21,7 +23,7 @@
 #define OPT_ADD_ACTION(flags, OPT, action) do { \
 	OPT_ADD(flags, OPT); \
 	if (action) { \
-		rsa_error_message(RSA_ERR_ARGREP); \
+		rsa_error_message(RSA_ERR_ARGCONFLICT); \
 		return -1; \
 	} \
 	action = OPT_FLAG(OPT); \
@@ -53,9 +55,33 @@ struct rsa_license_data {
 	time_t time_limit;
 };
 
-void usage(void)
+void usage(char *app)
 {
-	printf("usage: ...\n");
+	printf("Usage: %s [ACTION] [OPTIONS]\n", app);
+	printf("\n");
+	printf("Where possible actions are:\n");
+	printf("\n");
+	printf(C_HIGHLIGHT "  -c, --create=FILE_NAME" C_NORMAL "\n");
+	printf("       Create a license file with the following options:\n");
+	printf(C_HIGHLIGHT "       -k, --key=PRIVATE_KEY" C_NORMAL "\n");
+	printf("            Private RSA key (required)\n");
+	printf(C_HIGHLIGHT "       -v, --vendor=VENDOR_NAME" C_NORMAL "\n");
+	printf("            Vendor being licensed (default: Mellanox)\n");
+	printf(C_HIGHLIGHT "       -t, --time-limit=TIME_IN_MONTHS" C_NORMAL
+			"\n");
+	printf("            Months valide from license creation time "
+		  "(default: unlimited)\n");
+	printf("\n");
+	printf(C_HIGHLIGHT "  -i, --info=FILE_NAME.lic" C_NORMAL "\n");
+	printf("       Extract license information with possible option:\n");
+	printf(C_HIGHLIGHT "       -k, --key=PUBLIC_KEY" C_NORMAL "\n");
+	printf("            Public RSA key (optional, default is embeded)\n");
+	printf("\n");
+	printf(C_HIGHLIGHT "  -x, --test" C_NORMAL "\n");
+	printf("       Run license test\n");
+	printf("\n");
+	printf(C_HIGHLIGHT "  -h, --help" C_NORMAL "\n");
+	printf("       Print this information and exit\n");
 }
 
 static int parse_args(int argc, char **argv, unsigned long *action,
@@ -114,6 +140,7 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 	char *endptr;
 	int time_limit_in_months;
 	int seconds_in_day;
+	char *app = basename(argv[0]);
 
 	*action = 0;
 	memset(license, 0, FILE_NAME_MAX_LENGTH);
@@ -152,7 +179,7 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 			OPT_ADD(flags, RSA_OPT_LIC_TIME_LIMIT);
 			time_limit_in_months = strtol(optarg, &endptr, 10);
 			if (*endptr) {
-				rsa_error_message(RSA_ERR_ARGREP);
+				rsa_error_message(RSA_ERR_ARGNAN, optarg);
 				return -1;
 			}
 
@@ -164,7 +191,7 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 			}
 			break;
 		default:
-			usage();
+			usage(app);
 			break;
 		}
 	}
@@ -172,17 +199,20 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 	/* XXX do the following in a finalize() function after it's clear what
 	 * switches are required/optional/disallowed for each action */
 	if (!*action) {
-		rsa_error_message(RSA_ERR_ARGREP);
+		usage(app);
 		return -1;
 	}
 	if (flags & OPT_FLAG(RSA_OPT_LIC_HELP) &&
 			(flags & ~OPT_FLAG(RSA_OPT_LIC_HELP))) {
-		rsa_error_message(RSA_ERR_ARGREP);
+		rsa_error_message(RSA_ERR_ARGCONFLICT);
+		usage(app);
 		return -1;
 	}
 	if (OPT_FLAG_LIC_DATA(flags) &&
-			*action != OPT_FLAG(RSA_OPT_LIC_CREATE)) {
-		rsa_error_message(RSA_ERR_ARGREP);
+			!(*action & (OPT_FLAG(RSA_OPT_LIC_CREATE) |
+				OPT_FLAG(RSA_OPT_LIC_INFO)))) {
+		rsa_error_message(RSA_ERR_ARGCONFLICT);
+		usage(app);
 		return -1;
 	}
 
@@ -285,7 +315,7 @@ static int rsa_info_version(char **buf, int *len)
 	if (rsa_decrypt_version(buf, len, &version_enc))
 		return -1;
 
-	printf("file format version info : %llu\n", version_enc);
+	printf("file format version: %llu\n", version_enc);
 	return 0;
 }
 
@@ -321,7 +351,7 @@ static int rsa_info_vendor_name(char **buf, int *len)
 	if (rsa_decrypt_vendor_name(buf, len, vendor_name))
 		return -1;
 
-	printf("vendor name info: %s\n", vendor_name);
+	printf("vendor name: %s\n", vendor_name);
 	return 0;
 }
 
@@ -346,13 +376,9 @@ static int rsa_decrypt_time_limit(char **buf, int *len, time_t *time_limit)
 	return 0;
 }
 
-static int rsa_info_time_limit(char **buf, int *len)
+static char *time_t_to_str(time_t time_limit)
 {
-	time_t time_limit;
-	char stime[50];
-
-	if (rsa_decrypt_time_limit(buf, len, &time_limit))
-		return -1;
+	static char stime[50];
 
 	if (time_limit) {
 		strftime(stime, sizeof(stime),"%d %b, %Y",
@@ -361,7 +387,17 @@ static int rsa_info_time_limit(char **buf, int *len)
 		snprintf(stime, sizeof(stime), "unlimited");
 	}
 
-	printf("time limit info : %s\n", stime);
+	return stime;
+}
+
+static int rsa_info_time_limit(char **buf, int *len)
+{
+	time_t time_limit;
+
+	if (rsa_decrypt_time_limit(buf, len, &time_limit))
+		return -1;
+
+	printf("valid through: %s\n", time_t_to_str(time_limit));
 	return 0;
 }
 
@@ -456,7 +492,7 @@ int license_test(char key[FILE_NAME_MAX_LENGTH])
 
 	init.type = RSA_STREAM_TYPE_FILE;
 	init.params.file.path = private_key;
-	init.params.file.mode = "r";
+	init.params.file.mode = "rb";
 
 	ret = rsa_license_create(&init, license, &licnese_ops,
 		&license_data);
@@ -469,7 +505,7 @@ int license_test(char key[FILE_NAME_MAX_LENGTH])
 
 	init.type = RSA_STREAM_TYPE_FILE;
 	init.params.file.path = public_key;
-	init.params.file.mode = "r";
+	init.params.file.mode = "rb";
 
 	/* test license info */
 	ret = rsa_license_info(&init, license, &licnese_ops);
@@ -490,7 +526,7 @@ int license_test(char key[FILE_NAME_MAX_LENGTH])
 	}
 	printf("file format version extract: %llu\n", license_data.version);
 	printf("vendor name extract: %s\n", license_data.vendor_name);
-	printf("time limit extract: 0x%lx\n", license_data.time_limit);
+	printf("valid through extract: 0x%llx\n", license_data.time_limit);
 
 	return 0;
 }
@@ -625,7 +661,7 @@ static int license_info(char key_path[FILE_NAME_MAX_LENGTH],
 	if (key_path[0]) {
 		init.type = RSA_STREAM_TYPE_FILE;
 		init.params.file.path = key_path;
-		init.params.file.mode = "r";
+		init.params.file.mode = "rb";
 	} else {
 		init.type = RSA_STREAM_TYPE_MEMORY;
 		init.params.memory.buf = key_default;
@@ -656,18 +692,23 @@ static int license_create(char private_key[FILE_NAME_MAX_LENGTH],
 	/* test license create */
 	license_data.version = FILE_FORMAT_VERSION;
 	snprintf(license_data.vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
-		vendor_name);
+		vendor_name[0] ? vendor_name : VENDOR_NAME_DEFAULT);
 	license_data.time_limit = time_limit;
 
 	init.type = RSA_STREAM_TYPE_FILE;
 	init.params.file.path = private_key;
-	init.params.file.mode = "r";
+	init.params.file.mode = "rb";
 	ret = rsa_license_create(&init, license, &licnese_ops, &license_data);
 	if (ret) {
 		printf("rsa_license_create() failed\n");
 		return -1;
 	}
 
+	printf("created license %s:\n", license);
+	printf("  license version: %llu\n", license_data.version);
+	printf("  vendor name: %s\n", license_data.vendor_name);
+	printf("  valid through: %s\n",
+		time_t_to_str(license_data.time_limit));
 	return 0;
 
 }
@@ -690,7 +731,7 @@ int main(int argc, char **argv)
 
 	switch (action) {
 	case OPT_FLAG(RSA_OPT_LIC_HELP):
-		usage();
+		usage(basename(argv[0]));
 		ret = 0;
 		break;
 	case OPT_FLAG(RSA_OPT_LIC_CREATE):
