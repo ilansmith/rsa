@@ -247,7 +247,7 @@ static int rsa_decrypte_header_common(rsa_key_t *key, FILE *cipher,
     if (rsa_key_enclev_set(key, encryption_levels[0]) || 
 	rsa_read_u1024_full(cipher, &numdata))
     {
-	goto Error;
+	return -1;
     }
 
     rsa_decode(&numdata, &numdata, &key->exp, &key->n);
@@ -263,26 +263,29 @@ static int rsa_decrypte_header_common(rsa_key_t *key, FILE *cipher,
     for (level = encryption_levels, i = 0; *level && !(*keydata & 1<<i); 
 	level++, i++);
     if (!*level)
-	goto Error;
+    {
+	rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
+	return -1;
+    }
     if (*keydata & RSA_KEY_DATA_QUICK)
 	*is_full = 0;
     else if (*keydata & RSA_KEY_DATA_FULL)
 	*is_full = 1;
     else
-	goto Error;
+    {
+	rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
+	return -1;
+    }
 
     rsa_encryption_level = *level;
     if (rsa_key_enclev_set(key, rsa_encryption_level) || 
 	rsa_read_u1024_full(cipher, &seed))
     {
-	goto Error;
+	return -1;
     }
     rsa_decode(&seed, &seed, &key->exp, &key->n);
-    return number_seed_set_fixed(&seed);
 
-Error:
-    rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
-    return -1;
+    return number_seed_set_fixed(&seed);
 }
 
 static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher, 
@@ -292,10 +295,7 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
 
     /* open RSA private key */
     if (!(*key = rsa_key_open_decrypt()))
-    {
-	rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
 	return -1;
-    }
 
     /* open file to decrypt */
     if (!(*cipher = fopen(file_name, "r")))
