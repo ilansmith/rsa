@@ -59,6 +59,7 @@ int rsa_license_create(char *priv_key_path, char *file_name,
 	char *buf;
 	u64 crc[2];
 	int len = 0;
+	struct rsa_stream_init init;
 
 	buf = calloc(LICENSE_LENGTH_USER, sizeof(char));
 	if (!buf)
@@ -76,7 +77,10 @@ int rsa_license_create(char *priv_key_path, char *file_name,
 		goto exit;
 
 	/* open private key */
-	key = rsa_key_open(priv_key_path, RSA_KEY_TYPE_PRIVATE, 1);
+	init.params.file.path = priv_key_path;
+	init.params.file.mode = "r";
+	init.type = RSA_STREAM_TYPE_FILE;
+	key = rsa_key_open(&init, RSA_KEY_TYPE_PRIVATE, 1);
 	if (!key)
 		goto exit;
 
@@ -128,6 +132,7 @@ int rsa_license_get(char *pub_key_path, char *file_name, char *buf, int *len)
 	u1024_t seed;
 	u64 crc[2];
 	u64 crc_check;
+	struct rsa_stream_init init;
 	int ret = -1;
 
 	/* open file */
@@ -135,7 +140,10 @@ int rsa_license_get(char *pub_key_path, char *file_name, char *buf, int *len)
 		goto exit;
 
 	/* open private key */
-	key = rsa_key_open(pub_key_path, RSA_KEY_TYPE_PUBLIC, 1);
+	init.params.file.path = pub_key_path;
+	init.params.file.mode = "r";
+	init.type = RSA_STREAM_TYPE_FILE;
+	key = rsa_key_open(&init, RSA_KEY_TYPE_PUBLIC, 1);
 	if (!key)
 		goto exit;
 

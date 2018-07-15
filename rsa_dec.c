@@ -9,12 +9,13 @@
 #include "rsa_util.h"
 #include "rsa_num.h"
 
-static int key_files_generate(char *private_name, FILE **private_key,
-	char *public_name, FILE **public_key, int len)
+static int key_files_generate(char *private_name, rsa_stream_t **private_key,
+	char *public_name, rsa_stream_t **public_key, int len)
 {
 	char prefix[KEY_DATA_MAX_LEN], *path, *pprv, *ppub;
 	int i, total_len, path_len;
 	struct stat st;
+	struct rsa_stream_init rsa_init;
 
 	path = key_path_get();
 	path_len = strlen(path);
@@ -50,12 +51,18 @@ static int key_files_generate(char *private_name, FILE **private_key,
 		rsa_strcat(public_name, "%s.pub", prefix);
 	}
 
-	if (!(*private_key = fopen(private_name, "w"))) {
+	rsa_init.type = RSA_STREAM_TYPE_FILE;
+	rsa_init.params.file.path = private_name;
+	rsa_init.params.file.mode = "w";
+	if (!(*private_key = sopen(&rsa_init))) {
 		rsa_error_message(RSA_ERR_FOPEN, private_name);
 		return -1;
 	}
-	if (!(*public_key = fopen(public_name, "w"))) {
-		fclose(*private_key);
+	rsa_init.type = RSA_STREAM_TYPE_FILE;
+	rsa_init.params.file.path = public_name;
+	rsa_init.params.file.mode = "w";
+	if (!(*public_key = sopen(&rsa_init))) {
+		sclose(*private_key);
 		rsa_error_message(RSA_ERR_FOPEN, public_name);
 		return -1;
 	}
@@ -63,7 +70,7 @@ static int key_files_generate(char *private_name, FILE **private_key,
 	return 0;
 }
 
-static int rsa_sign(FILE *key, char keytype, u1024_t *exp, u1024_t *n)
+static int rsa_sign(rsa_stream_t *key, char keytype, u1024_t *exp, u1024_t *n)
 {
 	u1024_t signiture, id;
 
@@ -80,7 +87,7 @@ static int rsa_sign(FILE *key, char keytype, u1024_t *exp, u1024_t *n)
 	return 0;
 }
 
-static int insert_key(FILE *key, u1024_t *exp, u1024_t *n)
+static int insert_key(rsa_stream_t *key, u1024_t *exp, u1024_t *n)
 {
 	u1024_t montgomery_factor;
 
@@ -165,7 +172,7 @@ int rsa_keygen(void)
 {
 	int ret, *level, is_first = 1;
 	char private_name[MAX_FILE_NAME_LEN], public_name[MAX_FILE_NAME_LEN];
-	FILE *private_key, *public_key;
+	rsa_stream_t *private_key, *public_key;
 
 	if (key_files_generate(private_name, &private_key, public_name,
 		&public_key, MAX_FILE_NAME_LEN)) {
@@ -231,7 +238,7 @@ static void verbose_decryption(int is_full, char *key_name, int level,
 	fflush(stdout);
 }
 
-static int rsa_decryption_length(rsa_key_t *key ,FILE *ciphertext)
+static int rsa_decryption_length(rsa_key_t *key ,rsa_stream_t *ciphertext)
 {
 	u1024_t length;
 
@@ -244,7 +251,7 @@ static int rsa_decryption_length(rsa_key_t *key ,FILE *ciphertext)
 		-1 : (int)length.arr[0];
 }
 
-static int rsa_decrypte_header_common(rsa_key_t *key, FILE *ciphertext,
+static int rsa_decrypte_header_common(rsa_key_t *key, rsa_stream_t *ciphertext,
 	int *is_full)
 {
 	u1024_t numdata, seed;
@@ -307,17 +314,22 @@ static int rsa_decrypte_header_common(rsa_key_t *key, FILE *ciphertext,
 	return 0;
 }
 
-static int rsa_decrypt_prolog(rsa_key_t **key, FILE **plaintext,
-	FILE **ciphertext, int *is_full)
+static int rsa_decrypt_prolog(rsa_key_t **key, rsa_stream_t **plaintext,
+	rsa_stream_t **ciphertext, int *is_full)
 {
 	int file_name_len, is_enable;
+	struct rsa_stream_init stream_init_plaintext;
+	struct rsa_stream_init stream_init_ciphertext;
 
 	/* open RSA private key */
 	if (!(*key = rsa_key_open_type(RSA_KEY_TYPE_PRIVATE)))
 		return -1;
 
 	/* open file to decrypt */
-	if (!(*ciphertext = fopen(file_name, "r"))) {
+	stream_init_ciphertext.type = RSA_STREAM_TYPE_FILE;
+	stream_init_ciphertext.params.file.path = file_name;
+	stream_init_ciphertext.params.file.mode = "r";
+	if (!(*ciphertext = sopen(&stream_init_ciphertext))) {
 		rsa_key_close(*key);
 		rsa_error_message(RSA_ERR_FOPEN, file_name);
 		return -1;
@@ -326,7 +338,7 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **plaintext,
 	/* decipher common headers */
 	if (rsa_decrypte_header_common(*key, *ciphertext, is_full)) {
 		rsa_key_close(*key);
-		fclose(*ciphertext);
+		sclose(*ciphertext);
 		return -1;
 	}
 
@@ -340,10 +352,13 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **plaintext,
 		} else {
 			sprintf(newfile_name, "%s.dec", file_name);
 		}
+		stream_init_plaintext.type = RSA_STREAM_TYPE_FILE;
+		stream_init_plaintext.params.file.path = newfile_name;
+		stream_init_plaintext.params.file.mode = "w";
 		if (!(is_enable = is_fwrite_enable(newfile_name)) ||
-			!(*plaintext = fopen(newfile_name, "w"))) {
+			!(*plaintext = sopen(&stream_init_plaintext))) {
 			rsa_key_close(*key);
-			fclose(*ciphertext);
+			sclose(*ciphertext);
 			if (is_enable)
 				rsa_error_message(RSA_ERR_FOPEN, newfile_name);
 			return -1;
@@ -356,19 +371,20 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **plaintext,
 	return 0;
 }
 
-static void rsa_decrypt_epilog(rsa_key_t *key, FILE *plaintext,
-	FILE *ciphertext)
+static void rsa_decrypt_epilog(rsa_key_t *key, rsa_stream_t *plaintext,
+	rsa_stream_t *ciphertext)
 {
 	rsa_key_close(key);
-	fclose(ciphertext);
+	sclose(ciphertext);
 	if (is_encryption_info_only)
 		return;
-	fclose(plaintext);
+	sclose(plaintext);
 	if (!keep_orig_file)
 		remove(file_name);
 }
 
-static int rsa_decrypt_quick(rsa_key_t *key, FILE *ciphertext, FILE *plaintext)
+static int rsa_decrypt_quick(rsa_key_t *key, rsa_stream_t *ciphertext,
+		rsa_stream_t *plaintext)
 {
 	int len, buf_len;
 
@@ -379,10 +395,10 @@ static int rsa_decrypt_quick(rsa_key_t *key, FILE *ciphertext, FILE *plaintext)
 		u64 *xor_buf = (u64*)buf;
 		int i;
 
-		len = fread(buf, sizeof(char), buf_len, ciphertext);
+		len = sread(buf, sizeof(char), buf_len, ciphertext);
 		for (i = 0; len && i < (len-1)/sizeof(u64) + 1; i++)
 			xor_buf[i] ^= RSA_RANDOM();
-		fwrite(buf, sizeof(char), len, plaintext);
+		swrite(buf, sizeof(char), len, plaintext);
 		rsa_timeline_update();
 	}
 	while (len == buf_len);
@@ -390,7 +406,8 @@ static int rsa_decrypt_quick(rsa_key_t *key, FILE *ciphertext, FILE *plaintext)
 	return 0;
 }
 
-static int rsa_decrypt_full(rsa_key_t *key, FILE *ciphertext, FILE *plaintext)
+static int rsa_decrypt_full(rsa_key_t *key, rsa_stream_t *ciphertext,
+		rsa_stream_t *plaintext)
 {
 	int len, ct_buf_len, pt_blk_sz, ct_blk_sz;
 	u1024_t num_iv, tmp;
@@ -448,7 +465,7 @@ static int rsa_decrypt_full(rsa_key_t *key, FILE *ciphertext, FILE *plaintext)
 				break;
 			}
 
-			len += fwrite(&ct_buf[i].arr, sizeof(char),
+			len += swrite(&ct_buf[i].arr, sizeof(char),
 				MIN(pt_blk_sz, file_size - len), plaintext);
 			rsa_timeline_update();
 		}
@@ -461,7 +478,7 @@ static int rsa_decrypt_full(rsa_key_t *key, FILE *ciphertext, FILE *plaintext)
 int rsa_decrypt(void)
 {
 	rsa_key_t *key;
-	FILE *plaintext = NULL, *ciphertext;
+	rsa_stream_t *plaintext = NULL, *ciphertext;
 	int ret = 0, is_full;
 
 	if (rsa_decrypt_prolog(&key, &plaintext, &ciphertext, &is_full))

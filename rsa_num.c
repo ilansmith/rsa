@@ -1,10 +1,10 @@
-#include "rsa_util.h"
-#include "rsa_num.h"
 #include <stdlib.h>
 #include <sys/time.h>
 #include <time.h>
 #include <string.h>
 #include <math.h>
+#include "rsa_util.h"
+#include "rsa_num.h"
 
 #ifdef CONFIG_MERSENNE_TWISTER
 #include "mt19937_64.h"

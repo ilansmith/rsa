@@ -23,7 +23,7 @@ static void verbose_encryption(int is_full, char *key_name, int level,
 	fflush(stdout);
 }
 
-static int rsa_encrypt_length(rsa_key_t *key, FILE *ciphertext)
+static int rsa_encrypt_length(rsa_key_t *key, rsa_stream_t *ciphertext)
 {
 	u1024_t length;
 
@@ -38,7 +38,7 @@ static int rsa_encrypt_length(rsa_key_t *key, FILE *ciphertext)
 	return rsa_key_enclev_set(key, rsa_encryption_level);
 }
 
-static int rsa_encrypt_header_common(rsa_key_t *key, FILE *ciphertext, 
+static int rsa_encrypt_header_common(rsa_key_t *key, rsa_stream_t *ciphertext, 
 	int is_full)
 {
 	u1024_t numdata;
@@ -113,10 +113,11 @@ static int rsa_assert_non_lfs(int is_full)
 	return 0;
 }
 
-static int rsa_encrypt_prolog(rsa_key_t **key, FILE **plaintext, 
-	FILE **ciphertext, int is_full)
+static int rsa_encrypt_prolog(rsa_key_t **key, rsa_stream_t **plaintext, 
+	rsa_stream_t **ciphertext, int is_full)
 {
 	int is_enable;
+	struct rsa_stream_init stream_init;
 
 	/* assert that resulting files will not be LFS and open RSA public
 	 * key */
@@ -126,7 +127,10 @@ static int rsa_encrypt_prolog(rsa_key_t **key, FILE **plaintext,
 	}
 
 	/* open file to encrypt */
-	if (!(*plaintext = fopen(file_name, "r"))) {
+	stream_init.type = RSA_STREAM_TYPE_FILE;
+	stream_init.params.file.path = file_name;
+	stream_init.params.file.mode = "r";
+	if (!(*plaintext = sopen(&stream_init))) {
 		rsa_key_close(*key);
 		rsa_error_message(RSA_ERR_FOPEN, file_name);
 		return -1;
@@ -134,10 +138,13 @@ static int rsa_encrypt_prolog(rsa_key_t **key, FILE **plaintext,
 
 	/* open ciphertext file */
 	sprintf(newfile_name, "%s.enc", file_name);
+	stream_init.type = RSA_STREAM_TYPE_FILE;
+	stream_init.params.file.path = newfile_name;
+	stream_init.params.file.mode = "w";
 	if (!(is_enable = is_fwrite_enable(newfile_name)) || 
-		!(*ciphertext = fopen(newfile_name, "w"))) {
+		!(*ciphertext = sopen(&stream_init))) {
 		rsa_key_close(*key);
-		fclose(*plaintext);
+		sclose(*plaintext);
 		if (is_enable)
 			rsa_error_message(RSA_ERR_FOPEN, newfile_name);
 		return -1;
@@ -149,8 +156,8 @@ static int rsa_encrypt_prolog(rsa_key_t **key, FILE **plaintext,
 	/* write common headers to ciphertext */
 	if (rsa_encrypt_header_common(*key, *ciphertext, is_full)) {
 		rsa_key_close(*key);
-		fclose(*plaintext);
-		fclose(*ciphertext);
+		sclose(*plaintext);
+		sclose(*ciphertext);
 		remove(newfile_name);
 		return -1;
 	}
@@ -158,12 +165,12 @@ static int rsa_encrypt_prolog(rsa_key_t **key, FILE **plaintext,
 	return 0;
 }
 
-static void rsa_encrypt_epilog(rsa_key_t *key, FILE *plaintext, 
-	FILE *ciphertext)
+static void rsa_encrypt_epilog(rsa_key_t *key, rsa_stream_t *plaintext, 
+	rsa_stream_t *ciphertext)
 {
 	rsa_key_close(key);
-	fclose(plaintext);
-	fclose(ciphertext);
+	sclose(plaintext);
+	sclose(ciphertext);
 	if (!keep_orig_file)
 		remove(file_name);
 }
@@ -171,7 +178,7 @@ static void rsa_encrypt_epilog(rsa_key_t *key, FILE *plaintext,
 int rsa_encrypt_quick(void)
 {
 	rsa_key_t *key;
-	FILE *plaintext, *ciphertext;
+	rsa_stream_t *plaintext, *ciphertext;
 	int len, buf_len;
 
 	if (rsa_encrypt_prolog(&key, &plaintext, &ciphertext, 0))
@@ -185,10 +192,10 @@ int rsa_encrypt_quick(void)
 		u64 *xor_buf = (u64*)buf;
 		int i;
 
-		len = fread(buf, sizeof(char), buf_len, plaintext);
+		len = sread(buf, sizeof(char), buf_len, plaintext);
 		for (i = 0; len && i < (len-1)/sizeof(u64) + 1; i++)
 			xor_buf[i] ^= RSA_RANDOM();
-		fwrite(buf, sizeof(char), len, ciphertext);
+		swrite(buf, sizeof(char), len, ciphertext);
 		rsa_timeline_update();
 	}
 	while (len == buf_len);
@@ -201,7 +208,7 @@ int rsa_encrypt_quick(void)
 int rsa_encrypt_full(void)
 {
 	rsa_key_t *key;
-	FILE *plaintext, *ciphertext;
+	rsa_stream_t *plaintext, *ciphertext;
 	int len, pt_buf_len, ct_buf_len, pt_blk_sz, ct_blk_sz;
 	u1024_t num_iv;
 
@@ -231,7 +238,7 @@ int rsa_encrypt_full(void)
 		u1024_t ct_buf[ct_buf_len];
 		int i;
 
-		len = fread(pt_buf, sizeof(char), pt_buf_len, plaintext);
+		len = sread(pt_buf, sizeof(char), pt_buf_len, plaintext);
 		for (i = 0; len && i < (len-1)/pt_blk_sz + 1; i++) {
 			number_data2num(&ct_buf[i], &pt_buf[i*pt_blk_sz],
 				pt_blk_sz);
