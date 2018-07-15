@@ -37,78 +37,73 @@ static char rsa_path_prv[RSAPATH_LEN];
 static char rsa_path_pub[RSAPATH_LEN];
 #endif
 
-static int rsa_mkdir_single(char *path, char *new_dir)
+static int rsa_mkdir_single(char *prefix, char *new_dir)
 {
     struct stat buf;
-    char new_path[HOMEDIR_LEN + 1 + RSADIR_LEN];
+    char path[RSAPATH_LEN];
 
-    if (path && *path && stat(path, &buf))
+#if 0
+    if (stat(prefix, &buf))
+	return -1;
+#endif
+
+    /* path length must be less than RSAPATH_LEN */
+    if (snprintf(path, RSAPATH_LEN, "%s/%s", prefix, new_dir) >= RSAPATH_LEN)
 	return -1;
 
-    snprintf(new_path, sizeof(new_path), "%s/%s", path, new_dir);
-    if (stat(new_path, &buf) && (mkdir(new_path, 0) || chmod(new_path, 
-	S_IRWXU | S_IRWXG | S_IRWXO)))
-    {
+    /* create the new directory if it does not yet exist */
+    if (stat(path, &buf) && mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO))
 	return -1;
-    }
 
     return 0;
+}
+
+static char *skip_slashes(char *str)
+{
+    for ( ; *str == '/'; str++);
+    return str;
 }
 
 static int rsa_mkdir_full(char *path)
 {
-    char buf[RSAPATH_LEN], *ptr = buf, *next = NULL;
+    char buf[RSAPATH_LEN], *start, *end;
 
     snprintf(buf, RSAPATH_LEN, "%s", path);
-    if (*ptr == '/')
+    end = buf;
+    do
     {
-	*ptr = 0;
-	ptr++;
-    }
-
-    next = ptr;
-    while (*ptr)
-    {
-	if (*ptr != '/')
-	{
-	    ptr++;
-	    continue;
-	}
-
-	*ptr = 0;
-	if (rsa_mkdir_single(buf, next))
+	start = skip_slashes(end);
+	end = strchr(start, '/');
+	if (end)
+	    *end = 0;
+	if (rsa_mkdir_single(start == buf ? "./" : buf, start))
 	    return -1;
-	*(buf + strlen(buf)) = '/';
-	ptr++;
-	next = ptr;
+	if (end)
+	    *end = '/';
     }
+    while (end);
     return 0;
 }
 
-int rsa_io_init(void)
+int rsa_io_init(char *path)
 {
-    char *env_path;
     int ret = 0;
 
-    if ((env_path = getenv(ENV_VAR_PATH)))
-    {
-	snprintf(rsa_path, HOMEDIR_LEN, "%s/", env_path);
-	goto Exit;
-    }
-	
-    snprintf(rsa_path, HOMEDIR_LEN, "%s/", getenv(ENV_HOME_DIR));
-    if (HOMEDIR_LEN <= strlen(rsa_path) + strlen(RSA_DIR))
-	return -1;
+    /* path is either provided by command line or by environment variable */
+    if (path || (path = getenv(ENV_VAR_PATH)))
+	snprintf(rsa_path, HOMEDIR_LEN, "%s", path);
+    /* assume path is at home directory */
+    else
+	snprintf(rsa_path, HOMEDIR_LEN, "%s/%s", getenv(ENV_HOME_DIR), RSA_DIR);
 
-    strcat(rsa_path, RSA_DIR "/");
-
-Exit:
 #if RSA_MASTER || RSA_DECRYPTER
-    snprintf(rsa_path_prv, RSAPATH_LEN, "%s%s/", rsa_path, RSA_PRV_DIR);
+    /* private key path */
+    snprintf(rsa_path_prv, RSAPATH_LEN, "%s/%s", rsa_path, RSA_PRV_DIR);
     ret += rsa_mkdir_full(rsa_path_prv);
 #endif
 #if RSA_MASTER || RSA_ENCRYPTER
-    snprintf(rsa_path_pub, RSAPATH_LEN, "%s%s/", rsa_path, RSA_PUB_DIR);
+    /* puglic key path */
+    snprintf(rsa_path_pub, RSAPATH_LEN, "%s/%s", rsa_path, RSA_PUB_DIR);
     ret += rsa_mkdir_full(rsa_path_pub);
 #endif
 
@@ -174,16 +169,18 @@ FILE *rsa_file_create(char *suffix)
 #if RSA_MASTER
     preffix = "master";
 #else
-    preffix = SIG;
+    preffix = VENDOR;
 #endif
     return rsa_file_open(LOCAL_DIR, preffix, suffix, 0, 1);
 }
 
+/* XXX create files in the .rsa/prv directory */
 FILE *rsa_file_create_private(void)
 {
     return rsa_file_create(SUFFIX_PRV);
 }
 
+/* XXX create files in the .rsa/pub directory */
 FILE *rsa_file_create_public(void)
 {
     return rsa_file_create(SUFFIX_PUB);
@@ -192,7 +189,7 @@ FILE *rsa_file_create_public(void)
 
 static int rsa_file_io_u1024(FILE *fptr, void *buf, int is_half, int is_write)
 {
-    int nmemb = BYTES_SZ(u1024_t) / BYTES_SZ(u64);
+    int nmemb = block_sz_u1024;
     int size = BYTES_SZ(u64);
 
     if (is_half)
@@ -271,12 +268,14 @@ FILE *rsa_open_decryption_file(char *path, char *file_name)
 {
     char *tmp_name;
 
+    /* append .dec to encrypted file's name if it does not end with .rsa */
     if (strlen(file_name) <= strlen(SUFFIX_RSA) || strncmp(file_name + 
 	(strlen(file_name) - strlen(SUFFIX_RSA)), SUFFIX_RSA, 
 	strlen(SUFFIX_RSA)))
     {
 	file_name = rsa_file_name(path, file_name, SUFFIX_DEC, stat, 1);
     }
+    /* remove the .rsa suffix from the encrypted file's name */
     else
     {
 	tmp_name = calloc(1, strlen(file_name) - (strlen(SUFFIX_RSA) - 1));
@@ -293,6 +292,7 @@ FILE *rsa_open_decryption_file(char *path, char *file_name)
 #if RSA_MASTER || RSA_ENCRYPTER
 FILE *rsa_open_encryption_file(char *path, char *file_name)
 {
+    /* append .rsa to the encrypted file's name */
     file_name = rsa_file_name(path, file_name, SUFFIX_RSA, stat, 1);
 
     return file_name ? fopen(file_name, "wb+") : NULL;
@@ -322,12 +322,12 @@ static FILE *rsa_key_open(char *preffix, int is_decrypt)
     return rsa_file_open(path, preffix, suffix, 1, 0);
 }
 
-int rsa_key_get_params(char *preffix, u1024_t *n, u1024_t *exp, 
+int rsa_key_get_params(char *vendor, u1024_t *n, u1024_t *exp, 
     u1024_t *montgomery_factor, int is_decrypt)
 {
     FILE *key;
 
-    if (!(key = rsa_key_open(preffix, is_decrypt)))
+    if (!(key = rsa_key_open(vendor, is_decrypt)))
 	return -1;
 
     number_reset(n);
@@ -351,7 +351,7 @@ int rsa_key_get_vendor(u1024_t *vendor, int is_decrypt)
     int i;
     FILE *key;
 
-    if (!(key = rsa_key_open(SIG, is_decrypt)))
+    if (!(key = rsa_key_open(VENDOR, is_decrypt)))
 	return -1;
 
     for (i = 0; i < 3; i++)
