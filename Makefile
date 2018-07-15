@@ -24,6 +24,7 @@
 CC=gcc
 TARGET_OBJS=rsa_num.o rsa_util.o
 CONFFILE=rsa.mk
+CYGWIN_COMPAT=echo "$1" | sed -e 's/--\|$(MAKE_MODE)//g'
 
 -include $(CONFFILE)
 
@@ -119,7 +120,8 @@ config:
 	@echo "doing make config"
 	set -e; \
 	rm -f $(CONFFILE); \
-	echo "$(strip $(MAKEFLAGS))" | sed -e 's/ /\r\n/g' > $(CONFFILE);
+	echo $$($(strip $(call CYGWIN_COMPAT, $(MAKEFLAGS)))) | \
+	sed -e 's/ /\r\n/g' > $(CONFFILE);
 
 clean:
 	rm -f *.o gmon.out
