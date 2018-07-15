@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <unistd.h>
 #include <getopt.h>
 #include <string.h>
 #include <stdarg.h>
@@ -20,8 +19,8 @@
 #define RSA_KEYPATH "RSA_KEYPATH"
 #define MULTIPLE_ENTRIES_STR "the following keys have multiple entries\n"
 #define KEY_DISPLAY_DEFAULT "(d)"
-#define KEY_DISPLAY_WIDTH (KEY_DATA_MAX_LEN + \
-    strlen(" " KEY_DISPLAY_DEFAULT) + 1)
+#define KEY_DISPLAY_WIDTH ((int)(KEY_DATA_MAX_LEN + \
+    strlen(" " KEY_DISPLAY_DEFAULT) + 1))
 
 typedef struct rsa_keyring_t {
     struct rsa_keyring_t *next;
@@ -157,9 +156,12 @@ int rsa_set_file_name(char *name)
     }
     if (stat(name, &st))
     {
+#if 0
+        XXX investigate!!!
 	if (errno == EOVERFLOW)
 	    rsa_error_message(RSA_ERR_FILE_TOO_LARGE, name, "to open");
 	else
+#endif
 	    rsa_error_message(RSA_ERR_FILE_NOT_EXIST, name);
 	goto Exit;
     }
@@ -302,7 +304,7 @@ static void output_option_array(opt_t *arr)
 	if (!arr->description)
 	    continue;
 
-	printf(rsa_highlight_str(fmt, arr->short_opt, 
+	printf("%s", rsa_highlight_str(fmt, arr->short_opt, 
 	    args[arr->arg_required][0], arr->long_opt, 
 	    args[arr->arg_required][1]));
 	option_print_desc(arr->description);
@@ -344,7 +346,7 @@ char *key_path_get(void)
     static char key_path[MAX_FILE_NAME_LEN], *ptr;
 
     if ((ptr = getenv(RSA_KEYPATH)))
-	snprintf(key_path, MAX_FILE_NAME_LEN, ptr);
+	snprintf(key_path, MAX_FILE_NAME_LEN, "%s", ptr);
     else
 	getcwd(key_path, MAX_FILE_NAME_LEN);
 
@@ -390,8 +392,8 @@ static rsa_key_t *rsa_key_alloc(char type, char *name, char *path, FILE *file)
 	return NULL;
 
     key->type = type;
-    snprintf(key->name, KEY_DATA_MAX_LEN, name);
-    sprintf(key->path, path);
+    snprintf(key->name, KEY_DATA_MAX_LEN, "%s", name);
+    sprintf(key->path, "%s", path);
     key->file = file;
 
     return key;
@@ -838,7 +840,7 @@ static int keyname_display_single(char *fmt, rsa_keyring_t *kr,
 	if (!strcmp(kr->keys[idx]->path, lnkname))
 	{
 	    strcat(name, " " KEY_DISPLAY_DEFAULT);
-	    printf(rsa_highlight_str(fmt, name));
+	    printf("%s", rsa_highlight_str(fmt, name));
 	}
 	else
 	    printf(fmt, name);
