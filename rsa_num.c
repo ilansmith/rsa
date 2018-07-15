@@ -9,6 +9,7 @@
 #define CHAR_2_INT(c) ((int)((c) - '0'))
 #define COPRIME_PRIME(X) ((X).prime)
 #define COPRIME_DIVISOR(X) ((X).divisor)
+#define ASCII_LEN_2_BIN_LEN(STR) (strlen(STR)<<3)
 
 #define number_gcd_is_1(u, v) \
 ( \
@@ -38,7 +39,7 @@ u1024_t NUM_2 = {.seg_00=2};
 u1024_t NUM_5 = {.seg_00=5};
 u1024_t NUM_10 = {.seg_00=10};
 int bit_sz_u64 = BIT_SZ_U64;
-int bit_sz_u1024 = BIT_SZ_U1024;
+int encryption_level = BIT_SZ_U1024;
 int block_sz_u1024 = BLOCK_SZ_U1024;
 int sizeof_u1024 = sizeof(u1024_t);
 
@@ -49,23 +50,26 @@ STATIC u1024_t num_montgomery_n, num_montgomery_factor, num_res_nresidue;
 
 STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
-    static u1024_t tmp_res;
-    static u64 *max_advance, cmask;
-    u64 *seg = NULL, *seg1 = NULL, *seg2 = NULL, carry = 0;
+    u1024_t num_big, num_small, num_res;
+    u64 *top, *top_max, *seg = NULL, *seg1 = NULL, *seg2 = NULL, carry = 0;
 
     TIMER_START(FUNC_NUMBER_ADD);
-    if (!max_advance || !cmask)
+    /* set num_big => num_small */
+    if (number_is_greater_or_equal(num1, num2))
     {
-	/* bit carrying is continues into the buffer u64 to accomodate for  
-	 * number_montgomery_product()
-	 */
-	max_advance = (u64 *)&tmp_res + block_sz_u1024 + 1;
-	cmask = MSB_PT(u64);
+	num_big = *num1;
+	num_small = *num2;
+    }
+    else
+    {
+	num_big = *num2;
+	num_small = *num1;
     }
 
-    number_reset(&tmp_res);
-    for (seg = (u64 *)&tmp_res, seg1 = (u64 *)num1, seg2 = (u64 *)num2;
-	seg < max_advance; seg++, seg1++, seg2++)
+    num_res = num_big;
+    top = (u64*)&num_res + num_small.top + 1;
+    for (seg = (u64*)&num_res, seg1 = (u64*)&num_big, seg2 = (u64*)&num_small;
+	seg < top; seg++, seg1++, seg2++)
     {
 	if (!*seg1)
 	{
@@ -88,14 +92,27 @@ STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 	    continue;
 	}
 	*seg = *seg1 + *seg2 + carry;
-	if ((*seg1 & cmask) && (*seg2 & cmask))
+	if ((*seg1 & MSB_PT(u64)) && (*seg2 & MSB_PT(u64)))
 	    carry = 1;
-	else if (!(*seg1 & cmask) && !(*seg2 & cmask))
+	else if (!(*seg1 & MSB_PT(u64)) && !(*seg2 & MSB_PT(u64)))
 	    carry = 0;
 	else
-	    carry = (*seg & cmask) ? 0 : 1;
+	    carry = (*seg & MSB_PT(u64)) ? 0 : 1;
     }
-    *res = tmp_res;
+
+    top_max = (u64*)&num_res + block_sz_u1024;
+    for ( ; carry && seg <= top_max; seg++)
+    {
+	carry = *seg == (u64)-1;
+	(*seg)++;
+	if (seg > (u64*)&num_res + num_res.top)
+	    num_res.top++;
+    }
+    if (num_res.top > block_sz_u1024)
+	num_res.top--;
+    if (carry)
+	number_reset_buffer(&num_res);
+    *res = num_res;
     TIMER_STOP(FUNC_NUMBER_ADD);
 }
 
@@ -106,7 +123,7 @@ int INLINE number_init_random(u1024_t *num, int bit_len)
     u1024_t num_mask;
 
     TIMER_START(FUNC_NUMBER_INIT_RANDOM);
-    if (bit_len < 1 || bit_len > bit_sz_u1024)
+    if (bit_len < 1 || bit_len > encryption_level)
 	return -1;
 
     number_reset(num);
@@ -119,8 +136,8 @@ int INLINE number_init_random(u1024_t *num, int bit_len)
     }
     srandom((unsigned int)tv.tv_sec * (unsigned int)tv.tv_usec);
 
-    /* initiate a bit_sz_u1024 random number */
-    max = (bit_sz_u1024/(sizeof(long)<<3));
+    /* initiate a BIT_SZ_U1024 random number */
+    max = (encryption_level/(sizeof(long)<<3));
     for (i = 0; i < max; i++)
 	*((long *)num + i) |= random();
 
@@ -134,6 +151,7 @@ int INLINE number_init_random(u1024_t *num, int bit_len)
     /* apply num_mask to num */
     for (i = 0; i < block_sz_u1024; i++)
 	*((u64 *)num + i) &= *((u64*)&num_mask + i);
+    number_top_set(num);
 
     ret = 0;
 
@@ -145,34 +163,20 @@ Exit:
 STATIC int INLINE number_find_most_significant_set_bit(u1024_t *num, 
     u64 **major, u64 *minor)
 {
-    u64 *tmp_major = (u64 *)num + block_sz_u1024 - 1;
-    u64 tmp_minor;
     int minor_offset;
 
     TIMER_START(FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT);
-    while (tmp_major >= (u64 *)num)
+    *major = (u64*)num + num->top;
+    *minor = MSB_PT(u64);
+    minor_offset = bit_sz_u64;
+
+    while (*minor)
     {
-	tmp_minor = MSB_PT(u64);
-	minor_offset = bit_sz_u64;
-
-	while (tmp_minor)
-	{
-	    if (!(*tmp_major & tmp_minor))
-	    {
-		tmp_minor = tmp_minor >> 1;
-		minor_offset--;
-		continue;
-	    }
-	    goto Exit;
-	}
-	tmp_major--;
+	if ((**major & *minor))
+	    break;
+	*minor = *minor >> 1;
+	minor_offset--;
     }
-    tmp_major++; /* while loop terminates when tmp_major == (u64 *)num - 1 */
-
-Exit:
-    *minor = tmp_minor;
-    *major = tmp_major;
-
     TIMER_STOP(FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT);
     return minor_offset;
 }
@@ -191,14 +195,15 @@ STATIC void INLINE number_small_dec2num(u1024_t *num_n, u64 dec)
 STATIC void INLINE number_2complement(u1024_t *res, u1024_t *num)
 {
     u1024_t tmp;
-    u64 *seg = NULL;
+    u64 *seg = NULL, *seg_max = (u64 *)&tmp + block_sz_u1024;
+    int cur_block
 
     TIMER_START(FUNC_NUMBER_2COMPLEMENT);
     tmp = *num;
-    for (seg = (u64 *)&tmp; 
-	seg - (u64 *)&tmp <= block_sz_u1024; seg++)
+    for (seg = (u64 *)&tmp, cur_block = 0; seg <= seg_max; seg++,  cur_block++)
     {
-	*seg = ~*seg; /* one's complement */
+	if ((*seg = ~*seg)) /* one's complement */
+	    tmp.top = cur_block;
     }
 
     number_add(res, &tmp, &NUM_1); /* two's complement */
@@ -212,18 +217,19 @@ STATIC void INLINE number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2)
     TIMER_START(FUNC_NUMBER_SUB);
     number_2complement(&num2_2complement, num2);
     number_add(res, num1, &num2_2complement);
-    *((u64 *)res + block_sz_u1024) = 0;
+    number_reset_buffer(res);
     TIMER_STOP(FUNC_NUMBER_SUB);
 }
 
 void INLINE number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
-    int i;
+    int i, top;
     u1024_t tmp_res, multiplicand = *num1, multiplier = *num2;
 
     TIMER_START(FUNC_NUMBER_MUL);
     number_reset(&tmp_res);
-    for (i = 0; i < block_sz_u1024; i++)
+    top = num1->top + num2->top + 1;
+    for (i = 0; i < top; i++)
     {
 	u64 mask = 1;
 	int j;
@@ -233,7 +239,7 @@ void INLINE number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
 	    if ((*((u64 *)(&multiplier) + i)) & mask)
 		number_add(&tmp_res, &tmp_res, &multiplicand);
 	    number_shift_left_once(&multiplicand);
-	    *((u64 *)&multiplicand + block_sz_u1024) = 0;
+	    number_reset_buffer(&multiplicand);
 	    mask = mask << 1;
 	}
     }
@@ -274,9 +280,9 @@ STATIC void INLINE number_dev(u1024_t *num_q, u1024_t *num_r,
 	while (mask_dividend)
 	{
 	    number_shift_left_once(&remainder);
-	    *((u64 *)&remainder + block_sz_u1024) = 0;
+	    number_reset_buffer(&remainder);
 	    number_shift_left_once(&quotient);
-	    *((u64 *)&quotient + block_sz_u1024) = 0;
+	    number_reset_buffer(&quotient);
 	    *remainder_ptr = *remainder_ptr |
 		((*seg_dividend & mask_dividend) ? (u64)1 : (u64)0);
 	    if (number_is_greater_or_equal(&remainder, &divisor))
@@ -301,7 +307,7 @@ STATIC int INLINE number_modular_multiplication_naive(u1024_t *num_res,
     TIMER_START(FUNC_NUMBER_MODULAR_MULTIPLICATION_NAIVE);
     number_mul(&tmp, num_a, num_b);
     number_mod(num_res, &tmp, num_n);
-    *((u64 *)num_res + block_sz_u1024) = 0;
+    number_reset_buffer(num_res);
     TIMER_STOP(FUNC_NUMBER_MODULAR_MULTIPLICATION_NAIVE);
     return 0;
 }
@@ -314,7 +320,7 @@ static void INLINE number_init_random_strict_range(u1024_t *num_n,
 
     TIMER_START(FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE);
     number_sub(&num_range_min1, range, &NUM_1);
-    number_init_random(&num_tmp, bit_sz_u1024);
+    number_init_random(&num_tmp, encryption_level);
     number_mod(&num_tmp, &num_tmp, &num_range_min1);
     number_add(&num_tmp, &num_tmp, &NUM_1);
 
@@ -403,7 +409,7 @@ static void INLINE number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
     num_s = NUM_0;
     number_shift_left_once(&multiplier);
 
-    /* handle the first bit_sz_u1024 iterations */
+    /* handle the first BIT_SZ_U1024 iterations */
     for (seg = (u64 *)num_b; seg < top; seg++)
     {
 	u64 mask;
@@ -433,7 +439,7 @@ static void INLINE number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
     TIMER_STOP(FUNC_NUMBER_MONTGOMERY_PRODUCT);
 }
 
-/* shift left and do mod num_n 2*(bit_sz_u1024+2) times... */
+/* shift left and do mod num_n 2*(BIT_SZ_U1024 + 2) times... */
 void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
 {
     u1024_t factor;
@@ -446,7 +452,7 @@ void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
     if (num_factor)
 	goto Exit;
 
-    exp_max = 2*(bit_sz_u1024+2);
+    exp_max = 2*(encryption_level+2);
     number_small_dec2num(&factor, (u64)1);
     exp = 0;
 
@@ -464,6 +470,7 @@ void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
 
 Exit:
     num_montgomery_factor = factor;
+    num_montgomery_n = *num_n;
     number_montgomery_product(&num_res_nresidue, &num_montgomery_factor, &NUM_1,
 	num_n);
     TIMER_START(FUNC_NUMBER_MONTGOMERY_FACTOR_SET);
@@ -472,7 +479,7 @@ Exit:
 /* a: exponent
  * b: power
  * n: modulus
- * r: 2^(bit_sz_u1024)%n
+ * r: 2^(BIT_SZ_U1024)%n
  * MonPro(a, b, n) = abr^-1%n
  *
  * a * b % n = abrr^-1%n = 1abrr^-1%n = MonPro(1, abr%n, n) = 
@@ -758,7 +765,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 
 	do
 	{
-	    number_init_random(&num_a, bit_sz_u1024/2);
+	    number_init_random(&num_a, encryption_level>>1);
 	    number_modular_exponentiation_naive(&num_a_pow, &num_a,
 		&(small_primes[i].exp), &num_pi);
 	}
@@ -906,6 +913,19 @@ void number_find_prime(u1024_t *num)
     TIMER_STOP(FUNC_NUMBER_FIND_PRIME);
 }
 
+int number_str2num(u1024_t *num, char *str)
+{
+    u64 *seg;
+
+    if (ASCII_LEN_2_BIN_LEN(str) > encryption_level)
+	return -1;
+    number_reset(num);
+    sprintf((char *)num, "%s", str);
+    for (seg = (u64*)num + block_sz_u1024, num->top = block_sz_u1024; 
+	seg >= (u64*)num && !*seg; seg--, num->top--);
+    return 0;
+}
+
 #ifdef TESTS
 STATIC void number_shift_right(u1024_t *num, int n)
 {
@@ -948,11 +968,11 @@ static int is_valid_number_str_sz(char *str)
 	goto Exit;
     }
 
-    if (strlen(str) > bit_sz_u1024)
+    if (strlen(str) > encryption_level)
     {
 	char *ptr = NULL;
 
-	for (ptr = str + strlen(str) - bit_sz_u1024 - 1 ;
+	for (ptr = str + strlen(str) - encryption_level - 1 ;
 	    ptr >= str; ptr--)
 	{
 	    if (*ptr == '1')
@@ -992,6 +1012,7 @@ int number_init_str(u1024_t *num, char *init_str)
 	mask = (u64)(mask << 1) ? (u64)(mask << 1) : 1;
     }
 
+    num->top = ((end - init_str) - 1) / bit_sz_u64;
     return 0;
 }
 
@@ -999,7 +1020,7 @@ int number_dec2bin(u1024_t *num_bin, char *str_dec)
 {
     int ret;
     char *str_start = NULL, *str_end = NULL;
-    u1024_t num_counter, num_x10, num_digit, num_addition;
+    u1024_t num_tmp, num_counter;
     static char *str_dec2bin[] = {
 	"0000", /* 0 */
 	"0001", /* 1 */
@@ -1021,20 +1042,22 @@ int number_dec2bin(u1024_t *num_bin, char *str_dec)
 
     str_start = str_dec;
     str_end = str_dec + strlen(str_dec) - 1;
-    number_reset(num_bin);
-    number_init_str(&num_x10, "1010");
-    number_init_str(&num_counter, "1");
+    number_reset(&num_tmp);
+    /* eat leading zeros */
     while (str_start && *str_start == '0')
 	str_start++;
-
     if (str_end < str_start)
     {
+	*num_bin = num_tmp;
 	ret = 0;
 	goto Exit;
     }
 
+    num_counter = NUM_1;
     while (str_start <= str_end) 
     {
+	u1024_t num_digit, num_addition;
+
 	if (!IS_DIGIT(*str_end))
 	{
 	    ret = -1;
@@ -1043,10 +1066,13 @@ int number_dec2bin(u1024_t *num_bin, char *str_dec)
 
 	number_init_str(&num_digit, str_dec2bin[CHAR_2_INT(*str_end)]);
 	number_mul(&num_addition, &num_digit, &num_counter);
-	number_add(num_bin, num_bin, &num_addition);
-	number_mul(&num_counter, &num_counter, &num_x10);
+	number_add(&num_tmp, &num_tmp, &num_addition);
+	number_mul(&num_counter, &num_counter, &NUM_10);
 	str_end--;
     }
+    /* update top */
+    number_top_set(&num_tmp);
+    *num_bin = num_tmp;
     ret = 0;
 
 Exit:

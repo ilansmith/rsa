@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -125,6 +124,7 @@ typedef struct u1024_t {
     u64 seg_15; /* bits: 960 - 1023 */
 #endif
     u64 buffer; /* buffer */
+    int top;
 } u1024_t;
 
 #define RSA_MASTER (!defined(RSA_ENC) && !defined(RSA_DEC))
@@ -132,14 +132,14 @@ typedef struct u1024_t {
 #define RSA_DECRYPTER (!defined(RSA_ENC) && !RSA_MASTER)
 
 #define BIT_SZ_U64 (sizeof(u64)<<3)
-#define BIT_SZ_U1024 ((sizeof(u1024_t)-sizeof(u64))<<3)
-#define BLOCK_SZ_U1024 (BIT_SZ_U1024/BIT_SZ_U64)
+#define BLOCK_SZ_U1024 (EL>>6)
+#define BIT_SZ_U1024 (BIT_SZ_U64 * BLOCK_SZ_U1024)
 
 #define ARRAY_SZ(X) (sizeof(X) / sizeof((X)[0]))
 #define MSB_PT(X) ((X)(~((X)-1 >> 1)))
 
 #define NUMBER_IS_NEGATIVE(X) ((MSB_PT(u64) & \
-    *((u64 *)(X) + (BLOCK_SZ_U1024 - 1))) ? 1 : 0)
+    *((u64*)(X) + (BLOCK_SZ_U1024 - 1))) ? 1 : 0)
 
 #define RSA_PTASK_START(FMT, ...) printf(FMT ":\n", ##__VA_ARGS__); \
     fflush(stdout)
@@ -153,7 +153,7 @@ extern u1024_t NUM_2;
 extern u1024_t NUM_5;
 extern u1024_t NUM_10;
 extern int bit_sz_u64;
-extern int bit_sz_u1024;
+extern int encryption_level;
 extern int block_sz_u1024;
 extern int sizeof_u1024;
 
@@ -199,36 +199,53 @@ int str2u1024_t(u1024_t *num, char *str);
 int u1024_t2str(u1024_t *num, char *str);
 int rsa_key_get_params(char *preffix, u1024_t *n, u1024_t *exp,
     u1024_t *montgomery_factor, int is_decrypt);
+int number_str2num(u1024_t *num, char *str);
 #if RSA_DECRYPTER || RSA_ENCRYPTER
 int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 #endif
 
-#define number_reset(x) memset((x), 0, sizeof_u1024)
+#define number_reset_buffer(num) { \
+    do { \
+	*((u64*)(num) + block_sz_u1024) = 0; \
+	if ((num)->top == block_sz_u1024) \
+	    while ((num)->top && !*((u64*)(num) + --(num)->top)); \
+    } while (0); \
+}
+
+#define number_reset(num) memset((num), 0, sizeof_u1024)
 
 #define number_shift_right_once(num) { \
     do { \
-	u64 *seg, *top = (u64 *)(num) + block_sz_u1024; \
-	/* shifting is done from the buffer u64 to accomodate for \
+	u64 *seg, *top; \
+	/* shifting is done up to, at most, the buffer u64 to accomodate for \
 	 * number_montgomery_product() */ \
-	for (seg = (u64 *)(num); seg < top; seg++) \
+	top = (u64*)(num) + (num)->top; \
+	for (seg = (u64*)(num); seg < top; seg++) \
 	{ \
 	    *seg = *seg >> 1; \
 	    *seg = (*(seg+1) & (u64)1) ? *seg | MSB_PT(u64) : \
 		*seg & ~MSB_PT(u64); \
 	} \
 	*seg = *seg >> 1; \
+	if ((num)->top && !*seg) \
+	    (num)->top--; \
     } while (0); \
 }
 
 #define number_shift_left_once(num) { \
     do { \
-	u64 *seg; \
-	for (seg = (u64*)(num) + block_sz_u1024; seg > (u64*)(num); seg--) \
+	u64 *seg, *top; \
+	int is_top_can_shift = (num)->top < block_sz_u1024 ? 1 : 0; \
+	/* shifting is done from, at most, the buffer u64 */ \
+	top = (u64*)(num) + (num)->top + is_top_can_shift; \
+	for (seg = top; seg > (u64*)(num); seg--) \
 	{ \
 	    *seg = *seg << 1; \
 	    *seg = *(seg-1) & MSB_PT(u64) ? *seg | (u64)1 : *seg & ~(u64)1; \
 	} \
 	*seg = *seg << 1; \
+	if (is_top_can_shift && *(top)) \
+	    (num)->top++; \
     } while (0); \
 }
 
@@ -244,10 +261,15 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 #define number_compare(num1, num2, ret_on_equal) ({ \
     int ret; \
     do { \
-	u64 *seg1 = (u64 *)(num1) + BLOCK_SZ_U1024; \
-	u64 *seg2 = (u64 *)(num2) + BLOCK_SZ_U1024; \
-	for (; seg1 > (u64 *)(num1) && *seg1==*seg2; seg1--, seg2--); \
-	ret = *seg1==*seg2 ? (ret_on_equal) : *seg1>*seg2; \
+	if ((num1)->top == (num2)->top) \
+	{ \
+	    u64 *seg1 = (u64*)(num1) + (num1)->top; \
+	    u64 *seg2 = (u64*)(num2) + (num2)->top; \
+	    for (; seg1 > (u64*)(num1) && *seg1==*seg2; seg1--, seg2--); \
+	    ret = (*seg1 == *seg2) ? ret_on_equal : *seg1 > *seg2; \
+	} \
+	else \
+	    ret = (num1)->top > (num2)->top; \
     } while (0); \
     ret; \
 })
@@ -259,12 +281,21 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 #define number_is_greater_or_equal(num1, num2) number_compare((num1), (num2), 1)
 
 /* return: num1 == num2 */
-#define number_is_equal(num1, num2) !memcmp((num1), (num2), BIT_SZ_U1024>>3)
+#define number_is_equal(num1, num2) !memcmp((num1), (num2), encryption_level>>3)
 
 #define number_mod(r, a, n) { \
     do { \
 	u1024_t q; \
 	number_dev(&q, (r), (a), (n)); \
+    } \
+    while (0); \
+}
+
+#define number_top_set(num) { \
+    do { \
+	u64 *seg; \
+	for (seg = (u64*)(num) + block_sz_u1024, (num)->top = block_sz_u1024; \
+		seg > (u64*)(num) && !*seg; seg--, (num)->top--); \
     } \
     while (0); \
 }
