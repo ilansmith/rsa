@@ -53,8 +53,9 @@
    email: m-mat @ math.sci.hiroshima-u.ac.jp (remove spaces)
 */
 
-
+#ifndef MERSENNE_TWISTER
 #include <stdio.h>
+#endif
 
 #define NN 312
 #define MM 156
@@ -165,7 +166,7 @@ double genrand64_real3(void)
     return ((genrand64_int64() >> 12) + 0.5) * (1.0/4503599627370496.0);
 }
 
-
+#ifndef MERSENNE_TWISTER
 int main(void)
 {
     int i;
@@ -183,5 +184,5 @@ int main(void)
     }
     return 0;
 }
-
+#endif
 

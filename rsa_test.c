@@ -2474,7 +2474,7 @@ error:
 
 static int test120(void)
 {
-    u1024_t p1, p2, n, e, d, input, encryption, decryption, num_xor, num_seed;
+    u1024_t p1, p2, n, e, d, input, encryption, decryption, num_xor, seed;
     int res;
 
     rsa_key_generator(&p1, &p2, &n, &e, &d, 1);
@@ -2484,13 +2484,13 @@ static int test120(void)
 
     p_comment("encrypting...");
     local_timer_start();
-    number_reset(&num_seed);
-    if (!(*(unsigned int*)&num_seed = number_seed_set(0)))
+    number_reset(&seed);
+    if (!(*(prng_seed_t*)&seed = number_seed_set(0)))
     {
 	p_comment("number_seed_set()");
 	return -1;
     }
-    number_modular_exponentiation_montgomery(&num_seed, &num_seed, &e, &n);
+    number_modular_exponentiation_montgomery(&seed, &seed, &e, &n);
     number_init_random(&num_xor, block_sz_u1024);
     number_xor(&encryption, &num_xor, &input);
     local_timer_stop();
@@ -2498,8 +2498,8 @@ static int test120(void)
 
     p_comment("decrypting...");
     local_timer_start();
-    number_modular_exponentiation_montgomery(&num_seed, &num_seed, &d, &n);
-    if (!number_seed_set(*(unsigned int*)&num_seed))
+    number_modular_exponentiation_montgomery(&seed, &seed, &d, &n);
+    if (!number_seed_set(*(prng_seed_t*)&seed))
     {
 	p_comment("number_seed_set()");
 	return -1;
@@ -2517,7 +2517,7 @@ static int test120(void)
 
 static int test125(void)
 { 
-    u1024_t p1, p2, n, e, data, encryption, num_seed;
+    u1024_t p1, p2, n, e, data, encryption, seed;
     int i, mb, max;
 
     mb = 5;
@@ -2612,14 +2612,14 @@ static int test125(void)
 
     p_comment("encrypting %dMB of data:", mb);
     local_timer_start();
-    p_comment("seeding number generator...");
-    if (!(*(unsigned int*)&num_seed = number_seed_set(0)))
+    p_comment("seeding pseudo random number generator...");
+    if (!(*(prng_seed_t*)&seed = number_seed_set(0)))
     {
 	p_comment("number_seed_set()");
 	return -1;
     }
-    number_seed_set(*(unsigned int*)&num_seed);
-    number_modular_exponentiation_montgomery(&num_seed, &num_seed, &e, &n);
+    number_seed_set(*(prng_seed_t*)&seed);
+    number_modular_exponentiation_montgomery(&seed, &seed, &e, &n);
     local_timer_stop();
     p_local_timer();
     p_comment("encrypting...");
