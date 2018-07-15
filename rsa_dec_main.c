@@ -35,18 +35,12 @@ static int parse_args_decrypter(int opt, int *flags)
     case RSA_OPT_FILE:
 	OPT_ADD(flags, RSA_OPT_FILE);
 	if (rsa_set_file_name(optarg))
-	{
-	    rsa_error_message(RSA_ERR_FNAME_LEN, optarg);
 	    return -1;
-	}
 	break;
     case RSA_OPT_KEYGEN:
 	OPT_ADD(flags, RSA_OPT_KEYGEN);
-	if (rsa_set_key_id(optarg))
-	{
-	    rsa_error_message(RSA_ERR_KEYNAME, KEY_ID_MAX_LEN - 1);
+	if (rsa_set_key_data(optarg))
 	    return -1;
-	}
 	break;
     default:
 	rsa_error_message(RSA_ERR_OPTARG);
@@ -58,7 +52,7 @@ static int parse_args_decrypter(int opt, int *flags)
 
 int main(int argc, char *argv[])
 {
-    int action, flags = 0;
+    int ret, action, flags = 0;
     rsa_handler_t decrypter_handler = {
 	.keytype = RSA_KEY_TYPE_PRIVATE,
 	.options = options_decrypter,
@@ -72,15 +66,17 @@ int main(int argc, char *argv[])
     action = rsa_action_get(flags, RSA_OPT_DECRYPT, RSA_OPT_KEYGEN, NULL);
     switch (action)
     {
-    case OPT_FLAG(RSA_OPT_DECRYPT):
-	RSA_TBD("handle RSA_OPT_DECRYPT");
-	break;
     case OPT_FLAG(RSA_OPT_KEYGEN):
-	return rsa_keygen();
+	ret = rsa_keygen();
+	break;
+    case OPT_FLAG(RSA_OPT_DECRYPT):
+	ret = rsa_decrypt();
+	break;
     default:
-	return rsa_action_handle_common(action, argv[0], &decrypter_handler);
+	ret = rsa_action_handle_common(action, argv[0], &decrypter_handler);
+	break;
     }
 
-    return 0;
+    return ret;
 }
 

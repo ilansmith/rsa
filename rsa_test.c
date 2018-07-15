@@ -1782,6 +1782,22 @@ static int test084(void)
 
 static int test085(void)
 { 
+    u1024_t res_0, res_1, num_0, num_1, num_4, n;
+
+    number_assign(res_0, NUM_0);
+    number_assign(res_1, NUM_1);
+    number_assign(num_0, NUM_0);
+    number_assign(num_1, NUM_1);
+    number_small_dec2num(&num_4, (u64)4);
+    number_small_dec2num(&n, (u64)7);
+    number_modular_exponentiation_montgomery(&num_0, &num_0, &num_4, &n);
+    number_modular_exponentiation_montgomery(&num_1, &num_1, &num_4, &n);
+
+    return !number_is_equal(&res_0, &num_0) || !number_is_equal(&res_1, &num_1);
+}
+
+static int test086(void)
+{ 
     int res; 
     u1024_t n, p1, p2, num_2, num_4, num_7, buf1, buf2, res1, res2;
 
@@ -1824,7 +1840,7 @@ static int test085(void)
     return res;
 }
 
-static int test086(void)
+static int test087(void)
 {
     u1024_t res, pow, two, bit_sz;
 
@@ -2534,9 +2550,9 @@ static int test120(void)
     p_comment("encrypting...");
     local_timer_start();
     number_reset(&seed);
-    if (!(*(prng_seed_t*)&seed = number_seed_set(0)))
+    if (number_seed_set_random(&seed))
     {
-	p_comment("number_seed_set()");
+	p_comment("number_seed_set_random()");
 	return -1;
     }
     number_modular_exponentiation_montgomery(&seed, &seed, &e, &n);
@@ -2548,9 +2564,9 @@ static int test120(void)
     p_comment("decrypting...");
     local_timer_start();
     number_modular_exponentiation_montgomery(&seed, &seed, &d, &n);
-    if (!number_seed_set(*(prng_seed_t*)&seed))
+    if (number_seed_set_fixed(&seed))
     {
-	p_comment("number_seed_set()");
+	p_comment("number_seed_set_fixed()");
 	return -1;
     }
     number_init_random(&num_xor, block_sz_u1024);
@@ -2581,12 +2597,12 @@ static int test125(void)
     p_comment("encrypting %dMB of data:", mb);
     local_timer_start();
     p_comment("seeding pseudo random number generator...");
-    if (!(*(prng_seed_t*)&seed = number_seed_set(0)))
+    if (number_seed_set_random(&seed))
     {
-	p_comment("number_seed_set()");
+	p_comment("number_seed_set_random()");
 	return -1;
     }
-    number_seed_set(*(prng_seed_t*)&seed);
+    number_seed_set_fixed(&seed);
     number_modular_exponentiation_montgomery(&seed, &seed, &e, &n);
     local_timer_stop();
     p_local_timer();
@@ -3159,15 +3175,20 @@ static test_t rsa_tests[] =
 	disabled: DISABLE_UCHAR,
     },
     {
-	description: "exponentiation modolo a larg number",
+	description: "number_modular_exponentiation_montgomery()",
 	func: test085,
+	disabled: DISABLE_UCHAR,
+    },
+    {
+	description: "exponentiation modolo a larg number",
+	func: test086,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
 	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
 	    DISABLE_ULLONG_512,
     },
     {
 	description: "2^(encryption_level - 1)",
-	func: test086,
+	func: test087,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
 	    DISABLE_TIME_FUNCTIONS,
     },

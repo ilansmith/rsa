@@ -4,8 +4,10 @@
 #include <stdio.h>
 #include "rsa_num.h"
 
+#define MAX_FILE_NAME_LEN 256
 #define MAX_LINE_LENGTH 128
-#define KEY_ID_MAX_LEN 16
+#define KEY_DATA_MAX_LEN 16
+#define MAX_HIGHLIGHT_STR 128
 
 #define ARRAY_SZ(arr) (sizeof(arr) / sizeof(arr[0]))
 #define IS_WHITESPACE(c) ((c) == ' ' || (c) == '\t')
@@ -39,6 +41,7 @@ typedef enum {
     RSA_ERR_NOACTION,
     RSA_ERR_MULTIACTION,
     RSA_ERR_FNAME_LEN,
+    RSA_ERR_FILE_NOT_EXIST,
     RSA_ERR_NOFILE,
     RSA_ERR_FOPEN,
     RSA_ERR_FILEIO,
@@ -52,7 +55,9 @@ typedef enum {
     RSA_ERR_KEY_CORRUPT,
     RSA_ERR_KEY_OPEN,
     RSA_ERR_KEY_TYPE,
+    RSA_ERR_KEY_MISMATCH,
     RSA_ERR_LEVEL,
+    RSA_ERR_INTERNAL,
 } rsa_errno_t;
 
 int code2code(code2code_t *list, int code);
@@ -72,5 +77,7 @@ int rsa_read_str(FILE *file, char *str, int len);
 int rsa_write_str(FILE *file, char *str, int len);
 void rsa_verbose_set(verbose_t level);
 verbose_t rsa_verbose_get(void);
+int is_fwrite_enable(char *name);
+char *rsa_highlight_str(char *fmt, ...);
 #endif
 

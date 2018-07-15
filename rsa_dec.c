@@ -5,13 +5,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "rsa.h"
+#include "mt19937_64.h"
 #include "rsa_util.h"
 #include "rsa_num.h"
 
 static int key_files_generate(char *private_name, FILE **private_key, 
     char *public_name, FILE **public_key, int len)
 {
-    char prefix[KEY_ID_MAX_LEN], *path, *pprv, *ppub; 
+    char prefix[KEY_DATA_MAX_LEN], *path, *pprv, *ppub; 
     int i, total_len, path_len;
     struct stat st;
 
@@ -26,8 +27,8 @@ static int key_files_generate(char *private_name, FILE **private_key,
     sprintf(public_name, "%s/" , path);
     ppub = public_name + path_len + 1;
 
-    rsa_sprintf_nows(prefix, "%s%s", !strcmp(key_id + 1, RSA_KEYLINK_PREFIX) ? 
-	"_" : "", key_id + 1);
+    rsa_sprintf_nows(prefix, "%s%s", !strcmp(key_data + 1, RSA_KEYLINK_PREFIX) ?
+	"_" : "", key_data + 1);
     total_len = path_len + 1 + strlen(prefix) + 4;
 
     for (i = 0; !stat(private_name, &st) || !stat(public_name, &st); i++)
@@ -70,8 +71,8 @@ static int rsa_sign(FILE *key, char keytype, u1024_t *exp, u1024_t *n)
 {
     u1024_t signiture, id;
 
-    *key_id = keytype;
-    if (number_str2num(&id, key_id))
+    *key_data = keytype;
+    if (number_str2num(&id, key_data))
 	return -1;
 
     rsa_encode(&signiture, &id, exp, n);
@@ -88,8 +89,9 @@ static int insert_key(FILE *key, u1024_t *exp, u1024_t *n)
 {
     u1024_t montgomery_factor;
 
+    number_montgomery_factor_set(n, NULL);
     number_montgomery_factor_get(&montgomery_factor);
-    return rsa_write_u1024_full(key, n) || rsa_write_u1024_full(key, exp) || 
+    return rsa_write_u1024_full(key, exp) || rsa_write_u1024_full(key, n) || 
 	rsa_write_u1024_full(key, &montgomery_factor);
 }
 
@@ -144,7 +146,8 @@ static void rsa_key_generator(u1024_t *n, u1024_t *e, u1024_t *d)
     number_assign(p2_sub1, p2);
     number_sub1(&p1_sub1);
     number_sub1(&p2_sub1);
-    rsa_printf(1, 1, "calculating Euler phi function for n: phi=(p1-1)*(p2-1)...");
+    rsa_printf(1, 1, 
+	"calculating Euler phi function for n: phi=(p1-1)*(p2-1)...");
     number_mul(&phi, &p1_sub1, &p2_sub1);
 
     rsa_printf(1, 1, "generating puglic key: (e, n), where e is coprime with "
@@ -167,8 +170,8 @@ int rsa_keygen(void)
 	return -1;
     }
 
-    rsa_printf(0, 0, "generating key: %s%s%s (this will take a few minutes)", 
-	C_HIGHLIGHT, key_id + 1, C_NORMAL);
+    rsa_printf(0, 0, "generating key: %s (this will take a few minutes)", 
+	rsa_highlight_str(key_data + 1));
     for (level = encryption_levels; *level; level++)
     {
 	u1024_t n, e, d;
@@ -215,3 +218,209 @@ Exit:
     return ret;
 }
 
+static void verbose_decryption(int is_full, char *key_name, int level, 
+    char *cipher, char *data)
+{
+    rsa_printf(1, 0, "encryption method: %s", is_full ? "full" : "quick");
+    rsa_printf(1, 0, "key: %s", key_name);
+    rsa_printf(1, 0, "encryption level: %d", level);
+    rsa_printf(1, 0, "decrypting: %s", cipher);
+    rsa_printf(1, 0, "data file: %s", data);
+}
+
+static rsa_key_t *rsa_key_open_decrypt(void)
+{
+    char keyname[MAX_FILE_NAME_LEN];
+
+    sprintf(keyname, "%s/%s.prv", key_path_get(), RSA_KEYLINK_PREFIX);
+    return rsa_key_open(keyname, RSA_KEY_TYPE_PRIVATE);
+}
+
+static int rsa_decrypte_header_common(rsa_key_t *key, FILE *cipher, 
+    int *is_full)
+{
+    u1024_t numdata, seed;
+    char *keydata;
+    int i, *level;
+
+    if (rsa_key_enclev_set(key, encryption_levels[0]) || 
+	rsa_read_u1024_full(cipher, &numdata))
+    {
+	goto Error;
+    }
+
+    rsa_decode(&numdata, &numdata, &key->exp, &key->n);
+    keydata = (char *)numdata.arr;
+
+    if (memcmp(key->name, keydata + 1, strlen(key->name)))
+    {
+	rsa_error_message(RSA_ERR_KEY_MISMATCH, file_name, 
+	    rsa_highlight_str(key->name));
+	return -1;
+    }
+
+    for (level = encryption_levels, i = 0; *level && !(*keydata & 1<<i); 
+	level++, i++);
+    if (!*level)
+	goto Error;
+    if (*keydata & RSA_KEY_DATA_QUICK)
+	*is_full = 0;
+    else if (*keydata & RSA_KEY_DATA_FULL)
+	*is_full = 1;
+    else
+	goto Error;
+
+    rsa_encryption_level = *level;
+    if (rsa_key_enclev_set(key, rsa_encryption_level) || 
+	rsa_read_u1024_full(cipher, &seed))
+    {
+	goto Error;
+    }
+    rsa_decode(&seed, &seed, &key->exp, &key->n);
+    return number_seed_set_fixed(&seed);
+
+Error:
+    rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
+    return -1;
+}
+
+static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher, 
+    int *is_full)
+{
+    int file_name_len;
+
+    /* open RSA private key */
+    if (!(*key = rsa_key_open_decrypt()))
+    {
+	rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
+	return -1;
+    }
+
+    /* open file to decrypt */
+    if (!(*cipher = fopen(file_name, "r")))
+    {
+	rsa_key_close(*key);
+	rsa_error_message(RSA_ERR_FOPEN, file_name);
+	return -1;
+    }
+
+    /* decipher common headers */
+    if (rsa_decrypte_header_common(*key, *cipher, is_full))
+    {
+	rsa_key_close(*key);
+	fclose(*cipher);
+	return -1;
+    }
+
+    /* open unencrypted text file */
+    file_name_len = strlen(file_name);
+    if (file_name_len > 4 && !strcmp(file_name + file_name_len - 4, ".enc"))
+	snprintf(newfile_name, file_name_len - 3, "%s", file_name);
+    else
+	sprintf(newfile_name, "%s.dec", file_name);
+    if (!is_fwrite_enable(newfile_name) || 
+	!(*data = fopen(newfile_name, "w")))
+    {
+	rsa_key_close(*key);
+	fclose(*cipher);
+	rsa_error_message(RSA_ERR_FOPEN, newfile_name);
+	return -1;
+    }
+
+    verbose_decryption(*is_full, (*key)->name, rsa_encryption_level, file_name, 
+	newfile_name);
+
+    return 0;
+}
+
+static void rsa_decrypt_epilog(rsa_key_t *key, FILE *data, FILE *cipher)
+{
+    rsa_key_close(key);
+    fclose(data);
+    fclose(cipher);
+}
+
+static int rsa_decrypt_quick(rsa_key_t *key, FILE *cipher, FILE *data)
+{
+    int len, buf_len;
+
+    buf_len = sizeof(u64) * BUF_LEN_UNIT_QUICK;
+    do
+    {
+	char buf[buf_len];
+	u64 *xor_buf = (u64*)buf;
+	int i;
+
+	len = fread(buf, sizeof(char), buf_len, cipher);
+	for (i = 0; len && i < (len-1)/sizeof(u64) + 1; i++)
+	    xor_buf[i] ^= (u64)genrand64_int64();
+	fwrite(buf, sizeof(char), len, data);
+    }
+    while (len == buf_len);
+    return 0;
+}
+
+static int rsa_decryption_length(rsa_key_t *key ,FILE *cipher)
+{
+    u1024_t length;
+
+    if (rsa_key_enclev_set(key, encryption_levels[0]) || 
+	rsa_read_u1024_full(cipher, &length))
+    {
+	return -1;
+    }
+    rsa_decode(&length, &length, &key->exp, &key->n);
+    return rsa_key_enclev_set(key, rsa_encryption_level) ? 
+	-1 : (int)length.arr[0];
+}
+
+static int rsa_decrypt_full(rsa_key_t *key, FILE *cipher, FILE *data)
+{
+    int len, total_length, data_buf_len, num_buf_len, data_sz, num_sz;
+
+    if ((total_length = rsa_decryption_length(key, cipher)) < 0)
+    {
+	rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
+	return -1;
+    }
+
+    data_sz = rsa_encryption_level/sizeof(u64);
+    data_buf_len = BUF_LEN_UNIT_FULL * data_sz;
+    num_sz = number_size(rsa_encryption_level);
+    num_buf_len = BUF_LEN_UNIT_FULL * num_sz;
+    len = 0;
+    do
+    {
+	char buf[data_buf_len];
+	u1024_t nums[num_buf_len];
+	int i;
+
+	for (i = 0; i < num_buf_len && len < total_length; i++)
+	{
+	    if (rsa_read_u1024_full(cipher, &nums[i]))
+		break;
+	    rsa_decode(&nums[i], &nums[i], &key->exp, &key->n);
+	    len += fwrite(&nums[i].arr, sizeof(char), 
+		MIN(data_sz, total_length - len), data);
+	}
+	len += fread(buf, sizeof(char), data_buf_len, cipher);
+    }
+    while (len < total_length);
+    return 0;
+}
+
+int rsa_decrypt(void)
+{
+    rsa_key_t *key;
+    FILE *data, *cipher;
+    int ret, is_full;
+
+    if (rsa_decrypt_prolog(&key, &data, &cipher, &is_full))
+	return -1;
+
+    ret = is_full ? rsa_decrypt_full(key, cipher, data) : 
+	rsa_decrypt_quick(key, cipher, data);
+
+    rsa_decrypt_epilog(key, data, cipher);
+    return ret;
+}
