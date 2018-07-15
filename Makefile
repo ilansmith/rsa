@@ -43,7 +43,7 @@ endif
 endif
 endif
 else #not debug
-TARGET_OBJS+=main.o rsa_key.o
+TARGET_OBJS+=main.o rsa_key.o rsa_file.o
 endif
 
 .PHONY: all clean cleanall
@@ -59,6 +59,7 @@ rsa_test.o: rsa_test.c rsa.h
 rsa_num.o: rsa_num.c rsa.h
 main.o: main.c rsa.h
 rsa_key.o: rsa_key.c rsa.h
+rsa_file.o: rsa_file.c
 
 clean:
 	rm -rf *.o
