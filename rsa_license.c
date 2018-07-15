@@ -120,22 +120,15 @@ exit:
 	return ret;
 }
 
-int rsa_license_info(char *pub_key_path, char *file_name,
-		struct rsa_license_ops *license_ops)
+int rsa_license_get(char *pub_key_path, char *file_name, char *buf, int *len)
 {
 	FILE *ciphertext;
-	char *buf;
 	char c;
 	rsa_key_t *key = NULL;
 	u1024_t seed;
 	u64 crc[2];
 	u64 crc_check;
-	int len;
 	int ret = -1;
-
-	buf = calloc(LICENSE_LENGTH_USER, sizeof(char));
-	if (!buf)
-		return -1;
 
 	/* open file */
 	if (!(ciphertext = fopen(file_name, "r")))
@@ -163,24 +156,20 @@ int rsa_license_info(char *pub_key_path, char *file_name,
 		goto exit;
 
 	/* read user data from license */
-	len = fread(buf, sizeof(char), LICENSE_LENGTH_USER, ciphertext);
+	*len = fread(buf, sizeof(char), LICENSE_LENGTH_USER, ciphertext);
 	/* assert there's no more to read in license */
 	if (0 < fread(&c, sizeof(char), 1, ciphertext))
 		goto exit;
 
 	/* take crc check */
-	crc_check = rsa_crc(buf, len);
+	crc_check = rsa_crc(buf, *len);
 
 	/* XoR decrypt user data */
-	xor_user_data(buf, len);
+	xor_user_data(buf, *len);
 
 	/* assert crc is correct */
 	if (xor_decrypt_crc(crc, crc_check))
 		goto exit;
-
-	/* validate user data */
-	if (license_ops->lic_parse)
-		license_ops->lic_parse(buf, len);
 
 	ret = 0;
 
@@ -192,9 +181,54 @@ exit:
 	/* close private key */
 	rsa_key_close(key);
 
-	/* cleanup buf */
-	free(buf);
+	return ret;
+}
 
+int rsa_license_info(char *pub_key_path, char *file_name,
+		struct rsa_license_ops *license_ops)
+{
+	char *buf;
+	int len;
+	int ret = -1;
+
+	buf = calloc(LICENSE_LENGTH_USER, sizeof(char));
+	if (!buf)
+		return -1;
+
+	if (rsa_license_get(pub_key_path, file_name, buf, &len))
+		goto exit;
+
+	if (license_ops->lic_info)
+		license_ops->lic_info(buf, len);
+
+	ret = 0;
+
+exit:
+	free(buf);
+	return ret;
+}
+
+int rsa_license_extract(char *pub_key_path, char *file_name,
+		struct rsa_license_ops *license_ops, void *data)
+{
+	char *buf;
+	int len;
+	int ret = -1;
+
+	buf = calloc(LICENSE_LENGTH_USER, sizeof(char));
+	if (!buf)
+		return -1;
+
+	if (rsa_license_get(pub_key_path, file_name, buf, &len))
+		goto exit;
+
+	if (license_ops->lic_extract)
+		license_ops->lic_extract(buf, len, data);
+
+	ret = 0;
+
+exit:
+	free(buf);
 	return ret;
 }
 

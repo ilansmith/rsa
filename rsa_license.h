@@ -5,12 +5,12 @@
 #include "rsa_util.h"
 
 typedef int (*lic_create_t)(char *buf, int len, void *data);
-typedef int (*lic_parse_t)(char *buf, int len);
+typedef int (*lic_info_t)(char *buf, int len);
 typedef int (*lic_extract_t)(char *buf, int len, void *data);
 
 struct rsa_license_ops {
 	lic_create_t lic_create;
-	lic_parse_t lic_parse;
+	lic_info_t lic_info;
 	lic_extract_t lic_extract;
 };
 
@@ -68,6 +68,9 @@ int rsa_license_create(char *priv_key_path, char *file_name,
 		struct rsa_license_ops *license_ops, void *data);
 int rsa_license_info(char *pub_key_path, char *file_name,
 		struct rsa_license_ops * license_ops);
+int rsa_license_extract(char *pub_key_path, char *file_name,
+		struct rsa_license_ops *license_ops, void *data);
+
 void rsa_license_init(void);
 
 #endif

@@ -89,24 +89,41 @@ static int rsa_license_create_rivermax(char *buf, int len, void *data)
 	return len;
 }
 
-static int rsa_decrypt_version(char **buf, int *len)
+static int rsa_decrypt_version(char **buf, int *len, u64 *version_enc)
 {
-	u64 version_enc;
-
 	if (*len < sizeof(u64))
 		return -1;
 
-	version_enc = **((u64**)buf);
-	printf("file format version: %llu\n", version_enc);
+	*version_enc = **((u64**)buf);
 
 	*buf += sizeof(u64);
 	*len -= sizeof(u64);
 	return 0;
 }
 
-static int rsa_decrypt_vendor_name(char **buf, int *len)
+static int rsa_info_version(char **buf, int *len)
 {
-	char vendor_name[VENDOR_NAME_MAX_LENGTH];
+	u64 version_enc;
+
+	if (rsa_decrypt_version(buf, len, &version_enc))
+		return -1;
+
+	printf("file format version info : %llu\n", version_enc);
+	return 0;
+}
+
+static int rsa_extract_version(char **buf, int *len,
+		struct rsa_license_data *data)
+{
+	if (rsa_decrypt_version(buf, len, &data->version))
+		return -1;
+
+	return 0;
+}
+
+static int rsa_decrypt_vendor_name(char **buf, int *len,
+		char vendor_name[VENDOR_NAME_MAX_LENGTH])
+{
 	int i;
 
 	if (*len < VENDOR_NAME_MAX_LENGTH)
@@ -115,53 +132,105 @@ static int rsa_decrypt_vendor_name(char **buf, int *len)
 	for (i = 0; i < VENDOR_NAME_MAX_LENGTH; i++)
 		vendor_name[i] = (*buf)[i];
 
-	printf("vendor name: %s\n", vendor_name);
-
 	*buf += VENDOR_NAME_MAX_LENGTH;
 	*len -= VENDOR_NAME_MAX_LENGTH;
 	return 0;
 }
 
-static int rsa_decrypt_time_limit(char **buf, int *len)
+static int rsa_info_vendor_name(char **buf, int *len)
 {
-	time_t time_limit;
-	char stime[50];
+	char vendor_name[VENDOR_NAME_MAX_LENGTH];
 
+	if (rsa_decrypt_vendor_name(buf, len, vendor_name))
+		return -1;
+
+	printf("vendor name info: %s\n", vendor_name);
+	return 0;
+}
+
+static int rsa_extract_vendor_name(char **buf, int *len,
+		struct rsa_license_data *data)
+{
+	if (rsa_decrypt_vendor_name(buf, len, data->vendor_name))
+		return -1;
+
+	return 0;
+}
+
+static int rsa_decrypt_time_limit(char **buf, int *len, time_t *time_limit)
+{
 	if (*len < sizeof(time_t))
 		return -1;
 
-	time_limit = **(time_t**)buf;
-	if (time_limit) {
-		strftime(stime, sizeof(stime),"%d %b, %Y",
-			localtime(&time_limit));
-	} else {
-		snprintf(stime, sizeof(stime), "unlimited");
-	}
-	printf("time limit: %s\n", stime);
+	*time_limit = **(time_t**)buf;
 
 	*buf += sizeof(time_t);
 	*len -= sizeof(time_t);
 	return 0;
 }
 
-static int rsa_license_parse_rivermax(char *buf, int len)
+static int rsa_info_time_limit(char **buf, int *len)
 {
-	if (rsa_decrypt_version(&buf, &len)) {
+	time_t time_limit;
+	char stime[50];
+
+	if (rsa_decrypt_time_limit(buf, len, &time_limit))
+		return -1;
+
+	if (time_limit) {
+		strftime(stime, sizeof(stime),"%d %b, %Y",
+			localtime(&time_limit));
+	} else {
+		snprintf(stime, sizeof(stime), "unlimited");
+	}
+
+	printf("time limit info : 0x%lx (%s)\n", time_limit, stime);
+	return 0;
+}
+
+static int rsa_extract_time_limit(char **buf, int *len,
+		struct rsa_license_data *data)
+{
+	if (rsa_decrypt_time_limit(buf, len, &data->time_limit))
+		return -1;
+
+	return 0;
+}
+
+static int rsa_license_info_rivermax(char *buf, int len)
+{
+	if (rsa_info_version(&buf, &len)) {
 		printf("could not extract file format version\n");
 		return -1;
 	}
 
-	if (rsa_decrypt_vendor_name(&buf, &len)) {
+	if (rsa_info_vendor_name(&buf, &len)) {
 		printf("could not extract vendor name\n");
 		return -1;
 	}
 
-	if (rsa_decrypt_time_limit(&buf, &len)) {
+	if (rsa_info_time_limit(&buf, &len)) {
 		printf("could not extract time limit\n");
 		return -1;
 	}
 
 	return len;
+}
+
+static int rsa_license_extract_rivermax(char *buf, int len, void *data)
+{
+	struct rsa_license_data *lic_data = (struct rsa_license_data*)data;
+
+	if (rsa_extract_version(&buf, &len, lic_data))
+		return -1;
+
+	if (rsa_extract_vendor_name(&buf, &len, lic_data))
+		return -1;
+
+	if (rsa_extract_time_limit(&buf, &len, lic_data))
+		return -1;
+
+	return 0;
 }
 
 static time_t get_time_limit(int do_limit)
@@ -188,12 +257,12 @@ static time_t get_time_limit(int do_limit)
 	return t;
 }
 
-int main(int argc, char **argv)
+static int test(int set_time_limit)
 {
 	struct rsa_license_ops licnese_ops = {
 		rsa_license_create_rivermax,
-		rsa_license_parse_rivermax,
-		NULL
+		rsa_license_info_rivermax,
+		rsa_license_extract_rivermax,
 	};
 	struct rsa_license_data license_data;
 	char *public_key = "/home/ilan/.rsa/rivermax.pub";
@@ -201,10 +270,11 @@ int main(int argc, char **argv)
 	char *license = "rivermax.lic";
 	int ret;
 
+	/* test license create */
 	license_data.version = 1;
 	snprintf(license_data.vendor_name, VENDOR_NAME_MAX_LENGTH,
 		"GrassValley");
-	license_data.time_limit = get_time_limit(1);
+	license_data.time_limit = get_time_limit(set_time_limit);
 
 	rsa_license_init();
 
@@ -217,12 +287,35 @@ int main(int argc, char **argv)
 
 	printf("\n");
 
+	/* test license info */
 	ret = rsa_license_info(public_key, license, &licnese_ops);
 	if (ret) {
 		printf("rsa_license_info() failed\n");
 		return -1;
 	}
 
+	printf("\n");
+
+	/* test license extract */
+	memset(&license_data, 0, sizeof(struct rsa_license_data));
+	ret = rsa_license_extract(public_key, license, &licnese_ops,
+		&license_data);
+	if (ret) {
+		printf("rsa_license_extract() failed\n");
+		return -1;
+	}
+	printf("file format version extract: %llu\n", license_data.version);
+	printf("vendor name extract: %s\n", license_data.vendor_name);
+	printf("time limit extract: 0x%lx\n", license_data.time_limit);
+
 	return 0;
+}
+
+int main(int argc, char **argv)
+{
+	int ret;
+
+	ret = test(1);
+	return ret;
 }
 
