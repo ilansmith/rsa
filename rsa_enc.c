@@ -33,6 +33,21 @@ static int rsa_encrypt_seed(rsa_key_t *key, FILE *f)
     return rsa_write_u1024_full(f, &seed);
 }
 
+static int rsa_encrypt_length(rsa_key_t *key, FILE *cipher)
+{
+    u1024_t length;
+
+    if (rsa_key_enclev_set(key, encryption_levels[0]))
+	return -1;
+
+    number_data2num(&length, &file_size, sizeof(file_size));
+    rsa_encode(&length, &length, &key->exp, &key->n);
+    if (rsa_write_u1024_full(cipher, &length))
+	return -1;
+
+    return rsa_key_enclev_set(key, rsa_encryption_level);
+}
+
 static int rsa_encrypt_header_common(rsa_key_t *key, FILE *cipher, int is_full)
 {
     u1024_t numdata;
@@ -52,7 +67,8 @@ static int rsa_encrypt_header_common(rsa_key_t *key, FILE *cipher, int is_full)
 
     rsa_encode(&numdata, &numdata, &key->exp, &key->n);
     return rsa_write_u1024_full(cipher, &numdata) || 
-	rsa_encrypt_seed(key, cipher);
+	rsa_encrypt_seed(key, cipher) || rsa_encrypt_length(key, cipher) ? 
+	-1 : 0;
 }
 
 /* Large File System (LFS) is not supported */
@@ -88,21 +104,6 @@ static int rsa_assert_non_lfs(int is_full)
     }
 
     return 0;
-}
-
-static int rsa_encrypt_length(rsa_key_t *key, FILE *cipher)
-{
-    u1024_t length;
-
-    if (rsa_key_enclev_set(key, encryption_levels[0]))
-	return -1;
-
-    number_data2num(&length, &file_size, sizeof(file_size));
-    rsa_encode(&length, &length, &key->exp, &key->n);
-    if (rsa_write_u1024_full(cipher, &length))
-	return -1;
-
-    return rsa_key_enclev_set(key, rsa_encryption_level) ? -1 : file_size;
 }
 
 static int rsa_encrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher, 
@@ -146,7 +147,7 @@ static int rsa_encrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
 	rsa_key_close(*key);
 	fclose(*data);
 	fclose(*cipher);
-	unlink(newfile_name);
+	remove(newfile_name);
 	return -1;
     }
 
@@ -173,6 +174,7 @@ int rsa_encrypt_quick(void)
 
     /* quick encryption */
     buf_len = sizeof(u64) * BUF_LEN_UNIT_QUICK;
+    rsa_timeline_init(file_size, buf_len);
     do
     {
 	char buf[buf_len];
@@ -181,10 +183,12 @@ int rsa_encrypt_quick(void)
 
 	len = fread(buf, sizeof(char), buf_len, data);
 	for (i = 0; len && i < (len-1)/sizeof(u64) + 1; i++)
-	    xor_buf[i] ^= (u64)genrand64_int64();
+	    xor_buf[i] ^= RSA_RANDOM();
 	fwrite(buf, sizeof(char), len, cipher);
+	rsa_timeline_update();
     }
     while (len == buf_len);
+    rsa_timeline_uninit();
 
     rsa_encrypt_epilog(key, data, cipher);
     return 0;
@@ -198,19 +202,13 @@ int rsa_encrypt_full(void)
 
     if (rsa_encrypt_prolog(&key, &data, &cipher, 1))
 	return -1;
-    if ((len = rsa_encrypt_length(key, cipher)) < 0)
-    {
-	rsa_encrypt_epilog(key, data, cipher);
-	unlink(newfile_name);
-	return -1;
-    }
 
     /* full encryption */
     arr_sz = rsa_encryption_level/sizeof(u64);
     data_buf_len = BUF_LEN_UNIT_FULL * arr_sz;
     num_sz = number_size(rsa_encryption_level);
     num_buf_len = BUF_LEN_UNIT_FULL * num_sz;
-    rsa_timeline_init(len);
+    rsa_timeline_init(file_size, block_sz_u1024*sizeof(u64));
     do
     {
 	char buf[data_buf_len];
@@ -223,7 +221,7 @@ int rsa_encrypt_full(void)
 	    number_data2num(&nums[i], &buf[i*arr_sz], arr_sz);
 	    rsa_encode(&nums[i], &nums[i], &key->exp, &key->n);
 	    rsa_write_u1024_full(cipher, &nums[i]);
-	    rsa_timeline();
+	    rsa_timeline_update();
 	}
     }
     while (len == data_buf_len);

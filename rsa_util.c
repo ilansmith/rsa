@@ -312,12 +312,12 @@ char *rsa_highlight_str(char *fmt, ...)
     return ret;
 }
 
-int rsa_timeline_init(int len)
+int rsa_timeline_init(int len, int block_sz)
 {
     char fmt[20];
-    int block_num = (len-1)/(block_sz_u1024*sizeof(u64)) + 1;
+    int block_num = (len-1)/block_sz + 1;
 
-    if (rsa_verbose == V_QUIET || block_num < 2)
+    if (rsa_verbose == V_QUIET || block_num < 1)
 	return 0;
 
     timeline_inc = (double)block_num/RSA_TIMELINE_LEN;
@@ -329,7 +329,7 @@ int rsa_timeline_init(int len)
     return 1;
 }
 
-void rsa_timeline(void)
+void rsa_timeline_update(void)
 {
     static int blocks, dots;
     static double timeline;
@@ -353,3 +353,4 @@ void rsa_timeline_uninit(void)
     printf("\n");
     fflush(stdout);
 }
+
