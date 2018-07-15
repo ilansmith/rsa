@@ -22,12 +22,9 @@ static struct option longopts[RSA_OPT_MAX];
 static char file_name[MAX_FILE_NAME_LEN];
 
 char key_id[KEY_ID_MAX_LEN];
-char vendor_id[VENDOR_ID_MAX_LEN];
 
 static opt_t options_common[] = {
     {RSA_OPT_HELP, 'h', "help", no_argument, "print this message and exit"},
-    {RSA_OPT_VENDOR, 'o', "vendor", no_argument, "vendor owning the rsa "
-	"utility"},
     {RSA_OPT_SCANKEY, 's', "scankeys", no_argument, "scan available keys"},
     {RSA_OPT_SETKEY, 'x', "setkey", required_argument, "set rsa key"},
     {RSA_OPT_QUITE, 'q', "quite", no_argument, "set quite output"},
@@ -133,15 +130,14 @@ int rsa_set_file_name(char *name)
 
 static rsa_errno_t parse_args_finalize(int *flags, rsa_handler_t *handler)
 {
-    int act_help, act_vendor, act_scankey, act_setkey, actions;
+    int act_help, act_scankey, act_setkey, actions;
 
     act_help = *flags & OPT_FLAG(RSA_OPT_HELP) ? 1 : 0;
-    act_vendor = *flags & OPT_FLAG(RSA_OPT_VENDOR) ? 1 : 0;
     act_scankey = *flags & OPT_FLAG(RSA_OPT_SCANKEY) ? 1 : 0;
     act_setkey = *flags & OPT_FLAG(RSA_OPT_SETKEY) ? 1 : 0;
 
     /* test for a single action option */
-    if ((actions = act_help + act_vendor + act_scankey + act_setkey) > 1)
+    if ((actions = act_help + act_scankey + act_setkey) > 1)
 	return RSA_ERR_MULTIACTION;
 
     return handler->ops_handler_finalize(flags, actions);
@@ -159,7 +155,6 @@ rsa_errno_t parse_args(int argc, char *argv[], int *flags,
 	switch (code = opt_short2code(options_common, opt))
 	{
 	case RSA_OPT_HELP:
-	case RSA_OPT_VENDOR:
 	case RSA_OPT_SCANKEY:
 	    OPT_ADD(flags, code)
 	    break;
@@ -266,11 +261,6 @@ static void output_options(opt_t *options_private)
     output_option_array(options_private);
 }
 
-static void rsa_vendor(void)
-{
-    printf("rsa vendor: %s\n", VENDOR);
-}
-
 static void output_help(char *path, opt_t *options_private)
 {
 #define CHAR_COPYRIGHT 169
@@ -298,11 +288,6 @@ int rsa_set_key_id(char *id)
     /* key_id[0] is reserved for the e and d characters marking the key as
      * public or private respectively */
     return rsa_set_key_param(key_id, id, KEY_ID_MAX_LEN - 2, "%c%s", '*', id);
-}
-
-int rsa_set_vendor_id(char *id)
-{
-    return rsa_set_key_param(vendor_id, id, VENDOR_ID_MAX_LEN - 1, "%s", id);
 }
 
 char *key_path_get(void)
@@ -345,8 +330,8 @@ rsa_opt_t rsa_action_get(int flags, ...)
 {
     va_list va;
     rsa_opt_t new;
-    int actions = OPT_FLAG(RSA_OPT_HELP) | OPT_FLAG(RSA_OPT_VENDOR) | 
-	OPT_FLAG(RSA_OPT_SCANKEY) | OPT_FLAG(RSA_OPT_SETKEY);
+    int actions = OPT_FLAG(RSA_OPT_HELP) | OPT_FLAG(RSA_OPT_SCANKEY) | 
+	OPT_FLAG(RSA_OPT_SETKEY);
 
     va_start(va, flags);
     while ((new = va_arg(va, rsa_opt_t)))
@@ -363,9 +348,6 @@ int rsa_action_handle_common(rsa_opt_t action, char *app,
     {
     case OPT_FLAG(RSA_OPT_HELP):
 	output_help(app, options_private);
-	break;
-    case OPT_FLAG(RSA_OPT_VENDOR):
-	rsa_vendor();
 	break;
     case OPT_FLAG(RSA_OPT_SCANKEY):
 	rsa_scankey();
@@ -489,7 +471,6 @@ static rsa_errno_t parse_args_master(int opt, int *flags)
 	OPT_ADD(flags, RSA_OPT_KEYGEN);
 	if (rsa_set_key_id(optarg))
 	    return RSA_ERR_KEYNAME;
-	rsa_set_vendor_id(VENDOR);
 	break;
     default:
 	return RSA_ERR_OPTARG;

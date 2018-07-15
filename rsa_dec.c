@@ -12,12 +12,12 @@ static int key_files_generate(char *private_name, FILE **private_key,
     char *public_name, FILE **public_key, int name_len)
 {
 #define FILE_NAME_FOMAT "%s/%s%s.%s"
-    char prefix[VENDOR_ID_MAX_LEN + KEY_ID_MAX_LEN]; 
+    char prefix[KEY_ID_MAX_LEN]; 
     char *path = key_path_get();
     struct stat buf;
     int i;
 
-    rsa_sprintf_nows(prefix, "%s_%s", VENDOR, key_id + 1);
+    rsa_sprintf_nows(prefix, "%s", key_id + 1);
     sprintf(private_name, FILE_NAME_FOMAT , path, "", prefix, "prv");
     sprintf(public_name, FILE_NAME_FOMAT , path, "", prefix, "pub");
 
@@ -49,18 +49,18 @@ static int key_files_generate(char *private_name, FILE **private_key,
 
 static int rsa_sign(FILE *key, char key_type, u1024_t *exp, u1024_t *n)
 {
-    u1024_t signiture, vendor, id;
+    u1024_t signiture, id;
 
     *key_id = key_type;
-    if (number_str2num(&vendor, VENDOR) || number_str2num(&id, key_id))
+    if (number_str2num(&id, key_id))
 	return -1;
 
-    rsa_encode(&signiture, &vendor, exp, n);
-    if (rsa_write_u1024(key, &signiture))
-	return -1;
     rsa_encode(&signiture, &id, exp, n);
-    if (rsa_write_u1024(key, &signiture))
+    if (fprintf(key, "%s", RSA_SIGNITURE) != strlen(RSA_SIGNITURE) || 
+	rsa_write_u1024(key, &signiture))
+    {
 	return -1;
+    }
 
     return 0;
 }
@@ -148,7 +148,7 @@ int rsa_keygen(void)
 	return -1;
     }
 
-    rsa_printf(0, 0, "generating key %s for vendor %s", key_id + 1, vendor_id);
+    rsa_printf(0, 0, "generating key: %s", key_id + 1);
     for (level = encryption_levels; *level; level++)
     {
 	u1024_t n, e, d;
@@ -230,7 +230,6 @@ static rsa_errno_t parse_args_decrypter(int opt, int *flags)
 	OPT_ADD(flags, RSA_OPT_KEYGEN);
 	if (rsa_set_key_id(optarg))
 	    return RSA_ERR_KEYNAME;
-	rsa_set_vendor_id(VENDOR);
 	break;
     default:
 	return RSA_ERR_OPTARG;
