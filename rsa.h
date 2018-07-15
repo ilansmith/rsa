@@ -6,8 +6,8 @@
 
 #define RSA_SIGNITURE "IASRSA"
 #define MAX_FILE_NAME_LEN 256
-#define ENCRYPTER_CHAR 'e'
-#define DECRYPTER_CHAR 'd'
+#define RSA_KEY_TYPE_PRIVATE 1<<0
+#define RSA_KEY_TYPE_PUBLIC 1<<1
 
 #define	RSA_TBD(msg) printf("TBD: %s\n", (msg))
 #define OPT_FLAG(OPT) (1 << (OPT))
@@ -24,8 +24,9 @@
 typedef enum {
     /* actions */
     RSA_OPT_HELP,
-    RSA_OPT_SCANKEY,
+    RSA_OPT_SCANKEYS,
     RSA_OPT_SETKEY,
+    RSA_OPT_PATH,
     RSA_OPT_QUITE,
     RSA_OPT_VERBOSE,
     RSA_OPT_ENCRYPT,
@@ -51,6 +52,7 @@ typedef struct opt_t {
 } opt_t;
 
 typedef struct {
+    char keytype;
     opt_t *options;
     rsa_errno_t (* ops_handler)(int code, int *flags);
     rsa_errno_t (* ops_handler_finalize)(int *flags, int actions);
@@ -65,11 +67,10 @@ int rsa_error(char *app, rsa_errno_t err);
 int rsa_set_file_name(char *name);
 rsa_opt_t rsa_action_get(int flags, ...);
 int rsa_action_handle_common(rsa_opt_t action, char *app, 
-    opt_t *options_private);
+    rsa_handler_t *handler);
 char *key_path_get(void);
 int rsa_set_key_id(char *id);
 int rsa_encryption_level_set(char *optarg);
-int rsa_scankey(void);
 void rsa_encode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);
 void rsa_decode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);
 #endif

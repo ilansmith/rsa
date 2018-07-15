@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
 {
     int err, action, flags = 0;
     rsa_handler_t encrypter_handler = {
+	.keytype = RSA_KEY_TYPE_PUBLIC,
 	.options = options_encrypter,
 	.ops_handler = parse_args_encrypter,
 	.ops_handler_finalize = parse_args_finalize_encrypter,
@@ -83,7 +84,7 @@ int main(int argc, char *argv[])
 	break;
     }
     default:
-	return rsa_action_handle_common(action, argv[0], options_encrypter);
+	return rsa_action_handle_common(action, argv[0], &encrypter_handler);
     }
 
     return 0;
