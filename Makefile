@@ -60,6 +60,9 @@ ifeq ($(TESTS),y)
   ifeq ($(TIME_FUNCTIONS),y)
     CFLAGS+=-DTIME_FUNCTIONS
   endif
+  ifeq ($(PROFILING),y)
+    CFLAGS+=-pg
+  endif
 
   # u64 type definition
   U64_VALUES=UCHAR USHORT ULONG ULLONG
@@ -125,7 +128,7 @@ config:
 	echo "$(strip $(MAKEFLAGS))" | sed -e 's/ /\r\n/g' > $(CONFFILE);
 
 clean:
-	rm -f *.o
+	rm -f *.o gmon.out
 
 cleanapps:
 	file `ls` | grep executable | awk -F: '{ print $$1 }' | xargs rm -f
