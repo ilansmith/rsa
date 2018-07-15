@@ -241,7 +241,26 @@ static int test001(void)
     p_comment("block_sz_u1024 = %d", block_sz_u1024);
     p_comment("encryption_level = bit_sz_u64*block_sz_u1024 = %d*%d = %d", 
 	bit_sz_u64, block_sz_u1024, encryption_level);
-    return 0;
+
+#if defined(UCHAR)
+    return !(bit_sz_u64==8 && block_sz_u1024==16 && encryption_level==128);
+#elif defined(USHORT)
+    return !(bit_sz_u64==16 && block_sz_u1024==16 && encryption_level==256);
+#elif defined(ULONG)
+    return !(bit_sz_u64==32 && block_sz_u1024==16 && encryption_level==512);
+#elif ENC_LEVEL(64)
+    return !(bit_sz_u64==64 && block_sz_u1024==1 && encryption_level==64);
+#elif ENC_LEVEL(128)
+    return !(bit_sz_u64==64 && block_sz_u1024==2 && encryption_level==128);
+#elif ENC_LEVEL(256)
+    return !(bit_sz_u64==64 && block_sz_u1024==4 && encryption_level==256);
+#elif ENC_LEVEL(512)
+    return !(bit_sz_u64==64 && block_sz_u1024==8 && encryption_level==512);
+#elif ENC_LEVEL(1024)
+    return !(bit_sz_u64==64 && block_sz_u1024==16 && encryption_level==1024);
+#else
+    return -1;
+#endif
 }
 
 static int test006(void)
@@ -1688,8 +1707,7 @@ static int test085(void)
     number_mul(&n, &p1, &p2);
     number_modular_exponentiation_montgomery(&buf1, &num_2, &num_4, &num_7);
     number_modular_exponentiation_montgomery(&buf2, &num_2, &num_4, &n);
-    res = memcmp(&res1, &buf1, sizeof(u1024_t)) || 
-	memcmp(&res2, &buf2, sizeof(u1024_t));
+    res = !(number_is_equal(&res1, &buf1) && number_is_equal(&res2, &buf2));
 
     return res;
 }
@@ -1700,6 +1718,7 @@ static int test086(void)
 
     number_reset(&res);
     *((u64*)&res + block_sz_u1024 - 1) = MSB(u64);
+    res.top = block_sz_u1024 - 1;
     number_small_dec2num(&two, (u64)2);
     number_small_dec2num(&bit_sz, (u64)(encryption_level - 1));
 
@@ -2106,7 +2125,7 @@ static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d,
 
     if (rsa_post_decrypt(&output, q, &decryption, n))
 	return -1;
-    res = memcmp(&input, &output, sizeof(u1024_t));
+    res = !number_is_equal(&input, &output);
     if (is_print)
     {
 	p_comment("decryption of encrypted data %s data",  res ? 
@@ -2470,7 +2489,7 @@ static int test120(void)
     local_timer_stop();
     p_local_timer();
 
-    res = memcmp(&input, &decryption, sizeof(u1024_t));
+    res = !number_is_equal(&input, &decryption);
     p_comment("decryption of encrypted data %s data",  res ? 
 	"does not equal" : "equals");
     return res;
@@ -2866,7 +2885,7 @@ static test_t rsa_tests[] =
 {
     /* basics: data structure sizes */
     {
-	description: "sizeof(u1024_t)",
+	description: "RSA data structure sizes",
 	func: test001,
     },
     /* basics: data structure initiation */
