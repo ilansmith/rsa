@@ -10,10 +10,15 @@
 #define RSA_ENCRYPTION_LEVEL_DEFAULT 128
 #define RSA_KEY_TYPE_PRIVATE 1<<0
 #define RSA_KEY_TYPE_PUBLIC 1<<1
-#define RSA_KEY_DATA_QUICK 1<<5
-#define RSA_KEY_DATA_FULL 1<<6
+
+/* rsa encryption descriptor: bits [4-0] are reserved for encryption level */
+#define RSA_DESCRIPTOR_FULL_ENC 1<<5
+#define RSA_DESCRIPTOR_CIPHER_MODE 0xc0
+#define RSA_DESCRIPTOR_CIPHER_MODE_ECB 0x00
+#define RSA_DESCRIPTOR_CIPHER_MODE_CBC 0x40
+
 #define BUF_LEN_UNIT_QUICK 1024
-#define BUF_LEN_UNIT_FULL 128
+#define BLOCKS_PER_DATA_BUF 128
 
 #define  MIN(x, y) ((x) < (y) ? (x) : (y))
 
@@ -46,11 +51,17 @@ typedef enum {
     /* non actions */
     RSA_OPT_LEVEL,
     RSA_OPT_RSAENC,
+    RSA_OPT_CBC,
     RSA_OPT_FILE,
     RSA_OPT_ENC_INFO_ONLY,
     RSA_OPT_ORIG_FILE,
     RSA_OPT_MAX
 } rsa_opt_t;
+
+typedef enum {
+    CIPHER_MODE_ECB,
+    CIPHER_MODE_CBC,
+} cipher_mode_t;
 
 typedef struct opt_t {
     int code;
@@ -63,8 +74,8 @@ typedef struct opt_t {
 typedef struct {
     char keytype;
     opt_t *options;
-    int (* ops_handler)(int code, int *flags);
-    int (* ops_handler_finalize)(int *flags, int actions);
+    int (* ops_handler)(int code, unsigned int *flags);
+    int (* ops_handler_finalize)(unsigned int *flags, int actions);
 } rsa_handler_t ;
 
 typedef struct rsa_key_t {
@@ -84,12 +95,14 @@ extern int rsa_encryption_level;
 extern int is_encryption_info_only;
 extern int file_size;
 extern int keep_orig_file;
+extern cipher_mode_t cipher_mode;
 
 int opt_short2code(opt_t *options, int opt);
-int parse_args(int argc, char *argv[], int *flags, rsa_handler_t *handler);
+int parse_args(int argc, char *argv[], unsigned int *flags, 
+    rsa_handler_t *handler);
 int rsa_error(char *app);
 int rsa_set_file_name(char *name);
-rsa_opt_t rsa_action_get(int flags, ...);
+rsa_opt_t rsa_action_get(unsigned int flags, ...);
 int rsa_action_handle_common(rsa_opt_t action, char *app, 
     rsa_handler_t *handler);
 char *key_path_get(void);

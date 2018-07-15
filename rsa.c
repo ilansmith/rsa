@@ -39,6 +39,7 @@ int rsa_encryption_level;
 int is_encryption_info_only;
 int file_size;
 int keep_orig_file;
+cipher_mode_t cipher_mode = CIPHER_MODE_ECB;
 
 static opt_t options_common[] = {
     {RSA_OPT_HELP, 'h', "help", no_argument, "print this message and exit"},
@@ -180,7 +181,7 @@ Exit:
     return ret;
 }
 
-static int parse_args_finalize(int *flags, rsa_handler_t *handler)
+static int parse_args_finalize(unsigned int *flags, rsa_handler_t *handler)
 {
     int actions = 0;
 
@@ -203,7 +204,7 @@ static int parse_args_finalize(int *flags, rsa_handler_t *handler)
     return handler->ops_handler_finalize(flags, actions);
 }
 
-int parse_args(int argc, char *argv[], int *flags, 
+int parse_args(int argc, char *argv[], unsigned int *flags, 
     rsa_handler_t *handler)
 {
     int opt, code;
@@ -1025,7 +1026,7 @@ static void rsa_show_path(void)
 	printf("%s/\n", key_path_get());
 }
 
-rsa_opt_t rsa_action_get(int flags, ...)
+rsa_opt_t rsa_action_get(unsigned int flags, ...)
 {
     va_list va;
     rsa_opt_t new;

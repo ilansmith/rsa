@@ -219,26 +219,27 @@ Exit:
 }
 
 static void verbose_decryption(int is_full, char *key_name, int level, 
-    char *cipher, char *data)
+    char *ciphertext, char *plaintext)
 {
-    rsa_printf(!is_encryption_info_only, 0, "encryption method: %s", 
-	is_full ? "full" : "quick");
+    rsa_printf(!is_encryption_info_only, 0, "encryption method: %s (%s)", 
+	is_full ? "full" : "quick", !is_full ? "rng" : 
+	cipher_mode == CIPHER_MODE_CBC ? "cbc" : "ecb");
     rsa_printf(!is_encryption_info_only, 0, "key: %s", key_name);
     rsa_printf(!is_encryption_info_only, 0, "encryption level: %d", level);
     if (!is_encryption_info_only)
     {
-	rsa_printf(1, 0, "decrypting: %s", cipher);
-	rsa_printf(1, 0, "data file: %s", data);
+	rsa_printf(1, 0, "decrypting: %s", ciphertext);
+	rsa_printf(1, 0, "plaintext file: %s", plaintext);
     }
     fflush(stdout);
 }
 
-static int rsa_decryption_length(rsa_key_t *key ,FILE *cipher)
+static int rsa_decryption_length(rsa_key_t *key ,FILE *ciphertext)
 {
     u1024_t length;
 
     if (rsa_key_enclev_set(key, encryption_levels[0]) || 
-	rsa_read_u1024_full(cipher, &length))
+	rsa_read_u1024_full(ciphertext, &length))
     {
 	return -1;
     }
@@ -247,49 +248,56 @@ static int rsa_decryption_length(rsa_key_t *key ,FILE *cipher)
 	-1 : (int)length.arr[0];
 }
 
-static int rsa_decrypte_header_common(rsa_key_t *key, FILE *cipher, 
+static int rsa_decrypte_header_common(rsa_key_t *key, FILE *ciphertext, 
     int *is_full)
 {
     u1024_t numdata, seed;
-    char *keydata;
+    char *descriptor;
     int i, *level;
 
     if (rsa_key_enclev_set(key, encryption_levels[0]) || 
-	rsa_read_u1024_full(cipher, &numdata))
+	rsa_read_u1024_full(ciphertext, &numdata))
     {
 	return -1;
     }
 
     rsa_decode(&numdata, &numdata, &key->exp, &key->n);
-    keydata = (char *)numdata.arr;
+    descriptor = (char *)numdata.arr;
 
-    if (memcmp(key->name, keydata + 1, strlen(key->name)))
+    if (memcmp(key->name, descriptor + 1, strlen(key->name)))
     {
 	rsa_error_message(RSA_ERR_KEY_STAT_PRV_DEF, file_name, 
 	    rsa_highlight_str(key->name));
 	return -1;
     }
 
-    for (level = encryption_levels, i = 0; *level && !(*keydata & 1<<i); 
+    /* get encryption level */
+    for (level = encryption_levels, i = 0; *level && !(*descriptor & 1<<i); 
 	level++, i++);
     if (!*level)
     {
 	rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
 	return -1;
     }
-    if (*keydata & RSA_KEY_DATA_QUICK)
-	*is_full = 0;
-    else if (*keydata & RSA_KEY_DATA_FULL)
-	*is_full = 1;
-    else
+
+    /* get encryption mode (full/quick) */
+    *is_full = (*descriptor & RSA_DESCRIPTOR_FULL_ENC) ? 1 : 0;
+
+    /* get cipher mode (ECB, CBC) */
+    switch (*descriptor & RSA_DESCRIPTOR_CIPHER_MODE)
     {
-	rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
-	return -1;
+    case RSA_DESCRIPTOR_CIPHER_MODE_CBC:
+	cipher_mode = CIPHER_MODE_CBC;
+	break;
+    case RSA_DESCRIPTOR_CIPHER_MODE_ECB:
+    default:
+	cipher_mode = CIPHER_MODE_ECB;
+	break;
     }
 
     rsa_encryption_level = *level;
     if (rsa_key_enclev_set(key, rsa_encryption_level) || 
-	rsa_read_u1024_full(cipher, &seed))
+	rsa_read_u1024_full(ciphertext, &seed))
     {
 	return -1;
     }
@@ -297,7 +305,7 @@ static int rsa_decrypte_header_common(rsa_key_t *key, FILE *cipher,
     if (number_seed_set_fixed(&seed))
 	return -1;
 
-    if ((file_size = rsa_decryption_length(key, cipher)) < 0)
+    if ((file_size = rsa_decryption_length(key, ciphertext)) < 0)
     {
 	rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
 	return -1;
@@ -306,8 +314,8 @@ static int rsa_decrypte_header_common(rsa_key_t *key, FILE *cipher,
     return 0;
 }
 
-static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher, 
-    int *is_full)
+static int rsa_decrypt_prolog(rsa_key_t **key, FILE **plaintext, 
+    FILE **ciphertext, int *is_full)
 {
     int file_name_len, is_enable;
 
@@ -316,7 +324,7 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
 	return -1;
 
     /* open file to decrypt */
-    if (!(*cipher = fopen(file_name, "r")))
+    if (!(*ciphertext = fopen(file_name, "r")))
     {
 	rsa_key_close(*key);
 	rsa_error_message(RSA_ERR_FOPEN, file_name);
@@ -324,10 +332,10 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
     }
 
     /* decipher common headers */
-    if (rsa_decrypte_header_common(*key, *cipher, is_full))
+    if (rsa_decrypte_header_common(*key, *ciphertext, is_full))
     {
 	rsa_key_close(*key);
-	fclose(*cipher);
+	fclose(*ciphertext);
 	return -1;
     }
 
@@ -340,10 +348,10 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
 	else
 	    sprintf(newfile_name, "%s.dec", file_name);
 	if (!(is_enable = is_fwrite_enable(newfile_name)) || 
-		!(*data = fopen(newfile_name, "w")))
+		!(*plaintext = fopen(newfile_name, "w")))
 	{
 	    rsa_key_close(*key);
-	    fclose(*cipher);
+	    fclose(*ciphertext);
 	    if (is_enable)
 		rsa_error_message(RSA_ERR_FOPEN, newfile_name);
 	    return -1;
@@ -356,18 +364,19 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
     return 0;
 }
 
-static void rsa_decrypt_epilog(rsa_key_t *key, FILE *data, FILE *cipher)
+static void rsa_decrypt_epilog(rsa_key_t *key, FILE *plaintext, 
+    FILE *ciphertext)
 {
     rsa_key_close(key);
-    fclose(cipher);
+    fclose(ciphertext);
     if (is_encryption_info_only)
 	return;
-    fclose(data);
+    fclose(plaintext);
     if (!keep_orig_file)
 	remove(file_name);
 }
 
-static int rsa_decrypt_quick(rsa_key_t *key, FILE *cipher, FILE *data)
+static int rsa_decrypt_quick(rsa_key_t *key, FILE *ciphertext, FILE *plaintext)
 {
     int len, buf_len;
 
@@ -379,10 +388,10 @@ static int rsa_decrypt_quick(rsa_key_t *key, FILE *cipher, FILE *data)
 	u64 *xor_buf = (u64*)buf;
 	int i;
 
-	len = fread(buf, sizeof(char), buf_len, cipher);
+	len = fread(buf, sizeof(char), buf_len, ciphertext);
 	for (i = 0; len && i < (len-1)/sizeof(u64) + 1; i++)
 	    xor_buf[i] ^= RSA_RANDOM();
-	fwrite(buf, sizeof(char), len, data);
+	fwrite(buf, sizeof(char), len, plaintext);
 	rsa_timeline_update();
     }
     while (len == buf_len);
@@ -390,28 +399,68 @@ static int rsa_decrypt_quick(rsa_key_t *key, FILE *cipher, FILE *data)
     return 0;
 }
 
-static int rsa_decrypt_full(rsa_key_t *key, FILE *cipher, FILE *data)
+static int rsa_decrypt_full(rsa_key_t *key, FILE *ciphertext, FILE *plaintext)
 {
-    int len, data_buf_len, num_buf_len, data_sz, num_sz;
+    int len, ct_buf_len, pt_blk_sz, ct_blk_sz;
+    u1024_t num_iv, tmp;
 
-    data_sz = rsa_encryption_level/sizeof(u64);
-    data_buf_len = BUF_LEN_UNIT_FULL * data_sz;
-    num_sz = number_size(rsa_encryption_level);
-    num_buf_len = BUF_LEN_UNIT_FULL * num_sz;
+    /* determine plaintext block size and ciphertext buffer length */
+    pt_blk_sz = rsa_encryption_level/sizeof(u64);
+    ct_blk_sz = number_size(rsa_encryption_level);
+    ct_buf_len = BLOCKS_PER_DATA_BUF * ct_blk_sz;
     len = 0;
+
+    /* cipher mode initialization */
+    switch (cipher_mode)
+    {
+    case CIPHER_MODE_CBC:
+	number_init_random(&num_iv, block_sz_u1024);
+	break;
+    case CIPHER_MODE_ECB:
+    default:
+	break;
+    }
+
     rsa_timeline_init(file_size, block_sz_u1024*sizeof(u64));
     do
     {
-	u1024_t nums[num_buf_len];
+	u1024_t ct_buf[ct_buf_len];
 	int i;
 
-	for (i = 0; i < num_buf_len && len < file_size; i++)
+	for (i = 0; i < ct_buf_len && len < file_size; i++)
 	{
-	    if (rsa_read_u1024_full(cipher, &nums[i]))
+	    if (rsa_read_u1024_full(ciphertext, &ct_buf[i]))
 		break;
-	    rsa_decode(&nums[i], &nums[i], &key->exp, &key->n);
-	    len += fwrite(&nums[i].arr, sizeof(char), 
-		MIN(data_sz, file_size - len), data);
+
+	    /* pre decrypting cipher mode handling */
+	    switch (cipher_mode)
+	    {
+	    case CIPHER_MODE_CBC:
+		number_assign(tmp, ct_buf[i]);
+		break;
+	    case CIPHER_MODE_ECB:
+	    default:
+		break;
+	    }
+
+	    rsa_decode(&ct_buf[i], &ct_buf[i], &key->exp, &key->n);
+
+	    /* post decrypting cipher mode handling */
+	    switch (cipher_mode)
+	    {
+	    case CIPHER_MODE_CBC:
+		number_xor(&ct_buf[i], &ct_buf[i], &num_iv);
+		number_assign(num_iv, tmp);
+		num_iv.arr[block_sz_u1024] = 0;
+		number_top_set(&num_iv);
+		break;
+	    case CIPHER_MODE_ECB:
+	    default:
+		break;
+	    }
+
+	    len += fwrite(&ct_buf[i].arr, sizeof(char), 
+		MIN(pt_blk_sz, file_size - len), plaintext);
 	    rsa_timeline_update();
 	}
     }
@@ -423,18 +472,18 @@ static int rsa_decrypt_full(rsa_key_t *key, FILE *cipher, FILE *data)
 int rsa_decrypt(void)
 {
     rsa_key_t *key;
-    FILE *data, *cipher;
+    FILE *plaintext, *ciphertext;
     int ret, is_full;
 
-    if (rsa_decrypt_prolog(&key, &data, &cipher, &is_full))
+    if (rsa_decrypt_prolog(&key, &plaintext, &ciphertext, &is_full))
 	return -1;
 
     if (!is_encryption_info_only)
     {
-	ret = is_full ? rsa_decrypt_full(key, cipher, data) : 
-	    rsa_decrypt_quick(key, cipher, data);
+	ret = is_full ? rsa_decrypt_full(key, ciphertext, plaintext) : 
+	    rsa_decrypt_quick(key, ciphertext, plaintext);
     }
 
-    rsa_decrypt_epilog(key, data, cipher);
+    rsa_decrypt_epilog(key, plaintext, ciphertext);
     return ret;
 }
