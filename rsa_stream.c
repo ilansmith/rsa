@@ -86,7 +86,7 @@ static size_t bio(void *ptr, size_t size, size_t nmemb, BUFFER *buffer,
 	ret = MIN(nmemb, (buffer->length - buffer->current) / size);
 	bytes = ret * size;
 	memcpy(to, from, bytes);
-	buffer->current += bytes;
+	buffer->current += (int)bytes;
 	return ret;
 }
 
@@ -98,7 +98,7 @@ static size_t bread(void *ptr, size_t size, size_t nmemb, BUFFER *buffer)
 static size_t bwrite(void *ptr, size_t size, size_t nmemb, BUFFER *buffer)
 {
 	if ((buffer->length - buffer->current) / size < nmemb) {
-		buffer->length = buffer->current + nmemb * size;
+		buffer->length = (int)(buffer->current + nmemb * size);
 		buffer->buf = realloc(buffer->buf, buffer->length);
 		if (!buffer->buf) {
 			buffer->length = 0;
@@ -139,7 +139,7 @@ static int bseek(BUFFER *buffer, long offset, int whence)
 rsa_stream_t *sopen(struct rsa_stream_init *init)
 {
 	struct rsa_stream *stream;
-	char *stream_type;
+	char *stream_type = NULL;
 
 	stream = (struct rsa_stream*)calloc(1, sizeof(struct rsa_stream));
 	if (!stream)
@@ -172,7 +172,8 @@ rsa_stream_t *sopen(struct rsa_stream_init *init)
 
 error:
 	free(stream);
-	stream_err("could not open %s based stream", stream_type);
+	if (stream_type)
+		stream_err("could not open %s based stream", stream_type);
 	return NULL;
 }
 

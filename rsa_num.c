@@ -1,5 +1,10 @@
 #include <stdlib.h>
+#if defined(__linux__)
 #include <sys/time.h>
+#else
+#include "Windows.h"
+#include "stdint.h"
+#endif
 #include <time.h>
 #include <string.h>
 #include <math.h>
@@ -8,6 +13,29 @@
 
 #ifdef CONFIG_MERSENNE_TWISTER
 #include "mt19937_64.h"
+#endif
+
+#if !defined(__linux__)
+static int gettimeofday(struct timeval * tp, struct timezone * tzp)
+{
+	// Note: some broken versions only have 8 trailing zero's, the correct epoch has 9 trailing zero's
+	// This magic number is the number of 100 nanosecond intervals since January 1, 1601 (UTC)
+	// until 00:00:00 January 1, 1970 
+	static const uint64_t EPOCH = ((uint64_t)116444736000000000ULL);
+
+	SYSTEMTIME  system_time;
+	FILETIME    file_time;
+	uint64_t    time;
+
+	GetSystemTime(&system_time);
+	SystemTimeToFileTime(&system_time, &file_time);
+	time = ((uint64_t)file_time.dwLowDateTime);
+	time += ((uint64_t)file_time.dwHighDateTime) << 32;
+
+	tp->tv_sec = (long)((time - EPOCH) / 10000000L);
+	tp->tv_usec = (long)(system_time.wMilliseconds * 1000);
+	return 0;
+}
 #endif
 
 #define IS_DIGIT(n) ((n)>='0' && (n)<='9')
@@ -154,10 +182,14 @@ static prng_seed_t number_seed_set(prng_seed_t seed)
 			(prng_seed_t)tv.tv_sec * (prng_seed_t)tv.tv_usec;
 	}
 
+#if defined(__linux__)
 #ifdef CONFIG_MERSENNE_TWISTER
 	init_genrand64(number_random_seed);
 #else
 	srandom(number_random_seed);
+#endif
+#else
+	srand(number_random_seed);
 #endif
 	return number_random_seed;
 }
@@ -756,7 +788,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 	if (!number_generate_coprime_init) {
 		code2list_t exponents[] = {
 			/* encryption_level 64 is not yet implemented */
-			{64, {}},
+			{64, { 0 }},
 			/* 16353755914851064710 */
 			{128, {1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2}},
 			/* 3.310090638572971097793164988204e+38 */

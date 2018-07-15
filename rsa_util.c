@@ -2,13 +2,17 @@
 #include <stdarg.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef __linux__
 #include <unistd.h>
+#endif
 #include "rsa_util.h"
 #include "rsa_stream.h"
 
 #define RSA_TIMELINE_LEN 80
+#define MAX_OUTPUT_LEN 100
 
 #define RSA_SIGNATURE "IASRSA"
+#define RSA_SIGNATURE_LEN 6
 
 typedef int (*io_func_t)(void *ptr, int size, int nmemb, rsa_stream_t *s);
 
@@ -61,7 +65,7 @@ char *rsa_strcat(char *dest, char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	vsprintf(dest + strlen(dest), fmt, ap);
+	vsnprintf(dest + strlen(dest), MAX_OUTPUT_LEN , fmt, ap);
 	va_end(ap);
 
 	return dest;
@@ -69,7 +73,7 @@ char *rsa_strcat(char *dest, char *fmt, ...)
 
 char *rsa_vstrcat(char *dest, char *fmt, va_list ap)
 {
-	vsprintf(dest + strlen(dest), fmt, ap);
+	vsnprintf(dest + strlen(dest), MAX_OUTPUT_LEN, fmt, ap);
 
 	return dest;
 }
@@ -80,7 +84,7 @@ int rsa_sprintf_nows(char *str, char *fmt, ...)
 	int ret;
 
 	va_start(ap, fmt);
-	ret = vsprintf(str, fmt, ap);
+	ret = vsnprintf(str, MAX_OUTPUT_LEN, fmt, ap);
 	va_end(ap);
 
 	for ( ; *str; str++) {
@@ -94,7 +98,7 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 {
 	char msg[MAX_LINE_LENGTH];
 
-	sprintf(msg, "%s: ", is_error ? "error" : "warning");
+	snprintf(msg, MAX_OUTPUT_LEN, "%s: ", is_error ? "error" : "warning");
 	switch (err)
 	{
 	case RSA_ERR_ARGREP:
@@ -298,6 +302,7 @@ verbose_t rsa_verbose_get(void)
 	return rsa_verbose;
 }
 
+#if defined(__linux__)
 int is_fwrite_enable(char *name)
 {
 	char path[MAX_FILE_NAME_LEN], input[4];
@@ -319,22 +324,23 @@ int is_fwrite_enable(char *name)
 		rsa_printf(0, 0, "aborting...");
 	return ret;
 }
+#endif
 
 char *rsa_highlight_str(char *fmt, ...)
 {
 	va_list ap;
 	static char highlight[MAX_HIGHLIGHT_STR] = C_HIGHLIGHT;
 	char *ret = highlight;
-	int len = strlen(C_HIGHLIGHT);
+	int len = (int)strlen(C_HIGHLIGHT);
 
 	va_start(ap, fmt);
-	if (vsnprintf(highlight + len, MAX_HIGHLIGHT_STR - len, fmt, ap) >
+	if ((unsigned int)vsnprintf(highlight + len, MAX_HIGHLIGHT_STR - len, fmt, ap) >
 		MAX_HIGHLIGHT_STR - strlen(C_NORMAL)) {
 		rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__,
 			__LINE__);
 		ret = "";
 	} else {
-		strcat(highlight, C_NORMAL);
+		strncat(highlight, C_NORMAL, strlen(C_NORMAL));
 	}
 	va_end(ap);
 
@@ -350,7 +356,7 @@ int rsa_timeline_init(int len, int block_sz)
 		return 0;
 
 	timeline_inc = (double)block_num/RSA_TIMELINE_LEN;
-	sprintf(fmt, "[%%-%ds]\r[", RSA_TIMELINE_LEN);
+	snprintf(fmt, MAX_OUTPUT_LEN, "[%%-%ds]\r[", RSA_TIMELINE_LEN);
 
 	printf(fmt, "");
 	fflush(stdout);
@@ -447,7 +453,7 @@ static int rsa_key_size(void)
 	for (level = encryption_levels; *level; level++)
 		accum += number_size(*level);
 
-	return strlen(RSA_SIGNATURE) + number_size(encryption_levels[0]) +
+	return RSA_SIGNATURE_LEN + number_size(encryption_levels[0]) +
 		3 * accum;
 }
 
@@ -474,7 +480,7 @@ static int rsa_stream_init_dup(struct rsa_stream_init *to,
 {
 	switch (from->type) {
 	case RSA_STREAM_TYPE_FILE:
-		to->params.file.path = strdup(from->params.file.path);
+		to->params.file.path = _strdup(from->params.file.path);
 		if (!to->params.file.path)
 			return -1;
 		to->params.file.mode = from->params.file.mode;
@@ -533,8 +539,7 @@ static rsa_key_t *rsa_key_alloc(char type, char *name,
 rsa_key_t *rsa_key_open(struct rsa_stream_init *init, char accept,
 		int is_expect_key)
 {
-	int siglen = strlen(RSA_SIGNATURE);
-	char signature[siglen], *info, keytype;
+	char signature[RSA_SIGNATURE_LEN], *info, keytype;
 	char *key_pair[2] = { "private", "public" };
 	struct stat st;
 	rsa_stream_t *s;
@@ -590,8 +595,8 @@ rsa_key_t *rsa_key_open(struct rsa_stream_init *init, char accept,
 		return NULL;
 	}
 
-	if (rsa_read_str(s, signature, siglen) || 
-			memcmp(RSA_SIGNATURE, signature, siglen)) {
+	if (rsa_read_str(s, signature, RSA_SIGNATURE_LEN) || 
+			memcmp(RSA_SIGNATURE, signature, RSA_SIGNATURE_LEN)) {
 		if (is_expect_key) {
 			switch (init->type) {
 			case RSA_STREAM_TYPE_FILE:
@@ -663,7 +668,7 @@ int rsa_key_enclev_set(rsa_key_t *key, int new_level)
 	u1024_t montgomery_factor;
 
 	/* rsa signature */
-	offset = strlen(RSA_SIGNATURE);
+	offset = (int)strlen(RSA_SIGNATURE);
 
 	/* rsa key data */
 	offset += number_size(encryption_levels[0]);
