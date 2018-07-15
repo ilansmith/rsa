@@ -394,7 +394,6 @@ static int rsa_decrypt_full(rsa_key_t *key, FILE *cipher, FILE *data)
     rsa_timeline_init(total_length);
     do
     {
-	char buf[data_buf_len];
 	u1024_t nums[num_buf_len];
 	int i;
 
@@ -407,7 +406,6 @@ static int rsa_decrypt_full(rsa_key_t *key, FILE *cipher, FILE *data)
 		MIN(data_sz, total_length - len), data);
 	    rsa_timeline();
 	}
-	len += fread(buf, sizeof(char), data_buf_len, cipher);
     }
     while (len < total_length);
     rsa_timeline_uninit();
