@@ -318,12 +318,10 @@ static void rsa_options(opt_t *options_private)
 
 static void rsa_help(char *path, opt_t *options_private)
 {
-#define CHAR_COPYRIGHT 169
-
     rsa_usage(path);
     rsa_options(options_private);
 
-    printf("\n%c IAS, February 2007\n", CHAR_COPYRIGHT);
+    printf("\nIAS, February 2007\n");
 }
 
 int rsa_set_key_data(char *name)
