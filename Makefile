@@ -148,3 +148,56 @@ cleanconf:
 	rm -f $(CONFFILE)
 
 cleanall: clean cleanapps cleantags cleanconf
+
+define hl
+\033[1m$1\033[0m
+endef
+
+define help_print_tool
+  @printf "$(call hl,%-16s) - %s.\n" $1 $2
+endef
+
+help:
+	@printf "usage:\n"
+	@printf "     $$ $(call hl,make [OPTIONS])\n"
+	@printf "       or\n"
+	@printf "     $$ $(call hl,make config [OPTIONS])\n"
+	@printf "     $$ $(call hl,make)\n"
+	@printf "       or\n"
+	@printf "     $$ $(call hl,make clean)      [clean object files]\n"
+	@printf "     $$ $(call hl,make cleanapps)  [clean executables]\n"
+	@printf "     $$ $(call hl,make cleanconf)  [clean make configuration file]\n"
+	@printf "     $$ $(call hl,make cleantags)  [clean tag file]\n"
+	@printf "     $$ $(call hl,make cleanall)   [clean all]\n"
+	@printf "\n"
+	@printf "By issuing $(call hl, make config) it is possible to recompile by simply issuing $(call hl,make),\n"
+	@printf "without the need to repeat the entire build command line.\n"
+	@printf "\n"
+	@printf "If no '$(call hl,OPTIONS)' are provided then $(call hl,$(TARGET_RSA_ENC)) and $(call hl,$(TARGET_RSA_DEC)) are built.\n"
+	@printf "If $(call hl,MASTER=y), then a master utility is built (enc/dec combined in one).\n"
+	@printf "\n"
+	@printf "Set $(call hl,MERSENNE_TWISTER=y) (default) to use Takuji Nishimura and Makoto Matsumoto's\n"
+	@printf "64-bit version Mersenne Twister PRNG (Pseudorandom Number Generator).\n"
+	@printf "If $(call hl,MERSENNE_TWISTER=n) then random(3) is used as a PRNG instead.\n"
+	@printf "\n"
+	@printf "If $(call hl,TESTS=y), then $(call hl,$(TARGET_RSA_TEST)) is built (rsa unit tests). In this case:\n"
+	$(call help_print_tool,"U64=UCHAR","define u64 as unsigned char")
+	$(call help_print_tool,"U64=USHORT","define u64 as unsigned short")
+	$(call help_print_tool,"U64=UINT","define u64 as unsigned int")
+	$(call help_print_tool,"U64=ULLONG","define u64 as unsigned long long (default)")
+	@printf "\n"
+	@printf "In the case of $(call hl,U64=ULLONG), the following options are available as well:\n"
+	$(call help_print_tool,"ENC_LEVEL=64","not yet implemented")
+	$(call help_print_tool,"ENC_LEVEL=128","tests encryption level: 128")
+	$(call help_print_tool,"ENC_LEVEL=256","tests encryption level: 256")
+	$(call help_print_tool,"ENC_LEVEL=512","tests encryption level: 512")
+	$(call help_print_tool,"ENC_LEVEL=1024","tests encryption level: 1024 (default)")
+	@printf "\n"
+	@printf "Note that different sets of unit tests are enabled for different values of $(call hl,U64).\n"
+	@printf "\n"
+	$(call help_print_tool,"TIME_FUNCTIONS=y","time functions for profiling)"
+	$(call help_print_tool,"PROFILING=y","build unit tests for profling with gprof(1)")
+	@printf "\n"
+	@printf "Enhanced colour output is enabled by default or explicitly if $(call hl,RSA_COLOURS=y) is set.\n"
+	@printf "To build without enhanced colour output use $(call hl,RSA_COLOURS=n).\n"
+
