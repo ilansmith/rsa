@@ -18,7 +18,7 @@ static opt_t options_decrypter[] = {
 };
 
 /* either encryption or decryption task are to be performed */
-static int parse_args_finalize_decrypter(int *flags, int actions)
+static int parse_args_finalize_decrypter(unsigned int *flags, int actions)
 {
     if (!actions && !(*flags & OPT_FLAG(RSA_OPT_KEYGEN)))
 	*flags |= OPT_FLAG(RSA_OPT_DECRYPT);
@@ -34,7 +34,7 @@ static int parse_args_finalize_decrypter(int *flags, int actions)
     return 0;
 }
 
-static int parse_args_decrypter(int opt, int *flags)
+static int parse_args_decrypter(int opt, unsigned int *flags)
 {
     switch (opt_short2code(options_decrypter, opt))
     {
@@ -66,7 +66,8 @@ static int parse_args_decrypter(int opt, int *flags)
 
 int main(int argc, char *argv[])
 {
-    int ret, action, flags = 0;
+    int ret, action;
+    unsigned int flags = 0;
     rsa_handler_t decrypter_handler = {
 	.keytype = RSA_KEY_TYPE_PRIVATE,
 	.options = options_decrypter,
