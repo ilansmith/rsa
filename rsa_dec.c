@@ -9,6 +9,8 @@
 #include "rsa_util.h"
 #include "rsa_num.h"
 
+int is_encryption_info_only;
+
 static int key_files_generate(char *private_name, FILE **private_key, 
     char *public_name, FILE **public_key, int len)
 {
@@ -221,11 +223,15 @@ Exit:
 static void verbose_decryption(int is_full, char *key_name, int level, 
     char *cipher, char *data)
 {
-    rsa_printf(1, 0, "encryption method: %s", is_full ? "full" : "quick");
-    rsa_printf(1, 0, "key: %s", key_name);
-    rsa_printf(1, 0, "encryption level: %d", level);
-    rsa_printf(1, 0, "decrypting: %s", cipher);
-    rsa_printf(1, 0, "data file: %s", data);
+    rsa_printf(!is_encryption_info_only, 0, "encryption method: %s", 
+	is_full ? "full" : "quick");
+    rsa_printf(!is_encryption_info_only, 0, "key: %s", key_name);
+    rsa_printf(!is_encryption_info_only, 0, "encryption level: %d", level);
+    if (!is_encryption_info_only)
+    {
+	rsa_printf(1, 0, "decrypting: %s", cipher);
+	rsa_printf(1, 0, "data file: %s", data);
+    }
     fflush(stdout);
 }
 
@@ -306,19 +312,22 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
     }
 
     /* open unencrypted text file */
-    file_name_len = strlen(file_name);
-    if (file_name_len > 4 && !strcmp(file_name + file_name_len - 4, ".enc"))
-	snprintf(newfile_name, file_name_len - 3, "%s", file_name);
-    else
-	sprintf(newfile_name, "%s.dec", file_name);
-    if (!(is_enable = is_fwrite_enable(newfile_name)) || 
-	!(*data = fopen(newfile_name, "w")))
+    if (!is_encryption_info_only)
     {
-	rsa_key_close(*key);
-	fclose(*cipher);
-	if (is_enable)
-	    rsa_error_message(RSA_ERR_FOPEN, newfile_name);
-	return -1;
+	file_name_len = strlen(file_name);
+	if (file_name_len > 4 && !strcmp(file_name + file_name_len - 4, ".enc"))
+	    snprintf(newfile_name, file_name_len - 3, "%s", file_name);
+	else
+	    sprintf(newfile_name, "%s.dec", file_name);
+	if (!(is_enable = is_fwrite_enable(newfile_name)) || 
+		!(*data = fopen(newfile_name, "w")))
+	{
+	    rsa_key_close(*key);
+	    fclose(*cipher);
+	    if (is_enable)
+		rsa_error_message(RSA_ERR_FOPEN, newfile_name);
+	    return -1;
+	}
     }
 
     verbose_decryption(*is_full, (*key)->name, rsa_encryption_level, file_name, 
@@ -330,7 +339,8 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
 static void rsa_decrypt_epilog(rsa_key_t *key, FILE *data, FILE *cipher)
 {
     rsa_key_close(key);
-    fclose(data);
+    if (!is_encryption_info_only)
+	fclose(data);
     fclose(cipher);
 }
 
@@ -415,8 +425,11 @@ int rsa_decrypt(void)
     if (rsa_decrypt_prolog(&key, &data, &cipher, &is_full))
 	return -1;
 
-    ret = is_full ? rsa_decrypt_full(key, cipher, data) : 
-	rsa_decrypt_quick(key, cipher, data);
+    if (!is_encryption_info_only)
+    {
+	ret = is_full ? rsa_decrypt_full(key, cipher, data) : 
+	    rsa_decrypt_quick(key, cipher, data);
+    }
 
     rsa_decrypt_epilog(key, data, cipher);
     return ret;

@@ -137,9 +137,6 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 	rsa_strcat(msg, "no default RSA public key is set, please either set "
 	    "one or state the key to be used");
 	break;
-    case RSA_ERR_KEY_STAT_PUB_DYN:
-	rsa_vstrcat(msg, "RSA public key %s could not be found", ap);
-	break;
     case RSA_ERR_KEY_STAT_PRV_DEF:
 	rsa_vstrcat(msg, "%s was not encrypted by the default key's (%s) "
 	    "corresponding public key", ap);

@@ -643,11 +643,7 @@ static rsa_key_t *rsa_key_open_dyn(char accept)
 
     /* did not find a key with the name we're looking for */
     if (!keyring)
-    {
-	rsa_error_message(RSA_ERR_KEY_STAT_PUB_DYN, 
-	    rsa_highlight_str(key_data));
 	goto Exit;
-    }
 
     /* there are multiple keys with the name we're looking for - ambiguous */
     if (keyring->is_ambiguous[idx])
