@@ -133,8 +133,7 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 			break;
 		case 'i':
 			OPT_ADD_ACTION(flags, RSA_OPT_LIC_INFO, *action);
-			snprintf(license, FILE_NAME_MAX_LENGTH, "%s.lic",
-				optarg);
+			snprintf(license, FILE_NAME_MAX_LENGTH, "%s", optarg);
 			break;
 		case 'x':
 			OPT_ADD_ACTION(flags, RSA_OPT_LIC_TEST, *action);
@@ -160,7 +159,8 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 			if (time_limit_in_months) {
 				seconds_in_day = 60*60*24;
 				*time_limit = ROUND_UP(time(NULL) +
-					seconds_in_day * 30, seconds_in_day);
+					seconds_in_day * 30 *
+					time_limit_in_months, seconds_in_day);
 			}
 			break;
 		default:
@@ -361,7 +361,7 @@ static int rsa_info_time_limit(char **buf, int *len)
 		snprintf(stime, sizeof(stime), "unlimited");
 	}
 
-	printf("time limit info : 0x%lx (%s)\n", time_limit, stime);
+	printf("time limit info : %s\n", stime);
 	return 0;
 }
 
@@ -422,7 +422,7 @@ static time_t get_time_limit(int do_limit)
 	if (do_limit) {
 		int seconds_in_day = 60*60*24;
 
-		t = ROUND_UP(t + seconds_in_day * 30, seconds_in_day);
+		t = ROUND_UP(t + 1 * seconds_in_day * 30, seconds_in_day);
 		strftime(stime, sizeof(stime),"%d %b, %Y", localtime(&t));
 	} else {
 		t = 0;
@@ -445,17 +445,20 @@ int license_test(char key[FILE_NAME_MAX_LENGTH])
 	char *public_key = "/home/ilan/.rsa/rivermax.pub";
 	char *private_key = "/home/ilan/.rsa/rivermax.prv";
 	char *license = "rivermax.lic";
+	struct rsa_stream_init init;
 	int ret;
 
 	/* test license create */
-	license_data.version = 1;
+	license_data.version = FILE_FORMAT_VERSION;
 	snprintf(license_data.vendor_name, VENDOR_NAME_MAX_LENGTH,
 		"GrassValley");
-	license_data.time_limit = get_time_limit(random() & (1<<3));
+	license_data.time_limit = get_time_limit(1);
 
-	rsa_license_init();
+	init.type = RSA_STREAM_TYPE_FILE;
+	init.params.file.path = private_key;
+	init.params.file.mode = "r";
 
-	ret = rsa_license_create(private_key, license, &licnese_ops,
+	ret = rsa_license_create(&init, license, &licnese_ops,
 		&license_data);
 	if (ret) {
 		printf("rsa_license_create() failed\n");
@@ -464,8 +467,12 @@ int license_test(char key[FILE_NAME_MAX_LENGTH])
 
 	printf("\n");
 
+	init.type = RSA_STREAM_TYPE_FILE;
+	init.params.file.path = public_key;
+	init.params.file.mode = "r";
+
 	/* test license info */
-	ret = rsa_license_info(public_key, license, &licnese_ops);
+	ret = rsa_license_info(&init, license, &licnese_ops);
 	if (ret) {
 		printf("rsa_license_info() failed\n");
 		return -1;
@@ -475,7 +482,7 @@ int license_test(char key[FILE_NAME_MAX_LENGTH])
 
 	/* test license extract */
 	memset(&license_data, 0, sizeof(struct rsa_license_data));
-	ret = rsa_license_extract(public_key, license, &licnese_ops,
+	ret = rsa_license_extract(&init, license, &licnese_ops,
 		&license_data);
 	if (ret) {
 		printf("rsa_license_extract() failed\n");
@@ -488,10 +495,9 @@ int license_test(char key[FILE_NAME_MAX_LENGTH])
 	return 0;
 }
 
-static int license_info(char key[FILE_NAME_MAX_LENGTH],
+static int license_info(char key_path[FILE_NAME_MAX_LENGTH],
 		char license[FILE_NAME_MAX_LENGTH])
 {
-#if 0
 	static unsigned char key_default[] = {
 		0x49, 0x41, 0x53, 0x52, 0x53, 0x41, 0x51, 0xe0,
 		0xcd, 0x77, 0xd2, 0xcf, 0xc3, 0x25, 0x30, 0x0d,
@@ -607,26 +613,75 @@ static int license_info(char key[FILE_NAME_MAX_LENGTH],
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x00,
 		0x00, 0x00,
 	};
-#endif
+	struct rsa_license_ops licnese_ops = {
+		rsa_license_create_rivermax,
+		rsa_license_info_rivermax,
+		rsa_license_extract_rivermax,
+	};
+	struct rsa_stream_init init;
+	int ret;
+
+	/* test license info */
+	if (key_path[0]) {
+		init.type = RSA_STREAM_TYPE_FILE;
+		init.params.file.path = key_path;
+		init.params.file.mode = "r";
+	} else {
+		init.type = RSA_STREAM_TYPE_MEMORY;
+		init.params.memory.buf = key_default;
+		init.params.memory.len = ARRAY_SZ(key_default);
+	}
+	ret = rsa_license_info(&init, license, &licnese_ops);
+	if (ret) {
+		printf("rsa_license_info() failed\n");
+		return -1;
+	}
 
 	return 0;
 }
 
-static int license_create(char key[FILE_NAME_MAX_LENGTH],
+static int license_create(char private_key[FILE_NAME_MAX_LENGTH],
 		char license[FILE_NAME_MAX_LENGTH],
 		char vendor_name[VENDOR_NAME_MAX_LENGTH], time_t time_limit)
 {
+	struct rsa_license_ops licnese_ops = {
+		rsa_license_create_rivermax,
+		rsa_license_info_rivermax,
+		rsa_license_extract_rivermax,
+	};
+	struct rsa_license_data license_data;
+	struct rsa_stream_init init;
+	int ret;
+
+	/* test license create */
+	license_data.version = FILE_FORMAT_VERSION;
+	snprintf(license_data.vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
+		vendor_name);
+	license_data.time_limit = time_limit;
+
+	init.type = RSA_STREAM_TYPE_FILE;
+	init.params.file.path = private_key;
+	init.params.file.mode = "r";
+	ret = rsa_license_create(&init, license, &licnese_ops, &license_data);
+	if (ret) {
+		printf("rsa_license_create() failed\n");
+		return -1;
+	}
+
 	return 0;
+
 }
 
 int main(int argc, char **argv)
 {
 	int ret;
 	unsigned long action;
-	char key[FILE_NAME_MAX_LENGTH];
+	char key[FILE_NAME_MAX_LENGTH] = { 0 };
 	char license[FILE_NAME_MAX_LENGTH];
 	char vendor_name[VENDOR_NAME_MAX_LENGTH];
 	time_t time_limit;
+
+	rsa_license_init();
 
 	if (parse_args(argc, argv, &action, key, license, vendor_name,
 			&time_limit)) {

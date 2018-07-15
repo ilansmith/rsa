@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include "rsa_stream.h"
 #include "rsa_num.h"
 #include "rsa_crc.h"
 #include "rsa_license.h"
@@ -50,16 +51,17 @@ static int xor_decrypt_crc(u64 crc[2], u64 crc_check)
  * | ...      | user specific data...      | Xor with RNG |
  * +----------+----------------------------+--------------+
  */
-int rsa_license_create(char *priv_key_path, char *file_name, 
-		struct rsa_license_ops *license_ops, void *data)
+int rsa_license_create(struct rsa_stream_init *stream_init_priv_key,
+		char *file_name, struct rsa_license_ops *license_ops,
+		void *data)
 {
-	FILE *ciphertext;
+	rsa_stream_t *ciphertext = NULL;
+	struct rsa_stream_init init;
 	rsa_key_t *key = NULL;
 	int ret = -1;
 	char *buf;
 	u64 crc[2];
 	int len = 0;
-	struct rsa_stream_init init;
 
 	buf = calloc(LICENSE_LENGTH_USER, sizeof(char));
 	if (!buf)
@@ -73,14 +75,14 @@ int rsa_license_create(char *priv_key_path, char *file_name,
 	}
 
 	/* open file */
-	if (!(ciphertext = fopen(file_name, "w+")))
+	init.type = RSA_STREAM_TYPE_FILE;
+	init.params.file.path = file_name;
+	init.params.file.mode = "w+b";
+	if (!(ciphertext = sopen(&init)))
 		goto exit;
 
 	/* open private key */
-	init.params.file.path = priv_key_path;
-	init.params.file.mode = "r";
-	init.type = RSA_STREAM_TYPE_FILE;
-	key = rsa_key_open(&init, RSA_KEY_TYPE_PRIVATE, 1);
+	key = rsa_key_open(stream_init_priv_key, RSA_KEY_TYPE_PRIVATE, 1);
 	if (!key)
 		goto exit;
 
@@ -97,11 +99,11 @@ int rsa_license_create(char *priv_key_path, char *file_name,
 	xor_encrypt_crc(crc, buf, len);
 
 	/* write crc to license file */
-	if (fwrite(crc, sizeof(u64), 2, ciphertext) != 2)
+	if (swrite(crc, sizeof(u64), 2, ciphertext) != 2)
 		goto exit;
 
 	/* write user encrypted data to license file */
-	if (fwrite(buf, sizeof(char), len, ciphertext) != len)
+	if (swrite(buf, sizeof(char), len, ciphertext) != len)
 		goto exit;
 
 	ret = 0;
@@ -109,7 +111,7 @@ int rsa_license_create(char *priv_key_path, char *file_name,
 exit:
 	/* close file */
 	if (ciphertext)
-		fclose(ciphertext);
+		sclose(ciphertext);
 
 	/* close private key */
 	rsa_key_close(key);
@@ -124,26 +126,27 @@ exit:
 	return ret;
 }
 
-int rsa_license_get(char *pub_key_path, char *file_name, char *buf, int *len)
+static int rsa_license_get(struct rsa_stream_init *pub_key_stream_init,
+		char *file_name, char *buf, int *len)
 {
-	FILE *ciphertext;
+	rsa_stream_t *ciphertext;
+	struct rsa_stream_init init;
 	char c;
 	rsa_key_t *key = NULL;
 	u1024_t seed;
 	u64 crc[2];
 	u64 crc_check;
-	struct rsa_stream_init init;
 	int ret = -1;
 
 	/* open file */
-	if (!(ciphertext = fopen(file_name, "r")))
+	init.type = RSA_STREAM_TYPE_FILE;
+	init.params.file.path = file_name;
+	init.params.file.mode = "rb";
+	if (!(ciphertext = sopen(&init)))
 		goto exit;
 
 	/* open private key */
-	init.params.file.path = pub_key_path;
-	init.params.file.mode = "r";
-	init.type = RSA_STREAM_TYPE_FILE;
-	key = rsa_key_open(&init, RSA_KEY_TYPE_PUBLIC, 1);
+	key = rsa_key_open(pub_key_stream_init, RSA_KEY_TYPE_PUBLIC, 1);
 	if (!key)
 		goto exit;
 
@@ -160,13 +163,13 @@ int rsa_license_get(char *pub_key_path, char *file_name, char *buf, int *len)
 		goto exit;
 
 	/* read crc from license */
-	if (fread(crc, sizeof(u64), 2, ciphertext) != 2)
+	if (sread(crc, sizeof(u64), 2, ciphertext) != 2)
 		goto exit;
 
 	/* read user data from license */
-	*len = fread(buf, sizeof(char), LICENSE_LENGTH_USER, ciphertext);
+	*len = sread(buf, sizeof(char), LICENSE_LENGTH_USER, ciphertext);
 	/* assert there's no more to read in license */
-	if (0 < fread(&c, sizeof(char), 1, ciphertext))
+	if (0 < sread(&c, sizeof(char), 1, ciphertext))
 		goto exit;
 
 	/* take crc check */
@@ -184,7 +187,7 @@ int rsa_license_get(char *pub_key_path, char *file_name, char *buf, int *len)
 exit:
 	/* close file */
 	if (ciphertext)
-		fclose(ciphertext);
+		sclose(ciphertext);
 
 	/* close private key */
 	rsa_key_close(key);
@@ -192,8 +195,8 @@ exit:
 	return ret;
 }
 
-int rsa_license_info(char *pub_key_path, char *file_name,
-		struct rsa_license_ops *license_ops)
+int rsa_license_info(struct rsa_stream_init *pub_key_stream_init,
+		char *file_name, struct rsa_license_ops *license_ops)
 {
 	char *buf;
 	int len;
@@ -203,7 +206,7 @@ int rsa_license_info(char *pub_key_path, char *file_name,
 	if (!buf)
 		return -1;
 
-	if (rsa_license_get(pub_key_path, file_name, buf, &len))
+	if (rsa_license_get(pub_key_stream_init, file_name, buf, &len))
 		goto exit;
 
 	if (license_ops->lic_info)
@@ -216,8 +219,9 @@ exit:
 	return ret;
 }
 
-int rsa_license_extract(char *pub_key_path, char *file_name,
-		struct rsa_license_ops *license_ops, void *data)
+int rsa_license_extract(struct rsa_stream_init *pub_key_stream_init,
+		char *file_name, struct rsa_license_ops *license_ops,
+		void *data)
 {
 	char *buf;
 	int len;
@@ -227,7 +231,7 @@ int rsa_license_extract(char *pub_key_path, char *file_name,
 	if (!buf)
 		return -1;
 
-	if (rsa_license_get(pub_key_path, file_name, buf, &len))
+	if (rsa_license_get(pub_key_stream_init, file_name, buf, &len))
 		goto exit;
 
 	if (license_ops->lic_extract)
