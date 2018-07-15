@@ -4,9 +4,9 @@
 #include "rsa_num.h"
 #include "rsa_util.h"
 
-typedef int (*lic_create_t)(FILE *ciphertext, void *data);
-typedef int (*lic_parse_t)(FILE *ciphertext);
-typedef int (*lic_extract_t)(FILE *ciphertext, void *data);
+typedef int (*lic_create_t)(char *buf, int len, void *data);
+typedef int (*lic_parse_t)(char *buf, int len);
+typedef int (*lic_extract_t)(char *buf, int len, void *data);
 
 struct rsa_license_ops {
 	lic_create_t lic_create;

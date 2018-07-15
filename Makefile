@@ -118,8 +118,8 @@ else # create rsa applications
     TARGET_OBJS_rsa_dec+=rsa_dec_main.o
   endif
 
-  TARGET_OBJS_rsa_license=rsa_license.o rsa_license_main.o
-  CFLAGS+=-DULLONG -O3
+  TARGET_OBJS_rsa_license=rsa_crc.o rsa_license.o rsa_license_main.o
+  CFLAGS+=-DULLONG -O0 -g
 endif
 
 %.o: %.c

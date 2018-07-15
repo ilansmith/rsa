@@ -3,48 +3,39 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include "rsa_num.h"
+#include "rsa_crc.h"
 #include "rsa_license.h"
 
-static int rsa_encrypt_signature(FILE *ciphertext)
+#define LICENSE_LENGTH_MAX 1024
+#define LICENSE_LENGTH_USER (LICENSE_LENGTH_MAX - \
+	(sizeof(u64) * (16 + 1) + sizeof(u64) * 2))
+
+static void xor_user_data(char *buf, int len)
 {
-	int written;
-	u64 signature;
-	u64 signature_enc;
+	int i;
 
-	signature = RSA_RANDOM();
-	signature_enc = signature ^ RSA_RANDOM();
+	for (i = 0; i < len; i++)
+		buf[i] ^= (char)RSA_RANDOM();
+}
 
-	written = fwrite(&signature, sizeof(u64), 1, ciphertext);
-	if (written != 1)
+static void xor_encrypt_crc(u64 crc[2], char *buf, int len)
+{
+	crc[0] = rsa_crc(buf, len);
+	crc[1] = crc[0] ^ (u64)RSA_RANDOM();
+}
+
+static int xor_decrypt_crc(u64 crc[2], u64 crc_check)
+{
+	/* assert correct public key is being used */
+	crc[1] ^= (u64)RSA_RANDOM();
+	if (crc[0] != crc[1])
 		return -1;
-	written = fwrite(&signature_enc, sizeof(u64), 1, ciphertext);
-	if (written != 1)
+
+	/* authenticate user data */
+	if (crc[0] != crc_check)
 		return -1;
 
 	return 0;
-}
-
-static int rsa_decrypt_signature(FILE *ciphertext)
-{
-	int read;
-	u64 signature_expected;
-	u64 signature;
-	u64 signature_enc;
-
-	signature_expected = RSA_RANDOM();
-
-	read = fread(&signature, sizeof(u64), 1, ciphertext);
-	if (read != 1)
-		return -1;
-
-	if (signature != signature_expected)
-		return -1;
-
-	read = fread(&signature_enc, sizeof(u64), 1, ciphertext);
-	if (read != 1)
-		return -1;
-
-	return signature == (signature_enc ^ RSA_RANDOM()) ? 0 : -1;
 }
 
 /* 
@@ -56,7 +47,7 @@ static int rsa_decrypt_signature(FILE *ciphertext)
  * | u64      | random seed                | RSA          |
  * | u64      | random signature           | Plaintext    |
  * | u64      | random signature encrypted | Xor with RNG |
- * | ...      | specific data...           | Xor with RNG |
+ * | ...      | user specific data...      | Xor with RNG |
  * +----------+----------------------------+--------------+
  */
 int rsa_license_create(char *priv_key_path, char *file_name, 
@@ -65,6 +56,20 @@ int rsa_license_create(char *priv_key_path, char *file_name,
 	FILE *ciphertext;
 	rsa_key_t *key = NULL;
 	int ret = -1;
+	char *buf;
+	u64 crc[2];
+	int len = 0;
+
+	buf = calloc(LICENSE_LENGTH_USER, sizeof(char));
+	if (!buf)
+		return -1;
+
+	/* setup extra data */
+	if (license_ops->lic_create) {
+		len = license_ops->lic_create(buf, LICENSE_LENGTH_USER, data);
+		if (len == -1)
+			goto exit;
+	}
 
 	/* open file */
 	if (!(ciphertext = fopen(file_name, "w+")))
@@ -79,29 +84,38 @@ int rsa_license_create(char *priv_key_path, char *file_name,
 	if (rsa_encrypt_seed(key, ciphertext))
 		goto exit;
 
-	/* Generate and XoR encrypt a signature */
-	if (rsa_encrypt_signature(ciphertext))
+	len = LICENSE_LENGTH_USER - len;
+
+	/* XoR encrypt user data */
+	xor_user_data(buf, len);
+
+	/* XoR encrypt crc */
+	xor_encrypt_crc(crc, buf, len);
+
+	/* write crc to license file */
+	if (fwrite(crc, sizeof(u64), 2, ciphertext) != 2)
 		goto exit;
 
-	/* encrypte extra data */
-	if (license_ops->lic_create &&
-			license_ops->lic_create(ciphertext, data)) {
+	/* write user encrypted data to license file */
+	if (fwrite(buf, sizeof(char), len, ciphertext) != len)
 		goto exit;
-	}
 
 	ret = 0;
 
 exit:
-	/* close private key */
-	rsa_key_close(key);
-
 	/* close file */
 	if (ciphertext)
 		fclose(ciphertext);
 
+	/* close private key */
+	rsa_key_close(key);
+
 	/* on error remove file */
 	if (ret)
 		remove(file_name);
+
+	/* cleanup buf */
+	free(buf);
 
 	return ret;
 }
@@ -110,9 +124,18 @@ int rsa_license_info(char *pub_key_path, char *file_name,
 		struct rsa_license_ops *license_ops)
 {
 	FILE *ciphertext;
+	char *buf;
+	char c;
 	rsa_key_t *key = NULL;
 	u1024_t seed;
+	u64 crc[2];
+	u64 crc_check;
+	int len;
 	int ret = -1;
+
+	buf = calloc(LICENSE_LENGTH_USER, sizeof(char));
+	if (!buf)
+		return -1;
 
 	/* open file */
 	if (!(ciphertext = fopen(file_name, "r")))
@@ -135,12 +158,29 @@ int rsa_license_info(char *pub_key_path, char *file_name,
 	if (number_seed_set_fixed(&seed))
 		goto exit;
 
-	/* read signature */
-	if (rsa_decrypt_signature(ciphertext))
+	/* read crc from license */
+	if (fread(crc, sizeof(u64), 2, ciphertext) != 2)
 		goto exit;
 
-	if (license_ops->lic_parse && license_ops->lic_parse(ciphertext))
+	/* read user data from license */
+	len = fread(buf, sizeof(char), LICENSE_LENGTH_USER, ciphertext);
+	/* assert there's no more to read in license */
+	if (0 < fread(&c, sizeof(char), 1, ciphertext))
 		goto exit;
+
+	/* take crc check */
+	crc_check = rsa_crc(buf, len);
+
+	/* XoR decrypt user data */
+	xor_user_data(buf, len);
+
+	/* assert crc is correct */
+	if (xor_decrypt_crc(crc, crc_check))
+		goto exit;
+
+	/* validate user data */
+	if (license_ops->lic_parse)
+		license_ops->lic_parse(buf, len);
 
 	ret = 0;
 
@@ -151,6 +191,9 @@ exit:
 
 	/* close private key */
 	rsa_key_close(key);
+
+	/* cleanup buf */
+	free(buf);
 
 	return ret;
 }
