@@ -17,9 +17,9 @@ static opt_t options_master[] = {
 	"key and only it will be RSA encrypted/decrypted. this switch implies "
 	"encryption"},
     {RSA_OPT_KEY_SET_DYNAMIC, 'k', "key", required_argument, "set the RSA key "
-	"to be used for the current encryption. this options overides the "
+	"to be used for the current encryption. this options overrides the "
 	"default key if it has been set. this switch implies encryption"},
-    {RSA_OPT_DECRYPT, 'd', "decrypt", no_argument, "decrypt the ciphertext "
+    {RSA_OPT_DECRYPT, 'd', "decrypt", no_argument, "decrypt the encrypted file "
 	"stated by --file"},
     {RSA_OPT_ORIG_FILE, 'o', "original", no_argument, "keep the original file. "
 	"if this option is not set the file will be deleted after it has been "
@@ -27,7 +27,7 @@ static opt_t options_master[] = {
     {RSA_OPT_KEYGEN, 'g', "generate", required_argument, "generate an RSA "
 	"public/private key pair. " ARG " is its name"},
     {RSA_OPT_ENC_INFO_ONLY, 'i', "info", no_argument, "get info regarding an "
-	"encrypted file. this depends on posessing the required private key"},
+	"encrypted file. this depends on possessing the required private key"},
     { RSA_OPT_MAX }
 };
 
@@ -58,7 +58,7 @@ static int parse_args_finalize_master(int *flags, int actions)
 	rsa_error_message(actions ? RSA_ERR_MULTIACTION : RSA_ERR_NOACTION);
 	return -1;
     }
-    /* test for non compatable options with encrypt/decrypt */
+    /* test for non compatible options with encrypt/decrypt */
     else if ((*flags & (OPT_FLAG(RSA_OPT_ENCRYPT) | OPT_FLAG(RSA_OPT_DECRYPT))) 
 	&& !(*flags & OPT_FLAG(RSA_OPT_FILE)))
     {
