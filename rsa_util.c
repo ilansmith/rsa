@@ -117,9 +117,6 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 	case RSA_ERR_FILE_NOT_REG:
 		rsa_vstrcat(msg, "%s is not a regular file", ap);
 		break;
-	case RSA_ERR_NOFILE:
-		rsa_strcat(msg, "no input file specified");
-		break;
 	case RSA_ERR_FOPEN:
 		rsa_vstrcat(msg, "could not open file %s", ap);
 		break;
