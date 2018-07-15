@@ -96,10 +96,10 @@ rsa.o: $(TARGET_OBJS) $(TAILOR_OBJS)
 
     TARGET=rsa
   else # create separate encoder/decoder
-rsa_enc.o: %.c rsa.h
+rsa_enc.o: %.c rsa_num.h
 	$(CC) -o $@ $(CFLAGS) -DRSA_ENC -c $<
 
-rsa_dec.o: %.c rsa.h
+rsa_dec.o: %.c rsa_num.h
 	$(CC) -o $@ $(CFLAGS) -DRSA_DEC -c $<
 
 rsa_%: $(TARGET_OBJS) $(TAILOR_OBJS:.o=%.o)
@@ -115,7 +115,7 @@ endif
 
 .PHONY: all clean cleanapps cleantags cleanconf cleanall config
 
-%.o: %.c rsa.h
+%.o: %.c rsa_num.h
 	$(CC) -o $@ $(CFLAGS) -c $<
 
 all: $(TARGET)
