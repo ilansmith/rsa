@@ -14,7 +14,7 @@
 #define C_BLUE "\033[01;34m"
 #define C_GREY "\033[00;37m"
 #define C_NORMAL "\033[00;00;00m"
-#define C_HIGHLIGHT "\033[01;38m"
+#define C_HIGHLIGHT "\033[01m"
 
 #define CURSOR_POS_SAVE "\033[s"
 #define CURSOR_POS_RESTORE "\033[u"
