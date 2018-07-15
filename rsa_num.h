@@ -127,9 +127,9 @@ typedef struct {
 
 #define number_reset(num) { \
     do { \
-	int i; \
-	for (i = 0; i <= block_sz_u1024; i++) \
-	    (num)->arr[i] = 0; \
+	int __i; \
+	for (__i = 0; __i <= block_sz_u1024; __i++) \
+	    (num)->arr[__i] = 0; \
 	(num)->top = 0; \
     } \
     while (0); \
@@ -137,62 +137,64 @@ typedef struct {
 
 #define number_shift_right_once(num) { \
     do { \
-	u64 *seg, *top; \
+	u64 *__seg, *__top; \
 	/* shifting is done up to, at most, the buffer u64 to accommodate for \
 	 * number_montgomery_product() */ \
-	top = (u64*)&(num)->arr + (num)->top; \
-	for (seg = (u64*)&(num)->arr; seg < top; seg++) \
+	__top = (u64*)&(num)->arr + (num)->top; \
+	for (__seg = (u64*)&(num)->arr; __seg < __top; __seg++) \
 	{ \
-	    *seg = *seg >> 1; \
-	    *seg = (*(seg+1) & (u64)1) ? *seg | MSB(u64) : \
-		*seg & ~MSB(u64); \
+	    *__seg = *__seg >> 1; \
+	    *__seg = (*(__seg+1) & (u64)1) ? *__seg | MSB(u64) : \
+		*__seg & ~MSB(u64); \
 	} \
-	*seg = *seg >> 1; \
-	if ((num)->top && !*seg) \
+	*__seg = *__seg >> 1; \
+	if ((num)->top && !*__seg) \
 	    (num)->top--; \
     } while (0); \
 }
 
 #define number_shift_left_once(num) { \
     do { \
-	u64 *seg, *top; \
-	int is_top_can_shift = (num)->top < block_sz_u1024 ? 1 : 0; \
+	u64 *__seg, *__top; \
+	int __is_top_can_shift = (num)->top < block_sz_u1024 ? 1 : 0; \
 	/* shifting is done from, at most, the u64 buffer */ \
-	top = (u64*)&(num)->arr + (num)->top + is_top_can_shift; \
-	for (seg = top; seg > (u64*)&(num)->arr; seg--) \
+	__top = (u64*)&(num)->arr + (num)->top + __is_top_can_shift; \
+	for (__seg = __top; __seg > (u64*)&(num)->arr; __seg--) \
 	{ \
-	    *seg = *seg << 1; \
-	    *seg = *(seg-1) & MSB(u64) ? *seg | (u64)1 : *seg & ~(u64)1; \
+	    *__seg = *__seg << 1; \
+	    *__seg = *(__seg-1) & MSB(u64) ? \
+	    *__seg | (u64)1 : *__seg & ~(u64)1; \
 	} \
-	*seg = *seg << 1; \
-	if (is_top_can_shift && *(top)) \
+	*__seg = *__seg << 1; \
+	if (__is_top_can_shift && *(__top)) \
 	    (num)->top++; \
     } while (0); \
 }
 
 #define number_sub1(num) { \
     do { \
-	u1024_t num_1; \
-	num_1 = NUM_1; \
-	number_sub((num), (num), &num_1);  \
+	u1024_t __num_1; \
+	number_assign(__num_1, NUM_1); \
+	number_sub((num), (num), &__num_1);  \
     } while (0); \
 }
 
 /* return: num1 > num2  or ret_on_equal if num1 == num2 */
 #define number_compare(num1, num2, ret_on_equal) ( { \
-    int ret; \
+    int __ret; \
     do { \
 	if ((num1)->top == (num2)->top) \
 	{ \
-	    u64 *seg1 = (u64*)&(num1)->arr + (num1)->top; \
-	    u64 *seg2 = (u64*)&(num2)->arr + (num2)->top; \
-	    for (; seg1 > (u64*)&(num1)->arr && *seg1==*seg2; seg1--, seg2--); \
-	    ret = (*seg1 == *seg2) ? ret_on_equal : *seg1 > *seg2; \
+	    u64 *__seg1 = (u64*)&(num1)->arr + (num1)->top; \
+	    u64 *__seg2 = (u64*)&(num2)->arr + (num2)->top; \
+	    for ( ; __seg1 > (u64*)&(num1)->arr && *__seg1==*__seg2; \
+		__seg1--, __seg2--); \
+	__ret = (*__seg1 == *__seg2) ? ret_on_equal : *__seg1 > *__seg2; \
 	} \
 	else \
-	    ret = (num1)->top > (num2)->top; \
+	    __ret = (num1)->top > (num2)->top; \
     } while (0); \
-    ret; \
+    __ret; \
 })
 
 /* return: num1 > num2 */
@@ -207,29 +209,29 @@ typedef struct {
 
 #define number_mod(r, a, n) { \
     do { \
-	u1024_t q; \
-	number_dev(&q, (r), (a), (n)); \
+	u1024_t __q; \
+	number_dev(&__q, (r), (a), (n)); \
     } \
     while (0); \
 }
 
 #define number_top_set(num) { \
     do { \
-	u64 *seg; \
-	for (seg = (u64*)&(num)->arr + block_sz_u1024, \
+	u64 *__seg; \
+	for (__seg = (u64*)&(num)->arr + block_sz_u1024, \
 	    (num)->top = block_sz_u1024; \
-	    seg > (u64*)&(num)->arr && !*seg; seg--, (num)->top--); \
+	    __seg > (u64*)&(num)->arr && !*__seg; __seg--, (num)->top--); \
     } \
     while (0); \
 }
 
 #define number_xor(res, num1, num2) { \
     do { \
-	u64 *seg, *seg1, *seg2; \
-	for (seg = (u64*)&(res)->arr + block_sz_u1024, \
-	    seg1 = (u64*)&(num1)->arr + block_sz_u1024, \
-	    seg2 = (u64*)&(num2)->arr + block_sz_u1024; \
-	    seg >= (u64*)&(res)->arr; *seg-- = *seg1-- ^ *seg2--); \
+	u64 *__seg, *__seg1, *__seg2; \
+	for (__seg = (u64*)&(res)->arr + block_sz_u1024, \
+	    __seg1 = (u64*)&(num1)->arr + block_sz_u1024, \
+	    __seg2 = (u64*)&(num2)->arr + block_sz_u1024; \
+	    __seg >= (u64*)&(res)->arr; *__seg-- = *__seg1-- ^ *__seg2--); \
 	number_top_set(res); \
     } \
     while (0); \
@@ -237,9 +239,9 @@ typedef struct {
 
 #define number_assign(to, from) { \
     do { \
-	int i; \
-	for (i = 0; i <= block_sz_u1024; i++) \
-	    (to).arr[i] = (from).arr[i]; \
+	int __i; \
+	for (__i = 0; __i <= block_sz_u1024; __i++) \
+	    (to).arr[__i] = (from).arr[__i]; \
 	(to).top = (from).top; \
     } \
     while (0); \
