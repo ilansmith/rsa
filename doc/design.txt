@@ -11,107 +11,121 @@ HLD
 ===
 Key Format
 ----------
-A public/private key contains a signiture, a data segment string and 4 key sets 
-of RSA keys - one for each of the supported encryption levels (128bits, 
-256bits, 512bits and 1024bits). Each key set consists of an RSA key 
-(<e, n>/<d, n>) and a montgomry factor for performing montgomry modular 
-multiplication and exponentiation.
-The signiture is used for quick identification of (possible) RSA keys (for 
-example, during key scanning). In each of the key pairs, the data section is 
-scrambled by it's peer's 128bit key. The data section contains a key descriptor 
-and a key ID. The key descyptor identifies the key as public or private, while
-the ID strings destinguishes the key from the keys.
-
-The total length of a key file is given by:
-strlen(RSA_SIGNITURE)+LEN(128)+3*(LEN(128)+LEN(256)+LEN(512)+LEN(1024))
-where: LEN(X)=(X+64)/sizeof(u64) + sizeof(int)
-for RSA_SIGNITURE: IASRSA, the key length is thus 898 bytes.
+A public/private key contains a vendor string, an ID string and 4 key sets of 
+RSA keys - one for each of the supported encryption levels (128bits, 256 bits, 
+512bits and 1024bits). Each key set consists of an RSA key (<n, e>/<n, d>) and 
+a montgomry factor for performing montgomry modular multiplication and 
+exponentiation.
+The vendor string is unique per utility and is set at compilation time. The ID 
+string is used to identify the key amongst the given utilities different keys.
+Both vendor and ID strings appear rsa scrambled in the key. Each key
+(public/private) has the scrambling done by 128 bit encryption level key set of 
+the peer key (for speedy perccessing). 
 
 legend:
-- s: sigiture string
-- i: a 1 byte key descriptor followed by a 15 byte key identifier. In each key 
-     the string is scrambled by the peer key
+- v: a vendor string set at compilation time: in each key the string is 
+     scrambled by the peer key. the vendor string has an 'e' or 'd' preffix to 
+     indicate whether it is a public or private key (needed for master 
+     utilities). see Vendor String Format
+- i: an identifying string for the key set by the key generator at key 
+     generation time. in each key the string is scrambled by the peer key
+- n: product of two big primes p1 and p2
 - e: co prime with phi=(p1-1)*(p2-1)
 - d: multiplicative inverse of e mod phi
-- n: product of two big primes p1 and p2
 - f: montgomry factor for n at the appropriate encryption level: 
      2 ^ 2*(BIT_SZ_U1024 + 2) mod n
 
 public key:
 +---------+---------+-----------------------------+-----------------------------+-----------------------------+-----------------------------+
-| u1024_t i data/id |u1024_t e|u1024_t n|u1024_t f|u1024_t e|u1024_t n|u1024_t f|u1024_t e|u1024_t n|u1024_t f|u1024_t e|u1024_t n|u1024_t f|
-|      el: 128      |    encryption level: 128    |    encryption level: 256    |    encryption level: 512    |    encryption level: 1024   |
+|u1024_t v|u1024_t i|u1024_t n|u1024_t e|u1024_t f|u1024_t n|u1024_t e|u1024_t f|u1024_t n|u1024_t e|u1024_t f|u1024_t n|u1024_t e|u1024_t f|
+| el: 128 | el: 128 |    encryption level: 128    |    encryption level: 256    |    encryption level: 512    |    encryption level: 1024   |
 +---------+---------+-----------------------------+-----------------------------+-----------------------------+-----------------------------+
 
 private key:
 +---------+---------+-----------------------------+-----------------------------+-----------------------------+-----------------------------+
-| u1024_t i data/id |u1024_t d|u1024_t n|u1024_t f|u1024_t d|u1024_t n|u1024_t f|u1024_t d|u1024_t n|u1024_t f|u1024_t d|u1024_t n|u1024_t f|
-|      el: 128      |    encryption level: 128    |    encryption level: 256    |    encryption level: 512    |    encryption level: 1024   |
+|u1024_t v|u1024_t i|u1024_t n|u1024_t d|u1024_t f|u1024_t n|u1024_t d|u1024_t f|u1024_t n|u1024_t d|u1024_t f|u1024_t n|u1024_t d|u1024_t f|
+| el: 128 | el: 128 |    encryption level: 128    |    encryption level: 256    |    encryption level: 512    |    encryption level: 1024   |
 +---------+---------+-----------------------------+-----------------------------+-----------------------------+-----------------------------+
 
 Key Proccessing
 ---------------
-Using the -s or --scan options the user can scan the keys in the key directory 
-(see Key Directory) and get a listing of its available keys.
-The utility scans all files in the key directory. It accepts a file as a valid
-key if it start with the IASRSA signiture and is of the correct key length (as
-seen above). It then uses the 128 encryption level key set to unscramble the key
-data. The key is tested for being private or public and is either disregarded or
-has its ID displayed - depending on the utility doing the scanning.
-The key in use is pointed to by the symbolic link: public.key/private.key in
-the key directory. This key's ID iis highlighted during the key display.
+Using the -s or --scan (-s e/d or --scan e/d on the master version) options the 
+user can scan the keys in the scanned directory (see Key Directory) and get a 
+listing of its available keys.
+The utility scans all files in the key directory and uses the 128 encryption
+level key set to unscramble the vendor key. Encoders and Decrypters compare the
+unsrambled u1024_t with that set at compilation time. Matches will go on to be
+displayed and non maches are discarded. Masters will forgo the matching proccess
+but will only display keys who's vendor string preffixed with an 'e' when giving
+e as the scan option argument or those with a 'd' when giving d as the sacn
+option argument.
+If matched, the id u1024_t is unscrambled and displayed.
+The current key is pointed to by the symbolic link: public.key/private.key in
+the key directory. This key is marked (highlighted display) as the default key.
 
 Key Directory
 -------------
-Keys are searched for in one of the following locations in the given order:
-1. a path indicated by the RSA_PATH environmet variable - if it is set.
-2. otherwise, the current working directory
+Keys are searched on one of the following locations in the given order of
+importance:
+1. the user can state a path using the -p or --path options
+2. setting the RSA_PATH environmet to point at the key path
+3. the current working directory
+
+Vendor String Format
+--------------------
+The 128 encryption level u1024_t vendor string consists of 16 bytes:
+byte    0            1 - 14          15
+     +-----+------------------------+---+
+     | e/d | vendor specific string | 0 |
+     +-----+------------------------+---+
 
 ID String Format
 ----------------
 The 128 encryption level u1024_t ID string consists of 16 bytes:
-byte 0           1                     15
-     +-----------+----------------------+
-     |1 byte key |  ID specific string  |
-     |descriptor |                      |
-     +-----------+----------------------+
+byte              0 - 14             15
+     +------------------------------+---+
+     |      ID specific string      | 0 |
+     +------------------------------+---+
 
-Cipertext Format
+Cypertext Format
 ----------------
-The cipher text can be generated in one of two ways:
+The cypher text can be generated in one of two ways:
 1. full rsa
 In this mode, the text to be encrypted is read u1024_t at a time at the
 requested encryption level (using the -l or --enclev options with 
 128, 256, 512 or 1024(default) as arguments) encrypted by performing a modular
 exponentiation with the given key.
-A random number generator seed is chosen and used for the special cases of
-encrypting 0 and 1 mod n. In these cases, the top value of the u1024_t data type
-in which their encryption is stored will be set to -1. It is RSA encrypted at 
-the selected encrypting level and located fater the key data. The length of the 
-original file is 128bit encypted and placed after the encrypted seed. It is 
-important to know the original file length before decrypting as the last 
-u1024_t in the cipher text is most likely to be padded with zeros.
-full cipher text format:
-+-------------------------------------------------+-----------------+-------------------------------+ ... +-------------------------------+
-|u1024_t key data | u1024_t encrypted seed        | u1024_t length  |     u1024_t <encryption>      |     |     u1024_t <encryption>      |
-|     el: 128     | el: selected encryption level |     el: 128     | el: selected encryption level |     | el: selected encryption level |
-+-----------------+-------------------------------+-----------------+-------------------------------+ ... +-------------------------------+
-
 2. symmetric key
 A symmetric key is generated by a mersenne twister random number generator [5] 
 and is used to encrypt/decrypt the text. This key is generated by a randomly
-selected seed which is RSA encrypted and then inserted in the ciphertext.
+selected seed which is RSA encrypted and then inserted in the cyphertext.
 When decrypting, only the seed is RSA decrypted. It is then use to reproduce the
 random numbers with the same generator to reproduce the symmetric key.
-symmetric key cipher text format:
-+-------------------------------------------------+-------------------------------+ ... +-------------------------------+
-|u1024_t key data | u1024_t encrypted seed        |     u1024_t <encryption>      |     |     u1024_t <encryption>      |
-|     el: 128     | el: selected encryption level | el: selected encryption level |     | el: selected encryption level |
-+-----------------+-------------------------------+-------------------------------+ ... +-------------------------------+
 
-The ciphertext format contains enough information to:
+The cyphertext format contains enough information to:
 - verify that it was encrypted using the current key
 - decide which of the above encryption schemes were used
+
+The cyphertext format:
+
+rsa cyphertext:
++---------+-------------------------------+-------------------------------+ ... +-------------------------------+
+|u1024_t i|      u1024_t rsa-marker       |     u1024_t <encryption>      |     |     u1024_t <encryption>      |
+| el: 128 | el: selected encryption level | el: selected encryption level |     | el: selected encryption level |
++---------+-------------------------------+-------------------------------+ ... +-------------------------------+
+The rsa-marker marks whether the cyphertext is rsa encrypted or symmetric key 
+encrypted. If the cyphertext is rsa encrypted, the rsa-marker is a non valid 
+u1024_t: the top value is set to -1.
+
+symmetric key cyphertext:
++---------+-------------------------------+-------------------------------+ ... +-------------------------------+
+|u1024_t i|    u1024_t encrypted seed     |   u1024_arr_t <encryption>    |     |   u1024_arr_t <encryption>    |
+| el: 128 | el: selected encryption level | el: selected encryption level |     | el: selected encryption level |
++---------+-------------------------------+-------------------------------+ ... +-------------------------------+
+If the top value of the rsa-marker is not -1, then the cyphertext is symmetric
+key encrypted and the rsa-marker is the rsa encrypted seed of the random number
+generator. It must be decrypted using the 128 encrypted level key and then used 
+to seed the random number generator.
 
 LLD
 ===
@@ -121,14 +135,14 @@ When reading and writing the text, encrypted text and decrypted text we
 differentiate between the following different cases:
 - rsa encryption:
   reading text: read block_sz_u1024 u64's into a u1024_arr_t
-  writing ciphertext: write the u1024 resulting from the encryption
-  reading ciphertext: read u1024 blocks and decrypt them
+  writing cyphertext: write the u1024 resulting from the encryption
+  reading cyphertext: read u1024 blocks and decrypt them
   writing decrypted text: write block_sz_u1024 of u64's from the decrypted 
     u1024_arr_t
 - symmetric key encryption
   reading text: read block_sz_u1024+1 u64's into a u1024_arr_t
-  writing ciphertext: write block_sz_u1024+1 u64's from the u1024_arr_t
-  reading ciphertext: read block_sz_u1024+1 u64's from the u1024_arr_t
+  writing cyphertext: write block_sz_u1024+1 u64's from the u1024_arr_t
+  reading cyphertext: read block_sz_u1024+1 u64's from the u1024_arr_t
   writing decrypted text: write block_sz_u1024+1 u64's from the decrypted
     u1024_arr_t
 

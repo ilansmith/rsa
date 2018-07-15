@@ -5,258 +5,38 @@
 #include <string.h>
 #include <math.h>
 
-#ifdef TIME_FUNCTIONS
-#include <sys/time.h>
-#include <stdio.h>
-
-typedef enum {
-    FUNC_NUMBER_RESET,
-    FUNC_NUMBER_GET_SEG,
-    FUNC_IS_VALID_NUMBER_STR_SZ,
-    FUNC_NUMBER_INIT_STR,
-    FUNC_NUMBER_INIT_RANDOM,
-    FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT,
-    FUNC_NUMBER_SHIFT_LEFT_ONCE,
-    FUNC_NUMBER_SHIFT_LEFT,
-    FUNC_NUMBER_SHIFT_RIGHT_ONCE,
-    FUNC_NUMBER_SHIFT_RIGHT,
-    FUNC_NUMBER_ADD,
-    FUNC_NUMBER_DEC2BIN,
-    FUNC_NUMBER_SMALL_DEC2NUM,
-    FUNC_NUMBER_2COMPLEMENT,
-    FUNC_NUMBER_SUB,
-    FUNC_NUMBER_MUL,
-    FUNC_NUMBER_MODULAR_MULTIPLICATION_NAIVE,
-    FUNC_NUMBER_MODULAR_MULTIPLICATION_MONTGOMERY,
-    FUNC_NUMBER_COMPARE,
-    FUNC_NUMBER_ABSOLUTE_VALUE,
-    FUNC_NUMBER_IS_GREATER,
-    FUNC_NUMBER_IS_GREATER_OR_EQUAL,
-    FUNC_NUMBER_IS_EQUAL,
-    FUNC_NUMBER_DEV,
-    FUNC_NUMBER_MOD,
-    FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE,
-    FUNC_NUMBER_EXPONENTIATION,
-    FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE,
-    FUNC_NUMBER_RADIX,
-    FUNC_NUMBER_MONTGOMERY_PRODUCT,
-    FUNC_NUMBER_MODULAR_EXPONENTIATION_MONTGOMERY,
-    FUNC_NUMBER_IS_ODD,
-    FUNC_NUMBER_WITNESS_INIT,
-    FUNC_NUMBER_WITNESS,
-    FUNC_NUMBER_MILLER_RABIN,
-    FUNC_NUMBER_IS_PRIME,
-    FUNC_NUMBER_IS_PRIME1,
-    FUNC_NUMBER_IS_PRIME2,
-    FUNC_NUMBER_SMALL_PRIME_INIT,
-    FUNC_NUMBER_GENERATE_COPRIME,
-    FUNC_NUMBER_EXTENDED_EUCLID_GCD,
-    FUNC_NUMBER_EUCLID_GCD,
-    FUNC_NUMBER_INIT_RANDOM_COPRIME,
-    FUNC_NUMBER_MODULAR_MULTIPLICATIVE_INVERSE,
-    FUNC_NUMBER_FIND_PRIME,
-    FUNC_COUNT
-} func_cnt_t;
-
-typedef struct {
-    char *name;
-    int enabled;
-    struct timeval hook;
-    unsigned int hits;
-    double time;
-} func_t;
-
-typedef struct {
-    int init;
-    struct timeval start;
-    struct timeval stop;
-} number_timer_t;
-
-static func_t func_table[FUNC_COUNT] = {
-    [ FUNC_NUMBER_RESET ] = { "number_reset", ENABLED },
-    [ FUNC_NUMBER_GET_SEG ] = { "number_get_seg", DISSABLED },
-    [ FUNC_IS_VALID_NUMBER_STR_SZ ] = { "is_valid_number_str_sz", ENABLED },
-    [ FUNC_NUMBER_INIT_STR ] = { "number_init_str", ENABLED },
-    [ FUNC_NUMBER_INIT_RANDOM ] = { "number_init_random", ENABLED },
-    [ FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT ] = 
-	{ "number_find_most_significant_set_bit ", ENABLED },
-    [ FUNC_NUMBER_SHIFT_LEFT_ONCE ] = { "number_shift_left_once", ENABLED },
-    [ FUNC_NUMBER_SHIFT_LEFT ] = { "number_shift_left", DISSABLED },
-    [ FUNC_NUMBER_SHIFT_RIGHT_ONCE ] = { "number_shift_right_once", ENABLED },
-    [ FUNC_NUMBER_SHIFT_RIGHT ] = { "number_shift_right", DISSABLED },
-    [ FUNC_NUMBER_ADD ] = { "number_add", ENABLED },
-    [ FUNC_NUMBER_DEC2BIN ] = { "number_dec2bin", DISSABLED },
-    [ FUNC_NUMBER_SMALL_DEC2NUM ] = {"func_number_small_dec2num", ENABLED},
-    [ FUNC_NUMBER_2COMPLEMENT ] = { "number_2complement", ENABLED },
-    [ FUNC_NUMBER_SUB ] = { "number_sub", ENABLED },
-    [ FUNC_NUMBER_MUL ] = { "number_mul", ENABLED },
-    [ FUNC_NUMBER_MODULAR_MULTIPLICATION_NAIVE ] = 
-	{ "number_modular_multiplication_naive", ENABLED },
-    [ FUNC_NUMBER_MODULAR_MULTIPLICATION_MONTGOMERY ] = 
-	{ "number_modular_multiplication_montgomery", ENABLED },
-
-    [ FUNC_NUMBER_ABSOLUTE_VALUE ] = { "number_absolute_value", DISSABLED },
-    [ FUNC_NUMBER_COMPARE ] = { "number_compare", DISSABLED },
-    [ FUNC_NUMBER_IS_GREATER] = { "number_is_greater", ENABLED },
-    [ FUNC_NUMBER_IS_GREATER_OR_EQUAL ] = { "number_is_greater_or_equal", 
-	ENABLED },
-    [ FUNC_NUMBER_IS_EQUAL ] = { "number_is_equal", ENABLED },
-    [ FUNC_NUMBER_DEV ] = { "number_dev", DISSABLED },
-    [ FUNC_NUMBER_MOD ] = { "number_mod", ENABLED },
-    [ FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE ] = 
-	{ "number_init_random_strict_range",  ENABLED },
-    [ FUNC_NUMBER_EXPONENTIATION ] = {"number_exponentiation", ENABLED },
-    [ FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE ] = 
-	{ "number_modular_exponentiation_naive", ENABLED },
-    [ FUNC_NUMBER_RADIX ] = 
-	{ "number_radix", ENABLED },
-    [ FUNC_NUMBER_MONTGOMERY_PRODUCT] = 
-	{ "number_montgomery_product", DISSABLED },
-    [ FUNC_NUMBER_MODULAR_EXPONENTIATION_MONTGOMERY ] = 
-	{ "number_modular_exponentiation_montgomery", ENABLED },
-    [ FUNC_NUMBER_IS_ODD ] = { "number_is_odd", ENABLED },
-    [ FUNC_NUMBER_WITNESS_INIT ] = { "number_witness_init", ENABLED },
-    [ FUNC_NUMBER_WITNESS ] = { "number_witness", ENABLED },
-    [ FUNC_NUMBER_MILLER_RABIN ] = { "number_miller_rabin", ENABLED },
-    [ FUNC_NUMBER_IS_PRIME ] = { "number_is_prime", ENABLED },
-    [ FUNC_NUMBER_IS_PRIME1 ] = { "number_is_prime1", DISSABLED },
-    [ FUNC_NUMBER_IS_PRIME2 ] = { "number_is_prime2", DISSABLED },
-    [ FUNC_NUMBER_SMALL_PRIME_INIT ] = { "number_small_prime_init", ENABLED },
-    [ FUNC_NUMBER_GENERATE_COPRIME ] = {"number_generate_coprime", ENABLED },
-    [ FUNC_NUMBER_EXTENDED_EUCLID_GCD ] = { "number_extended_euclid_gcd", 
-	ENABLED },
-    [ FUNC_NUMBER_EUCLID_GCD ] = { "number_euclid_gcd", ENABLED },
-    [ FUNC_NUMBER_INIT_RANDOM_COPRIME ] = { "number_init_random_coprime", 
-	ENABLED },
-    [ FUNC_NUMBER_MODULAR_MULTIPLICATIVE_INVERSE ] = 
-	{ "number_modular_multiplicative_inverse", ENABLED },
-    [ FUNC_NUMBER_FIND_PRIME] = { "number_find_prime", 
-	ENABLED },
-};
-
-static number_timer_t timer;
-
-void functions_stat_reset(void)
-{
-    int i;
-
-    for (i = 0; i < FUNC_COUNT; i++)
-    {
-	if (!func_table[i].hits)
-	    continue;
-	func_table[i].hits = 0;
-	func_table[i].time = 0;
-    }
-
-    timer.init = 0;
-    timer.start.tv_sec = 0;
-    timer.start.tv_usec = 0;
-}
-
-static inline void timer_start(func_cnt_t func)
-{
-    if (!func_table[func].enabled)
-	return;
-
-    if (!timer.init)
-    {
-	timer.init = 1;
-	gettimeofday(&timer.start, NULL);
-    }
-    func_table[func].hook.tv_sec = 0;
-    func_table[func].hook.tv_usec = 0;
-    gettimeofday(&func_table[func].hook, NULL);
-}
-
-static inline void timer_stop(func_cnt_t func)
-{
-    if (!func_table[func].enabled)
-	return;
-    timer.stop.tv_sec = 0;
-    timer.stop.tv_usec = 0;
-    gettimeofday(&timer.stop, NULL);
-    func_table[func].time += ((double)(timer.stop.tv_sec - 
-	func_table[func].hook.tv_sec)) + ((double)(timer.stop.tv_usec - 
-	func_table[func].hook.tv_usec) / 1000000);
-    func_table[func].hits++;
-}
-
-void functions_stat(void)
-{
-    int i;
-    double total_time;
-
-    timer.stop.tv_sec = 0;
-    timer.stop.tv_usec = 0;
-    gettimeofday(&timer.stop, NULL);
-    total_time = (double)(timer.stop.tv_sec - timer.start.tv_sec) + 
-	((double)(timer.stop.tv_usec - timer.start.tv_usec) / 1000000);
-    printf("\ntotal time: %.3lg sec\n", total_time);
-	
-    for (i = 0; i < FUNC_COUNT; i++)
-    {
-	if (!func_table[i].name)
-	    continue;
-	printf("%s(): ", func_table[i].name);
-	if (!func_table[i].enabled)
-	{
-	    printf("not timed\n");
-	    continue;
-	}
-	printf("hits: %u", func_table[i].hits);
-	if (func_table[i].hits)
-	{
-	    printf(", func time: %.3lg, average cycle time: %.3lg, "
-	    "percentage: %.3lg", func_table[i].time, 
-	    func_table[i].hits ? func_table[i].time / func_table[i].hits : -1, 
-	    total_time ? (func_table[i].time / total_time) * 100 : -1);
-	}
-	printf("\n");
-    }
-    fflush(stdout);
-}
-
-#endif
-
 #define IS_DIGIT(n) ((n)>='0' && (n)<='9')
 #define CHAR_2_INT(c) ((int)((c) - '0'))
 #define COPRIME_PRIME(X) ((X).prime)
 #define COPRIME_DIVISOR(X) ((X).divisor)
-#define NUMBER_IS_NEGATIVE(X) (((u64)(~((u64)-1 >> 1)) & \
-    *((u64 *)(X) + (BYTES_SZ(u1024_t) / BYTES_SZ(u64) - 1))) ? 1 : 0)
 
-typedef void (* func_modular_multiplication_t) (u1024_t *num_res, 
+#define FIRST
+
+typedef int (* func_modular_multiplication_t) (u1024_t *num_res, 
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n);
 
-void number_reset(u1024_t *num)
+STATIC u1024_t num_montgomery_n, num_montgomery_factor;
+
+void INLINE number_reset(u1024_t *num)
 {
     u64 *seg = NULL;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_RESET);
-#endif
-
+    TIMER_START(FUNC_NUMBER_RESET);
     for (seg = (u64 *)num; 
 	seg < (u64 *)num + (BYTES_SZ(u1024_t) / BYTES_SZ(u64)); seg++)
     {
 	*seg = (u64)0;
     }
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_RESET);
-#endif
+    TIMER_STOP(FUNC_NUMBER_RESET);
 }
 
-STATIC void number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
+STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
     static u1024_t tmp_res;
-    static u64 *max_advance = NULL, cmask = ~((u64)-1 >> 1);
+    static u64 *max_advance = NULL, cmask = MSB_PT(u64);
     u64 *seg = NULL, *seg1 = NULL, *seg2 = NULL, carry = 0;
-    
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_ADD);
-#endif
 
+    TIMER_START(FUNC_NUMBER_ADD);
     if (!max_advance)
 	max_advance = (u64 *)&tmp_res + (BYTES_SZ(u1024_t) / BYTES_SZ(u64));
 
@@ -293,39 +73,24 @@ STATIC void number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 	    carry = (*seg & cmask) ? 0 : 1;
     }
     *res = tmp_res;
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_ADD);
-#endif
+    TIMER_STOP(FUNC_NUMBER_ADD);
 }
 
-#ifdef DEBUG
+#ifdef TESTS
 static u64 *number_get_seg(u1024_t *num, int seg)
 {
     u64 *ret;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_IS_VALID_NUMBER_STR_SZ);
-#endif
-
     if (!num)
 	return NULL;
 
-    ret = (u64 *)num + seg * BYTES_SZ(u64);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_IS_VALID_NUMBER_STR_SZ);
-#endif
+    ret = (u64 *)num + seg;
     return ret;
 }
 
 static int is_valid_number_str_sz(char *str)
 {
     int ret;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_IS_VALID_NUMBER_STR_SZ);
-#endif
 
     if (!strlen(str))
     {
@@ -350,9 +115,6 @@ static int is_valid_number_str_sz(char *str)
     ret = 1;
 
 Exit:
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_IS_VALID_NUMBER_STR_SZ);
-#endif
     return ret;
 
 }
@@ -360,18 +122,14 @@ Exit:
 int number_init_str(u1024_t *num, char *init_str)
 {
     char *ptr = NULL;
-    char *end = init_str + strlen(init_str) - 1;
+    char *end = init_str + strlen(init_str) - 1; /* LSB */
     u64 mask = 1;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_INIT_STR);
-#endif
 
     if (!is_valid_number_str_sz(init_str))
 	return -1;
 
     number_reset(num);
-    for (ptr = end; ptr >= init_str; ptr--)
+    for (ptr = end; ptr >= init_str; ptr--) /* LSB to MSB */
     {
 	u64 *seg = NULL;
 
@@ -384,12 +142,211 @@ int number_init_str(u1024_t *num, char *init_str)
 	mask = (u64)(mask << 1) ? (u64)(mask << 1) : 1;
     }
 
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_INIT_STR);
-#endif
     return 0;
 }
 
+
+#endif
+
+int INLINE number_init_random(u1024_t *num)
+{
+    int i, ret;
+    struct timeval tv;
+
+    TIMER_START(FUNC_NUMBER_INIT_RANDOM);
+    number_reset(num);
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    if (gettimeofday(&tv, NULL))
+    {
+	ret = -1;
+	goto Exit;
+    }
+    srandom((unsigned int)tv.tv_sec * (unsigned int)tv.tv_usec);
+    /* since the most significant BITS_SZ(u1024_t)/2 bits of the u1024_t are
+     * buffer bits, random numbers are initiated with at most
+     * (BITS_SZ(u1024_t)/2) / 2 bits
+     */
+    for (i = 0; i < ((BYTES_SZ(u1024_t) / 4) / BYTES_SZ(long)); i++)
+	*((long *)num + i) |= random();
+
+    ret = 0;
+
+Exit:
+    TIMER_STOP(FUNC_NUMBER_INIT_RANDOM);
+    return ret;
+}
+
+STATIC int INLINE number_find_most_significant_set_bit(u1024_t *num, 
+    u64 **major, u64 *minor)
+{
+    u64 *tmp_major = (u64 *)num + (BYTES_SZ(u1024_t) / BYTES_SZ(u64)) - 1;
+    u64 tmp_minor;
+    int minor_offset;
+
+    TIMER_START(FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT);
+    while (tmp_major >= (u64 *)num)
+    {
+	tmp_minor = MSB_PT(u64);
+	minor_offset = BITS_SZ(u64);
+
+	while (tmp_minor)
+	{
+	    if (!(*tmp_major & tmp_minor))
+	    {
+		tmp_minor = tmp_minor >> 1;
+		minor_offset--;
+		continue;
+	    }
+	    goto Exit;
+	}
+	tmp_major--;
+    }
+    tmp_major++; /* while loop terminates when tmp_major == (u64 *)num - 1 */
+
+Exit:
+    *minor = tmp_minor;
+    *major = tmp_major;
+
+    TIMER_STOP(FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT);
+    return minor_offset;
+}
+
+static void INLINE number_shift_left_once(u1024_t *num)
+{
+    u64 mask_msb = MSB_PT(u64);
+    u64 mask_lsb = ~1;
+    u64 *seg = (u64 *)num + (BYTES_SZ(u1024_t) / BYTES_SZ(u64)) - 1;
+
+    TIMER_START(FUNC_NUMBER_SHIFT_LEFT_ONCE);
+    *seg = *seg << 1;
+    *seg = *seg & mask_lsb;
+    seg--;
+    while (seg >= (u64 *)num)
+    {
+	*(seg + 1) += *seg & mask_msb ? 1 : 0;
+	*seg = *seg << 1;
+	*seg = *seg & mask_lsb;
+	seg--;
+    }
+    TIMER_STOP(FUNC_NUMBER_SHIFT_LEFT_ONCE);
+}
+
+#ifdef TESTS
+STATIC void number_shift_left(u1024_t *num, int n)
+{
+    int i;
+
+    TIMER_START(FUNC_NUMBER_SHIFT_LEFT);
+    for (i = 0; i < n; i++)
+	number_shift_left_once(num);
+    TIMER_STOP(FUNC_NUMBER_SHIFT_LEFT);
+}
+#endif
+
+static void INLINE number_shift_right_once(u1024_t *num)
+{
+    u64 mask_msb = MSB_PT(u64);
+    u64 mask_lsb = 1;
+    u64 *seg = (u64 *)num + (BYTES_SZ(u1024_t) / BYTES_SZ(u64)) - 1;
+    int next_overflow, prev_overflow = 0;
+
+    TIMER_START(FUNC_NUMBER_SHIFT_RIGHT_ONCE);
+    while (seg >= (u64 *)num)
+    {
+	next_overflow = (int)(*seg & mask_lsb);
+	*seg = *seg >> 1;
+	if (prev_overflow)
+	    *seg = *seg | mask_msb;
+	prev_overflow = next_overflow;
+	seg--;
+    }
+    TIMER_STOP(FUNC_NUMBER_SHIFT_RIGHT_ONCE);
+}
+
+#ifdef TESTS
+STATIC void number_shift_right(u1024_t *num, int n)
+{
+    int i;
+
+    TIMER_START(FUNC_NUMBER_SHIFT_RIGHT);
+    for (i = 0; i < n; i++)
+	number_shift_right_once(num);
+    TIMER_STOP(FUNC_NUMBER_SHIFT_RIGHT);
+}
+#endif
+
+STATIC void INLINE number_small_dec2num(u1024_t *num_n, u64 dec)
+{
+    u64 zero = (u64)0;
+    u64 *ptr = &zero;
+
+    TIMER_START(FUNC_NUMBER_SMALL_DEC2NUM);
+    number_reset(num_n);
+    *(u64 *)num_n = (u64)(*ptr | dec);
+    TIMER_STOP(FUNC_NUMBER_SMALL_DEC2NUM);
+}
+
+STATIC void INLINE number_2complement(u1024_t *res, u1024_t *num)
+{
+    u1024_t tmp = *num, num_1;
+    u64 *seg = NULL;
+
+    TIMER_START(FUNC_NUMBER_2COMPLEMENT);
+    number_small_dec2num(&num_1, (u64)1);
+    for (seg = (u64 *)&tmp; 
+	seg - (u64 *)&tmp < (BYTES_SZ(u1024_t) / BYTES_SZ(u64)); seg++)
+    {
+	*seg = ~*seg; /* one's complement */
+    }
+
+    number_add(res, &tmp, &num_1); /* two's complement */
+    TIMER_STOP(FUNC_NUMBER_2COMPLEMENT);
+}
+
+STATIC void INLINE number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2)
+{
+    u1024_t num2_2complement;
+
+    TIMER_START(FUNC_NUMBER_SUB);
+    number_2complement(&num2_2complement, num2);
+    number_add(res, num1, &num2_2complement);
+    TIMER_STOP(FUNC_NUMBER_SUB);
+}
+
+void number_sub1(u1024_t *num)
+{
+    u1024_t num_1;
+
+    number_small_dec2num(&num_1, (u64)1);
+    number_sub(num, num, &num_1);
+}
+
+void INLINE number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
+{
+    int i;
+    u1024_t tmp_res, multiplicand = *num1, multiplier = *num2;
+
+    TIMER_START(FUNC_NUMBER_MUL);
+    number_reset(&tmp_res);
+    for (i = 0; i < BYTES_SZ(u1024_t) / BYTES_SZ(u64); i++)
+    {
+	u64 mask = 1;
+	int j;
+
+	for (j = 0; j < BITS_SZ(u64); j++)
+	{
+	    if ((*((u64 *)(&multiplier) + i)) & mask)
+		number_add(&tmp_res, &tmp_res, &multiplicand);
+	    number_shift_left_once(&multiplicand);
+	    mask = mask << 1;
+	}
+    }
+    *res = tmp_res;
+    TIMER_STOP(FUNC_NUMBER_MUL);
+}
+
+#ifdef TESTS
 int number_dec2bin(u1024_t *num_bin, char *str_dec)
 {
     int ret;
@@ -408,10 +365,6 @@ int number_dec2bin(u1024_t *num_bin, char *str_dec)
 	"1001", /* 9 */
     };
     
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_DEC2BIN);
-#endif
-
     if (!num_bin || !str_dec)
     {
 	ret = -1;
@@ -449,271 +402,15 @@ int number_dec2bin(u1024_t *num_bin, char *str_dec)
     ret = 0;
 
 Exit:
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_DEC2BIN);
-#endif
     return ret;
 }
 #endif
 
-int number_init_random(u1024_t *num)
-{
-    int i, ret;
-    struct timeval tv;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_INIT_RANDOM);
-#endif
-
-    number_reset(num);
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
-    if (gettimeofday(&tv, NULL))
-    {
-	ret = -1;
-	goto Exit;
-    }
-    srandom((unsigned int)tv.tv_sec * (unsigned int)tv.tv_usec);
-    /* random numbers are initiated with at most BITS_SZ(u1024_t) / 2 bits */
-    for (i = 0; i < ((BYTES_SZ(u1024_t) / 2) / BYTES_SZ(long)); i++)
-	*((long *)num + i) |= random();
-
-    ret = 0;
-Exit:
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_INIT_RANDOM);
-#endif
-    return ret;
-}
-
-STATIC int number_find_most_significant_set_bit(u1024_t *num, u64 **major, 
-    u64 *minor)
-{
-    u64 *tmp_major = (u64 *)num + (BYTES_SZ(u1024_t) / BYTES_SZ(u64)) - 1;
-    u64 tmp_minor;
-    int minor_offset;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT);
-#endif
-
-    while (tmp_major >= (u64 *)num)
-    {
-	tmp_minor = ~((u64)-1 >> 1);
-	minor_offset = BITS_SZ(u64);
-
-	while (tmp_minor)
-	{
-	    if (!(*tmp_major & tmp_minor))
-	    {
-		tmp_minor = tmp_minor >> 1;
-		minor_offset--;
-		continue;
-	    }
-	    goto Exit;
-	}
-	tmp_major--;
-    }
-    tmp_major++; /* while loop terminates when tmp_major == (u64 *)num - 1 */
-
-Exit:
-    *minor = tmp_minor;
-    *major = tmp_major;
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT);
-#endif
-    return minor_offset;
-}
-
-static void number_shift_left_once(u1024_t *num)
-{
-    u64 mask_msb = ~((u64)-1 >> 1);
-    u64 mask_lsb = ~1;
-    u64 *seg = (u64 *)num + (BYTES_SZ(u1024_t) / BYTES_SZ(u64)) - 1;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_SHIFT_LEFT_ONCE);
-#endif
-
-    *seg = *seg << 1;
-    *seg = *seg & mask_lsb;
-    seg--;
-    while (seg >= (u64 *)num)
-    {
-	*(seg + 1) += *seg & mask_msb ? 1 : 0;
-	*seg = *seg << 1;
-	*seg = *seg & mask_lsb;
-	seg--;
-    }
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_SHIFT_LEFT_ONCE);
-#endif
-}
-
-#ifdef DEBUG
-STATIC void number_shift_left(u1024_t *num, int n)
-{
-    int i;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_SHIFT_LEFT);
-#endif
-
-    for (i = 0; i < n; i++)
-	number_shift_left_once(num);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_SHIFT_LEFT);
-#endif
-}
-#endif
-
-static void number_shift_right_once(u1024_t *num)
-{
-    u64 mask_msb = ~((u64)-1 >> 1);
-    u64 mask_lsb = 1;
-    u64 *seg = (u64 *)num + (BYTES_SZ(u1024_t) / BYTES_SZ(u64)) - 1;
-    int next_overflow, prev_overflow = 0;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_SHIFT_RIGHT_ONCE);
-#endif
-
-    while (seg >= (u64 *)num)
-    {
-	next_overflow = (int)(*seg & mask_lsb);
-	*seg = *seg >> 1;
-	if (prev_overflow)
-	    *seg = *seg | mask_msb;
-	prev_overflow = next_overflow;
-	seg--;
-    }
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_SHIFT_RIGHT_ONCE);
-#endif
-}
-
-#ifdef DEBUG
-STATIC void number_shift_right(u1024_t *num, int n)
-{
-    int i;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_SHIFT_RIGHT);
-#endif
-
-    for (i = 0; i < n; i++)
-	number_shift_right_once(num);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_SHIFT_RIGHT);
-#endif
-}
-#endif
-
-STATIC void number_small_dec2num(u1024_t *num_n, u64 dec)
-{
-    u64 zero = (u64)0;
-    u64 *ptr = &zero;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_SMALL_DEC2NUM);
-#endif
-    number_reset(num_n);
-    *(u64 *)num_n = (u64)(*ptr | dec);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_SMALL_DEC2NUM);
-#endif
-}
-
-STATIC void number_2complement(u1024_t *res, u1024_t *num)
-{
-    u1024_t tmp = *num, num_1;
-    u64 *seg = NULL;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_2COMPLEMENT);
-#endif
-
-    number_small_dec2num(&num_1, (u64)1);
-    for (seg = (u64 *)&tmp; 
-	seg - (u64 *)&tmp < (BYTES_SZ(u1024_t) / BYTES_SZ(u64)); seg++)
-    {
-	*seg = ~*seg; /* one's complement */
-    }
-
-    number_add(res, &tmp, &num_1); /* two's complement */
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_2COMPLEMENT);
-#endif
-}
-
-STATIC void number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2)
-{
-    u1024_t num2_2complement;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_SUB);
-#endif
-
-    number_2complement(&num2_2complement, num2);
-    number_add(res, num1, &num2_2complement);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_SUB);
-#endif
-}
-
-void number_sub1(u1024_t *num)
-{
-    u1024_t num_1;
-
-    number_small_dec2num(&num_1, (u64)1);
-    number_sub(num, num, &num_1);
-}
-
-void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
-{
-    int i;
-    u1024_t tmp_res, multiplicand = *num1, multiplier = *num2;
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_MUL);
-#endif
-
-    number_reset(&tmp_res);
-    for (i = 0; i < BYTES_SZ(u1024_t) / BYTES_SZ(u64); i++)
-    {
-	u64 mask = 1;
-	int j;
-
-	for (j = 0; j < BITS_SZ(u64); j++)
-	{
-	    if ((*((u64 *)(&multiplier) + i)) & mask)
-		number_add(&tmp_res, &tmp_res, &multiplicand);
-	    number_shift_left_once(&multiplicand);
-	    mask = mask << 1;
-	}
-    }
-    *res = tmp_res;
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_MUL);
-#endif
-}
-
-STATIC void number_absolute_value(u1024_t *abs, u1024_t *num)
+STATIC void INLINE number_absolute_value(u1024_t *abs, u1024_t *num)
 {
     *abs = *num;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_ABSOLUTE_VALUE);
-#endif
-
+    TIMER_START(FUNC_NUMBER_ABSOLUTE_VALUE);
     if (NUMBER_IS_NEGATIVE(num))
     {
 	u1024_t num_1;
@@ -727,25 +424,19 @@ STATIC void number_absolute_value(u1024_t *abs, u1024_t *num)
 	    seg--;
 	}
     }
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_ABSOLUTE_VALUE);
-#endif
+    TIMER_STOP(FUNC_NUMBER_ABSOLUTE_VALUE);
 }
 
-static int number_compare(u1024_t *num1, u1024_t *num2, int ret_on_equal)
+static int INLINE number_compare(u1024_t *num1, u1024_t *num2, int ret_on_equal)
 {
     int ret;
     u64 *seg1 = (u64 *)num1 + (BYTES_SZ(u1024_t) / BYTES_SZ(u64)) - 1;
     u64 *seg2 = (u64 *)num2 + (BYTES_SZ(u1024_t) / BYTES_SZ(u64)) - 1;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_COMPARE);
-#endif
-
+    TIMER_START(FUNC_NUMBER_COMPARE);
     while (seg1 >= (u64 *)num1)
     {
-	u64 mask = ~((u64)-1 >> 1);
+	u64 mask = MSB_PT(u64);
 
 	while (mask)
 	{
@@ -763,21 +454,16 @@ static int number_compare(u1024_t *num1, u1024_t *num2, int ret_on_equal)
     ret = ret_on_equal; /* *num1 == *num2 */
 
 Exit:
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_COMPARE);
-#endif
+    TIMER_STOP(FUNC_NUMBER_COMPARE);
     return ret;
 }
 
-STATIC int number_is_equal(u1024_t *a, u1024_t *b)
+STATIC int INLINE number_is_equal(u1024_t *a, u1024_t *b)
 {
     u64 *seg_a = (u64 *)a, *seg_b = (u64 *)b;
     int i, ret;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_IS_EQUAL);
-#endif
-
+    TIMER_START(FUNC_NUMBER_IS_EQUAL);
     for (i = 0; i < BYTES_SZ(u1024_t) / BYTES_SZ(u64); i++)
     {
 	if (*(seg_a + i) != *(seg_b + i))
@@ -789,44 +475,33 @@ STATIC int number_is_equal(u1024_t *a, u1024_t *b)
     ret = 1;
 
 Exit:
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_IS_EQUAL);
-#endif
+    TIMER_STOP(FUNC_NUMBER_IS_EQUAL);
     return ret;
 }
 
-STATIC int number_is_greater(u1024_t *num1, u1024_t *num2)
+STATIC int INLINE number_is_greater(u1024_t *num1, u1024_t *num2)
 {
     int ret;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_IS_GREATER);
-#endif
+    TIMER_START(FUNC_NUMBER_IS_GREATER);
     ret = number_compare(num1, num2, 0);
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_IS_GREATER);
-#endif
-
+    TIMER_STOP(FUNC_NUMBER_IS_GREATER);
     return ret;
 }
 
-static int number_is_greater_or_equal(u1024_t *num1, u1024_t *num2)
+/* return: num1 >= num2 */
+static int INLINE number_is_greater_or_equal(u1024_t *num1, u1024_t *num2)
 {
     int ret;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_IS_GREATER_OR_EQUAL);
-#endif
+    TIMER_START(FUNC_NUMBER_IS_GREATER_OR_EQUAL);
     ret = number_compare(num1, num2, 1);
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_IS_GREATER_OR_EQUAL);
-#endif
-    
+    TIMER_STOP(FUNC_NUMBER_IS_GREATER_OR_EQUAL);
     return ret;
 }
 
-STATIC void number_dev(u1024_t *num_q, u1024_t *num_r, u1024_t *num_dividend, 
-    u1024_t *num_divisor)
+STATIC void INLINE number_dev(u1024_t *num_q, u1024_t *num_r, 
+    u1024_t *num_dividend, u1024_t *num_divisor)
 {
     u1024_t dividend = *num_dividend, divisor = *num_divisor, quotient, 
 	remainder;
@@ -834,15 +509,12 @@ STATIC void number_dev(u1024_t *num_q, u1024_t *num_r, u1024_t *num_dividend,
 	- 1;
     u64 *remainder_ptr = (u64 *)&remainder, *quotient_ptr = (u64 *)&quotient;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_DEV);
-#endif
-
+    TIMER_START(FUNC_NUMBER_DEV);
     number_reset(&remainder);
     number_reset(&quotient);
     while (seg_dividend >= (u64 *)&dividend)
     {
-	u64 mask_dividend = ~((u64)-1 >> 1);
+	u64 mask_dividend = MSB_PT(u64);
 
 	while (mask_dividend)
 	{
@@ -861,53 +533,37 @@ STATIC void number_dev(u1024_t *num_q, u1024_t *num_r, u1024_t *num_dividend,
     }
     *num_q = quotient;
     *num_r = remainder;
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_DEV);
-#endif
+    TIMER_STOP(FUNC_NUMBER_DEV);
 }
 
-STATIC void number_mod(u1024_t *r, u1024_t *a, u1024_t *n)
+STATIC void INLINE number_mod(u1024_t *r, u1024_t *a, u1024_t *n)
 {
     u1024_t q;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_MOD);
-#endif
-
+    TIMER_START(FUNC_NUMBER_MOD);
     number_dev(&q, r, a, n);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_MOD);
-#endif
+    TIMER_STOP(FUNC_NUMBER_MOD);
 }
 
-STATIC void number_modular_multiplication_naive(u1024_t *num_res, 
+STATIC int INLINE number_modular_multiplication_naive(u1024_t *num_res, 
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n)
 {
     u1024_t tmp;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_MODULAR_MULTIPLICATION_NAIVE);
-#endif
-
+    TIMER_START(FUNC_NUMBER_MODULAR_MULTIPLICATION_NAIVE);
     number_mul(&tmp, num_a, num_b);
     number_mod(num_res, &tmp, num_n);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_MODULAR_MULTIPLICATION_NAIVE);
-#endif
+    TIMER_STOP(FUNC_NUMBER_MODULAR_MULTIPLICATION_NAIVE);
+    return 0;
 }
 
 /* assigns num_n: 0 < num_n < range */
-static void number_init_random_strict_range(u1024_t *num_n, u1024_t *range)
+static void INLINE number_init_random_strict_range(u1024_t *num_n, 
+    u1024_t *range)
 {
     u1024_t num_tmp, num_range_min1, num_1;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE);
-#endif
-
+    TIMER_START(FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE);
     number_small_dec2num(&num_1, (u64)1);
     number_sub(&num_range_min1, range, &num_1);
     number_init_random(&num_tmp);
@@ -915,21 +571,15 @@ static void number_init_random_strict_range(u1024_t *num_n, u1024_t *range)
     number_add(&num_tmp, &num_tmp, &num_1);
 
     *num_n = num_tmp;
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE);
-#endif
+    TIMER_STOP(FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE);
 }
 
-STATIC void number_exponentiation(u1024_t *res, u1024_t *num_base, 
+STATIC void INLINE number_exponentiation(u1024_t *res, u1024_t *num_base, 
     u1024_t *num_exp)
 {
     u1024_t num_cnt, num_1, num_tmp;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_EXPONENTIATION);
-#endif
-
+    TIMER_START(FUNC_NUMBER_EXPONENTIATION);
     number_small_dec2num(&num_1, (u64)1);
     number_small_dec2num(&num_cnt, (u64)0);
     number_small_dec2num(&num_tmp, (u64)1);
@@ -941,19 +591,16 @@ STATIC void number_exponentiation(u1024_t *res, u1024_t *num_base,
     }
 
     *res = num_tmp;
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_EXPONENTIATION);
-#endif
+    TIMER_STOP(FUNC_NUMBER_EXPONENTIATION);
 }
 
-STATIC void number_modular_exponentiation(u1024_t *res, u1024_t *a, u1024_t *b, 
-    u1024_t *n, func_modular_multiplication_t modular_multiplication)
+STATIC int INLINE number_modular_exponentiation(u1024_t *res, u1024_t *a, 
+    u1024_t *b, u1024_t *n, 
+    func_modular_multiplication_t modular_multiplication)
 {
-    u1024_t c, d, num_1;
+    u1024_t d, num_1;
     u64 *seg = NULL, mask;
 
-    number_small_dec2num(&c, (u64)0);
     number_small_dec2num(&d, (u64)1);
     number_small_dec2num(&num_1, (u64)1);
     number_find_most_significant_set_bit(b, &seg, &mask);
@@ -961,23 +608,24 @@ STATIC void number_modular_exponentiation(u1024_t *res, u1024_t *a, u1024_t *b,
     {
 	while (mask)
 	{
-	    number_shift_left_once(&c);
-	    modular_multiplication(&d, &d, &d, n);
-
+	    if (modular_multiplication(&d, &d, &d, n))
+		return -1;
 	    if (*seg & mask)
 	    {
-		number_add(&c, &c, &num_1);
-		modular_multiplication(&d, &d, a, n);
+		if (modular_multiplication(&d, &d, a, n))
+		    return -1;
 	    }
+
 	    mask = mask >> 1;
 	}
-	mask = ~((u64)-1 >> 1);
+	mask = MSB_PT(u64);
 	seg--;
     }
     *res = d;
+    return 0;
 }
 
-static int number_gcd_is_1(u1024_t *num_a, u1024_t *num_b)
+static int INLINE number_gcd_is_1(u1024_t *num_a, u1024_t *num_b)
 {
     /* algorithm
      * ---------
@@ -1004,83 +652,136 @@ static int number_gcd_is_1(u1024_t *num_a, u1024_t *num_b)
 STATIC inline int number_is_odd(u1024_t *num)
 {
     int ret;
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_IS_ODD);
-#endif
 
+    TIMER_START(FUNC_NUMBER_IS_ODD);
     ret = *(u64 *)num & (u64)1;
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_IS_ODD);
-#endif
+    TIMER_STOP(FUNC_NUMBER_IS_ODD);
     return ret;
 }
 
-STATIC void number_modular_exponentiation_naive(u1024_t *res, u1024_t *a, 
+STATIC int INLINE number_modular_exponentiation_naive(u1024_t *res, u1024_t *a, 
     u1024_t *b, u1024_t *n)
 {
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE);
-#endif
-
-    number_modular_exponentiation(res, a, b, n, 
-	number_modular_multiplication_naive);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE);
-#endif
-}
-
-int number_radix(u1024_t *num_radix, u1024_t *num_n)
-{
-/* k = (log2(*num_n) + 1) + 2 */
-#define TWO_K ((u64)(2 * (BITS_SZ(u1024_t) + 2)))
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_RADIX);
-#endif
-
-    u1024_t num_exp;
-    u64 i = 0;
     int ret;
 
+    TIMER_START(FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE);
+    ret = number_modular_exponentiation(res, a, b, n, 
+	number_modular_multiplication_naive);
+    TIMER_STOP(FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE);
+    return ret;
+}
+
+/* num_radix = pow(2, 2*(BITS_SZ(u1024_t) + 2) % num_n) 
+ * returns: gcd(num_radix, num_n) == 1
+ *
+ * the algorithm:
+ * - let i be such that 2^i be the smallest power of 2 >=n
+ * - let num_exp and r be such that num_exp*i + r == two_k where r < i
+ * then
+ * - pow(2, two_k) == pow(2, num_exp*i + r) == pow(2, num_exp*i) * pow(2, r)
+ * - pow(2, num_exp*i) * pow(2, r) % n == 
+ * */
+int INLINE number_radix(u1024_t *num_radix, u1024_t *num_n)
+{
+    TIMER_START(FUNC_NUMBER_RADIX);
+
+/* k is the length of the memory buffer + 2 */
+#define TWO_K (u64)(2 * (BITS_SZ(u1024_t) + 2))
+
+    u1024_t exp, pow, acm, num_0, num_1;
+    int ret;
+
+    number_small_dec2num(&num_0, (u64)0);
+    number_small_dec2num(&num_1, (u64)1);
+    number_small_dec2num(&acm, (u64)1);
+    number_small_dec2num(&exp, (u64)2);
+    number_small_dec2num(&pow, TWO_K);
+
+    while (number_is_greater(&exp, &num_1) && !number_is_equal(&pow, &num_0))
+    {
+	while (!number_is_greater_or_equal(&exp, num_n))
+	{
+	    if (number_is_odd(&pow))
+	    {
+		number_mul(&acm, &acm, &exp);
+		if (number_is_greater_or_equal(&acm, num_n))
+		    number_mod(&acm, &acm, num_n);
+		number_sub(&pow, &pow, &num_1);
+		break;
+	    }
+
+	    number_shift_right_once(&pow);
+	    number_mul(&exp, &exp, &exp);
+	}
+
+	number_mod(&exp, &exp, num_n);
+    }
+
+    number_mod(&acm, &acm, num_n);
+    *num_radix = acm;
+    ret = number_is_equal(&exp, &num_0) ? 0 :
+	number_gcd_is_1(num_radix, num_n) - 1;
+
+    TIMER_STOP(FUNC_NUMBER_RADIX);
+    return ret;
+}
+
+#if 0
+/* num_radix = pow(2, 2*(BITS_SZ(u1024_t) + 2) % num_n) 
+ * returns: gcd(num_radix, num_n) == 1
+ *
+ * the algorithm:
+ * - let i be such that 2^i be the smallest power of 2 >=n
+ * - let num_exp and r be such that num_exp*i + r == two_k where r < i
+ * then
+ * - pow(2, two_k) == pow(2, num_exp*i + r) == pow(2, num_exp*i) * pow(2, r)
+ * - pow(2, num_exp*i) * pow(2, r) % n == 
+ * */
+int number_radix(u1024_t *num_radix, u1024_t *num_n)
+{
+    /* k is the length of the memory buffer + 2 */
+    u64 two_k = ((u64)(2 * (BITS_SZ(u1024_t) + 2)));
+    u1024_t num_exp;
+    u64 i = 0, r;
+    int ret;
+
+    TIMER_START(FUNC_NUMBER_RADIX);
+    /* num_radix = first power of 2 which is >= num_n 
+     * i = log2(*num_radix) */
     number_small_dec2num(num_radix, (u64)1);
     while (!number_is_greater_or_equal(num_radix, num_n))
     {
 	number_shift_left_once(num_radix);
 	i++;
     }
-    number_small_dec2num(&num_exp, (u64)((u64)TWO_K / i));
-    i = (u64)((u64)TWO_K % i);
+    number_small_dec2num(&num_exp, (u64)((u64)two_k / i));
+    r = (u64)((u64)two_k % i);
+    /* num_radix = num_radix % num_n */
     number_sub(num_radix, num_radix, num_n);
+    /* ilan: bug */
     number_modular_exponentiation_naive(num_radix, num_radix, &num_exp, num_n);
-    while (i)
+    while (r)
     {
 	number_shift_left_once(num_radix);
-	i--;
+	if (number_is_greater_or_equal(num_radix, num_n))
+	    number_mod(num_radix, num_radix, num_n);
+	r--;
     }
-    number_mod(num_radix, num_radix, num_n);
     ret = number_gcd_is_1(num_radix, num_n) - 1;
 
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_RADIX);
-#endif
-
+    TIMER_START(FUNC_NUMBER_RADIX);
     return ret;
 }
+#endif
 
-static void number_montgomery_product(u1024_t *num_res, u1024_t *num_a, 
+static void INLINE number_montgomery_product(u1024_t *num_res, u1024_t *num_a, 
     u1024_t *num_b, u1024_t *num_n)
 {
     u1024_t multiplier = *num_a, num_acc;
     u64 *seg = NULL;
     int i;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_MONTGOMERY_PRODUCT);
-#endif
-
+    TIMER_START(FUNC_NUMBER_MONTGOMERY_PRODUCT);
     number_small_dec2num(&num_acc, (u64)0);
     number_shift_left_once(&multiplier);
     for (seg = (u64 *)num_b; 
@@ -1107,63 +808,66 @@ static void number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
     }
 
     *num_res = num_acc;
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_MONTGOMERY_PRODUCT);
-#endif
+    TIMER_STOP(FUNC_NUMBER_MONTGOMERY_PRODUCT);
 }
 
-STATIC void number_modular_multiplication_montgomery(u1024_t *num_res, 
+int INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
+{
+    /* XXX timers... */
+    if (number_is_equal(&num_montgomery_n, num_n))
+	return 0;
+    num_montgomery_n = *num_n;
+    if (num_factor)
+    {
+	num_montgomery_factor = *num_factor;
+	return 0;
+    }
+    else
+	return number_radix(&num_montgomery_factor, num_n);
+}
+
+STATIC int INLINE number_modular_multiplication_montgomery(u1024_t *num_res, 
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n)
 {
-    static u1024_t num_converter, num_current_n;
+    int ret;
     u1024_t a_nresidue, b_nresidue, num_1;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_MODULAR_MULTIPLICATION_MONTGOMERY);
-#endif
-
-    if (!number_is_equal(&num_current_n, num_n))
+    TIMER_START(FUNC_NUMBER_MODULAR_MULTIPLICATION_MONTGOMERY);
+    if (number_montgomery_factor_set(num_n, NULL))
     {
-	num_current_n = *num_n;
-	number_radix(&num_converter, num_n);
+	ret = -1;
+	goto Exit;
     }
 
     number_small_dec2num(&num_1, (u64)1);
-    number_montgomery_product(&a_nresidue, num_a, &num_converter, num_n);
-    number_montgomery_product(&b_nresidue, num_b, &num_converter, num_n);
+    number_montgomery_product(&a_nresidue, num_a, &num_montgomery_factor,
+	num_n);
+    number_montgomery_product(&b_nresidue, num_b, &num_montgomery_factor, 
+	num_n);
     number_montgomery_product(num_res, &a_nresidue, &b_nresidue, num_n);
     number_montgomery_product(num_res, &num_1, num_res, num_n);
+    ret = 0;
 
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_MODULAR_MULTIPLICATION_MONTGOMERY);
-#endif
+Exit:
+    TIMER_STOP(FUNC_NUMBER_MODULAR_MULTIPLICATION_MONTGOMERY);
+    return ret;
 }
 
-void number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a, 
+int INLINE number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a, 
     u1024_t *b, u1024_t *n)
 {
-
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_MODULAR_EXPONENTIATION_MONTGOMERY);
-#endif
-
-    number_modular_exponentiation(res, a, b, n, 
+    TIMER_START(FUNC_NUMBER_MODULAR_EXPONENTIATION_MONTGOMERY);
+    return number_modular_exponentiation(res, a, b, n, 
 	number_modular_multiplication_montgomery);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_MODULAR_EXPONENTIATION_MONTGOMERY);
-#endif
+    TIMER_STOP(FUNC_NUMBER_MODULAR_EXPONENTIATION_MONTGOMERY);
 }
 
-static void number_witness_init(u1024_t *num_n_min1, u1024_t *num_u, int *t)
+static void INLINE number_witness_init(u1024_t *num_n_min1, u1024_t *num_u, 
+    int *t)
 {
     u1024_t tmp = *num_n_min1;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_WITNESS_INIT);
-#endif
-
+    TIMER_START(FUNC_NUMBER_WITNESS_INIT);
     *t = 0;
     while (!number_is_odd(&tmp))
     {
@@ -1172,37 +876,41 @@ static void number_witness_init(u1024_t *num_n_min1, u1024_t *num_u, int *t)
     }
 
     *num_u = tmp;
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_WITNESS_INIT);
-#endif
+    TIMER_STOP(FUNC_NUMBER_WITNESS_INIT);
 }
 
 /* If number_witness(num_a, num_n) is true, then num_n is composit */
-STATIC int number_witness(u1024_t *num_a, u1024_t *num_n)
+STATIC int INLINE number_witness(u1024_t *num_a, u1024_t *num_n)
 {
     u1024_t num_1, num_2, num_u, num_x_prev, num_x_curr, num_n_min1;
     int i, t, ret;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_WITNESS);
-#endif
-    number_small_dec2num(&num_1, (u64)1);
-    number_small_dec2num(&num_2, (u64)2);
+    TIMER_START(FUNC_NUMBER_WITNESS);
     if (!number_is_odd(num_n))
     {
 	ret = 1;
 	goto Exit;
     }
 
+    number_small_dec2num(&num_1, (u64)1);
+    number_small_dec2num(&num_2, (u64)2);
     number_sub(&num_n_min1, num_n, &num_1);
     number_witness_init(&num_n_min1, &num_u, &t);
-    number_modular_exponentiation_montgomery(&num_x_prev, num_a, &num_u, num_n);
+    if (number_modular_exponentiation_montgomery(&num_x_prev, num_a, &num_u, 
+	num_n))
+    {
+	ret = 1;
+	goto Exit;
+    }
 
     for (i = 0; i < t; i++)
     {
-	number_modular_multiplication_montgomery(&num_x_curr, &num_x_prev, 
-	    &num_x_prev, num_n);
+	if (number_modular_multiplication_montgomery(&num_x_curr, &num_x_prev, 
+	    &num_x_prev, num_n))
+	{
+	    ret = 1;
+	    goto Exit;
+	}
 	if (number_is_equal(&num_x_curr, &num_1) && 
 	    !number_is_equal(&num_x_prev, &num_1) &&
 	    !number_is_equal(&num_x_prev, &num_n_min1))
@@ -1221,9 +929,7 @@ STATIC int number_witness(u1024_t *num_a, u1024_t *num_n)
     ret = 0;
 
 Exit:
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_WITNESS);
-#endif
+    TIMER_STOP(FUNC_NUMBER_WITNESS);
     return ret;
 }
 
@@ -1232,15 +938,12 @@ Exit:
  * 0 - if num_n is composit
  * 1 - if num_n is almost surely prime
  */
-STATIC int number_miller_rabin(u1024_t *num_n, u1024_t *num_s)
+STATIC int INLINE number_miller_rabin(u1024_t *num_n, u1024_t *num_s)
 {
     int ret;
     u1024_t num_j, num_a, num_1;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_MILLER_RABIN);
-#endif
-
+    TIMER_START(FUNC_NUMBER_MILLER_RABIN);
     number_small_dec2num(&num_1, (u64)1);
     number_small_dec2num(&num_j, (u64)1);
 
@@ -1257,36 +960,27 @@ STATIC int number_miller_rabin(u1024_t *num_n, u1024_t *num_s)
     ret = 1;
 
 Exit:
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_MILLER_RABIN);
-#endif
+    TIMER_STOP(FUNC_NUMBER_MILLER_RABIN);
     return ret;
 }
 
-STATIC int number_is_prime(u1024_t *num_n)
+STATIC int INLINE number_is_prime(u1024_t *num_n)
 {
     int ret;
     u1024_t num_s;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_IS_PRIME);
-#endif
-
+    TIMER_START(FUNC_NUMBER_IS_PRIME);
     number_small_dec2num(&num_s, (u64)10);
     ret = number_miller_rabin(num_n, &num_s);
 
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_IS_PRIME);
-#endif
+    TIMER_STOP(FUNC_NUMBER_IS_PRIME);
     return ret;
 }
 
-static void number_small_prime_init(small_prime_entry_t *entry, 
+static void INLINE number_small_prime_init(small_prime_entry_t *entry, 
     u1024_t *num_pi, u1024_t *num_increment)
 {
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_SMALL_PRIME_INIT);
-#endif
+    TIMER_START(FUNC_NUMBER_SMALL_PRIME_INIT);
 
     /* initiate the entry's prime */
     number_small_dec2num(&(entry->prime), entry->prime_initializer);
@@ -1304,12 +998,10 @@ static void number_small_prime_init(small_prime_entry_t *entry,
     /* update incrementor*/
     number_mul(num_increment, num_increment, &(entry->prime));
 
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_SMALL_PRIME_INIT);
-#endif
+    TIMER_STOP(FUNC_NUMBER_SMALL_PRIME_INIT);
 }
 
-STATIC void number_generate_coprime(u1024_t *num_coprime, 
+STATIC void INLINE number_generate_coprime(u1024_t *num_coprime, 
     u1024_t *num_increment)
 {
     int i;
@@ -1331,9 +1023,15 @@ STATIC void number_generate_coprime(u1024_t *num_coprime,
 	{ .prime_initializer = 41, .exp_initializer = 11 },
     };
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_GENERATE_COPRIME);
+#ifdef TESTS
+    if (init_reset)
+    {
+	init = 0;
+	init_reset = 0;
+    }
 #endif
+
+    TIMER_START(FUNC_NUMBER_GENERATE_COPRIME);
     if (!init)
     {
 	number_small_dec2num(&num_0, (u64)0);
@@ -1376,24 +1074,18 @@ STATIC void number_generate_coprime(u1024_t *num_coprime,
 
     if (!number_is_equal(&num_jumper, num_increment))
 	number_add(num_coprime, num_coprime, &num_jumper);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_GENERATE_COPRIME);
-#endif
+    TIMER_STOP(FUNC_NUMBER_GENERATE_COPRIME);
 }
 
 /* a is assumed to be >= b */
-STATIC void number_extended_euclid_gcd(u1024_t *gcd, u1024_t *x, u1024_t *a, 
-    u1024_t *y, u1024_t *b)
+STATIC void INLINE number_extended_euclid_gcd(u1024_t *gcd, u1024_t *x, 
+    u1024_t *a, u1024_t *y, u1024_t *b)
 {
     u1024_t num_x, num_x1, num_x2, num_y, num_y1, num_y2, num_0;
     u1024_t num_a, num_b, num_q, num_r;
     int change;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_EXTENDED_EUCLID_GCD);
-#endif
-
+    TIMER_START(FUNC_NUMBER_EXTENDED_EUCLID_GCD);
     if (number_is_greater_or_equal(a, b))
     {
 	num_a = *a;
@@ -1433,49 +1125,34 @@ STATIC void number_extended_euclid_gcd(u1024_t *gcd, u1024_t *x, u1024_t *a,
     *x = change ? num_y2 : num_x2;
     *y = change ? num_x2 : num_y2;
     *gcd = change ? num_b : num_a;
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_EXTENDED_EUCLID_GCD);
-#endif
+    TIMER_STOP(FUNC_NUMBER_EXTENDED_EUCLID_GCD);
 }
 
-STATIC void number_euclid_gcd(u1024_t *gcd, u1024_t *a, u1024_t *b)
+STATIC void INLINE number_euclid_gcd(u1024_t *gcd, u1024_t *a, u1024_t *b)
 {
     u1024_t x, y;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_EUCLID_GCD);
-#endif
-
+    TIMER_START(FUNC_NUMBER_EUCLID_GCD);
     if (number_is_greater_or_equal(a, b))
 	number_extended_euclid_gcd(gcd, &x, a, &y, b);
     else
 	number_extended_euclid_gcd(gcd, &y, b, &x, a);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_EUCLID_GCD);
-#endif
+    TIMER_STOP(FUNC_NUMBER_EUCLID_GCD);
 }
 
 void number_init_random_coprime(u1024_t *num, u1024_t *coprime)
 {
     u1024_t num_1, num_gcd;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_INIT_RANDOM_COPRIME);
-#endif
-
+    TIMER_START(FUNC_NUMBER_INIT_RANDOM_COPRIME);
     number_small_dec2num(&num_1, (u64)1);
     do
     {
-	number_init_random(num);
+	number_init_random_strict_range(num, coprime);
 	number_euclid_gcd(&num_gcd, num, coprime);
     }
     while (!number_is_equal(&num_gcd, &num_1));
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_INIT_RANDOM_COPRIME);
-#endif
+    TIMER_STOP(FUNC_NUMBER_INIT_RANDOM_COPRIME);
 }
 
 void number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num, 
@@ -1483,10 +1160,7 @@ void number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num,
 {
     u1024_t num_x, num_y, num_gcd, num_y_abs;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_MODULAR_MULTIPLICATIVE_INVERSE);
-#endif
-
+    TIMER_START(FUNC_NUMBER_MODULAR_MULTIPLICATIVE_INVERSE);
     /* num < mod */
     number_extended_euclid_gcd(&num_gcd, &num_x, mod, &num_y, num);
     number_absolute_value(&num_y_abs, &num_y);
@@ -1494,20 +1168,14 @@ void number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num,
 
     if (!number_is_equal(&num_y_abs, &num_y))
 	number_sub(inv, mod, inv);
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_MODULAR_MULTIPLICATIVE_INVERSE);
-#endif
+    TIMER_STOP(FUNC_NUMBER_MODULAR_MULTIPLICATIVE_INVERSE);
 }
 
 void number_find_prime(u1024_t *num)
 {
     u1024_t num_candidate, num_1, num_increment;
 
-#ifdef TIME_FUNCTIONS
-    timer_start(FUNC_NUMBER_FIND_PRIME);
-#endif
-
+    TIMER_START(FUNC_NUMBER_FIND_PRIME);
     number_small_dec2num(&num_1, (u64)1);
     number_generate_coprime(&num_candidate, &num_increment);
 
@@ -1520,9 +1188,6 @@ void number_find_prime(u1024_t *num)
     }
 
     *num = num_candidate;
-
-#ifdef TIME_FUNCTIONS
-    timer_stop(FUNC_NUMBER_FIND_PRIME);
-#endif
+    TIMER_STOP(FUNC_NUMBER_FIND_PRIME);
 }
 

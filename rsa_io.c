@@ -22,8 +22,12 @@
 #define RSA_PUB_DIR "pub"
 #define LOCAL_DIR "./"
 
+#define SUFFIX_RSA ".rsa"
+#define SUFFIX_DEC ".dec"
+#define SUFFIX_PRV ".prv"
+#define SUFFIX_PUB ".pub"
+
 typedef int (* stat_func_t) (const char *fname, struct stat *buf);
-typedef int (* io_func_t)(void *ptr, size_t size, size_t nmemb, FILE *stream);
 
 static char rsa_path[RSAPATH_LEN];
 #if RSA_MASTER || RSA_DECRYPTER
@@ -154,7 +158,7 @@ FILE *rsa_file_open(char *path, char *preffix, char *suffix, int is_slink,
 	return NULL;
     }
 
-    return fopen(fname, is_new ? "w+" : "r+");
+    return fopen(fname, is_new ? "wb+" : "rb+");
 }
 
 int rsa_file_close(FILE *fp)
@@ -177,25 +181,25 @@ FILE *rsa_file_create(char *suffix)
 
 FILE *rsa_file_create_private(void)
 {
-    return rsa_file_create(".prv");
+    return rsa_file_create(SUFFIX_PRV);
 }
 
 FILE *rsa_file_create_public(void)
 {
-    return rsa_file_create(".pub");
+    return rsa_file_create(SUFFIX_PUB);
 }
 #endif
 
 static int rsa_file_io_u1024(FILE *fptr, void *buf, int is_half, int is_write)
 {
     int nmemb = BYTES_SZ(u1024_t) / BYTES_SZ(u64);
-    int size = sizeof(u64);
-    io_func_t io_func = is_write ? (io_func_t)fwrite : (io_func_t)fread;
+    int size = BYTES_SZ(u64);
 
     if (is_half)
 	nmemb /= 2;
 
-    return io_func(buf, size, nmemb, fptr);
+    return nmemb != (is_write ? fwrite(buf, size, nmemb, fptr) : 
+	fread(buf, size, nmemb, fptr));
 }
 
 static int rsa_file_io_u1024_half(FILE *fptr, u1024_t *num, int is_write, 
@@ -229,12 +233,12 @@ int rsa_file_read_u1024_low(FILE *fptr, u1024_t *num)
 
 int rsa_file_write_u1024(FILE *fptr, u1024_t *num)
 {
-    return rsa_file_io_u1024(fptr, (void *)fptr, 0, 1);
+    return rsa_file_io_u1024(fptr, num, 0, 1);
 }
 
 int rsa_file_read_u1024(FILE *fptr, u1024_t *num)
 {
-    return rsa_file_io_u1024(fptr, (void *)fptr, 0, 0);
+    return rsa_file_io_u1024(fptr, num, 0, 0);
 }
 
 int str2u1024_t(u1024_t *num, char *str)
@@ -262,3 +266,105 @@ int u1024_t2str(u1024_t *num, char *str)
     return i;
 }
 
+#if RSA_MASTER || RSA_DECRYPTER
+FILE *rsa_open_decryption_file(char *path, char *file_name)
+{
+    char *tmp_name;
+
+    if (strlen(file_name) <= strlen(SUFFIX_RSA) || strncmp(file_name + 
+	(strlen(file_name) - strlen(SUFFIX_RSA)), SUFFIX_RSA, 
+	strlen(SUFFIX_RSA)))
+    {
+	file_name = rsa_file_name(path, file_name, SUFFIX_DEC, stat, 1);
+    }
+    else
+    {
+	tmp_name = calloc(1, strlen(file_name) - (strlen(SUFFIX_RSA) - 1));
+	memcpy(tmp_name, file_name, strlen(file_name) - strlen(SUFFIX_RSA));
+	tmp_name[strlen(file_name)] = 0;
+	file_name = rsa_file_name(path, tmp_name, "", stat, 1);
+	free(tmp_name);
+    }
+
+    return file_name ? fopen(file_name, "wb+") : NULL;
+}
+#endif
+
+#if RSA_MASTER || RSA_ENCRYPTER
+FILE *rsa_open_encryption_file(char *path, char *file_name)
+{
+    file_name = rsa_file_name(path, file_name, SUFFIX_RSA, stat, 1);
+
+    return file_name ? fopen(file_name, "wb+") : NULL;
+}
+#endif
+
+static FILE *rsa_key_open(char *preffix, int is_decrypt)
+{
+    char *path = NULL, *suffix = NULL;
+
+#if RSA_MASTER || RSA_DECRYPTER
+    if (is_decrypt)
+    {
+	path = rsa_path_prv;
+	suffix = SUFFIX_PRV;
+    }
+#endif
+
+#if RSA_MASTER || RSA_ENCRYPTER
+    if (!is_decrypt)
+    {
+	path = rsa_path_pub;
+	suffix = SUFFIX_PUB;
+    }
+#endif
+
+    return rsa_file_open(path, preffix, suffix, 1, 0);
+}
+
+int rsa_key_get_params(char *preffix, u1024_t *n, u1024_t *exp, 
+    u1024_t *montgomery_factor, int is_decrypt)
+{
+    FILE *key;
+
+    if (!(key = rsa_key_open(preffix, is_decrypt)))
+	return -1;
+
+    number_reset(n);
+    number_reset(exp);
+    number_reset(montgomery_factor);
+
+    if (rsa_file_read_u1024(key, n) || rsa_file_read_u1024(key, exp) || 
+	rsa_file_read_u1024(key, montgomery_factor))
+    {
+	return -1;
+    }
+
+    rsa_file_close(key);
+    return 0;
+}
+
+
+#if RSA_DECRYPTER || RSA_ENCRYPTER
+int rsa_key_get_vendor(u1024_t *vendor, int is_decrypt)
+{
+    int i;
+    FILE *key;
+
+    if (!(key = rsa_key_open(SIG, is_decrypt)))
+	return -1;
+
+    for (i = 0; i < 3; i++)
+    {
+	if (rsa_file_read_u1024(key, vendor))
+	    return -1;
+    }
+
+    number_reset(vendor);
+    if (rsa_file_read_u1024(key, vendor))
+	return -1;
+
+    rsa_file_close(key);
+    return 0;
+}
+#endif
