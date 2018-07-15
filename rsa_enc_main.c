@@ -5,13 +5,16 @@
 #include "rsa.h"
 
 static opt_t options_encrypter[] = {
-    {RSA_OPT_FILE, 'f', "file", required_argument, "arg is the input file to "
+    {RSA_OPT_FILE, 'f', "file", required_argument, ARG " is the input file to "
 	"encrypt"},
     {RSA_OPT_LEVEL, 'l', "level", required_argument, "set encryption level to "
 	"128, 256, 512 or 1024(default)."},
     {RSA_OPT_RSAENC, 'r', "rsa", no_argument, "full RSA encryption. if this "
 	"flag is not set, encryption will be done using a symmetric "
 	"key and only it will be RSA encrypted"},
+    {RSA_OPT_KEY_SET_DYNAMIC, 'k', "key", required_argument, "set the RSA key "
+	"to be used for the current encryption. this options overides the "
+	"default key if it has been set"},
     { RSA_OPT_MAX }
 };
 
@@ -48,6 +51,11 @@ static int parse_args_encrypter(int opt, int *flags)
 	break;
     case RSA_OPT_RSAENC:
 	OPT_ADD(flags, RSA_OPT_RSAENC);
+	break;
+    case RSA_OPT_KEY_SET_DYNAMIC:
+	OPT_ADD(flags, RSA_OPT_KEY_SET_DYNAMIC);
+	if (optarg && rsa_set_key_name(optarg))
+	    return -1;
 	break;
     default:
 	rsa_error_message(RSA_ERR_OPTARG);

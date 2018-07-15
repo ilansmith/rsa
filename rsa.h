@@ -4,6 +4,7 @@
 #include "rsa_num.h"
 #include "rsa_util.h"
 
+#define ARG "arg"
 #define RSA_SIGNITURE "IASRSA"
 #define RSA_KEYLINK_PREFIX "key"
 #define RSA_ENCRYPTION_LEVEL_DEFAULT 1024
@@ -34,7 +35,8 @@ typedef enum {
     /* actions */
     RSA_OPT_HELP,
     RSA_OPT_KEY_SCAN,
-    RSA_OPT_KEY_SET_ACTIVE,
+    RSA_OPT_KEY_SET_DEFAULT,
+    RSA_OPT_KEY_SET_DYNAMIC,
     RSA_OPT_PATH,
     RSA_OPT_QUITE,
     RSA_OPT_VERBOSE,
@@ -90,8 +92,9 @@ rsa_opt_t rsa_action_get(int flags, ...);
 int rsa_action_handle_common(rsa_opt_t action, char *app, 
     rsa_handler_t *handler);
 char *key_path_get(void);
-int rsa_set_key_data(char *id);
-rsa_key_t *rsa_key_open(char *path, char accept);
+int rsa_set_key_name(char *name);
+int rsa_set_key_data(char *name);
+rsa_key_t *rsa_key_open(char accept);
 void rsa_key_close(rsa_key_t *key);
 int rsa_key_enclev_set(rsa_key_t *key, int new_level);
 int rsa_encryption_level_set(char *optarg);
