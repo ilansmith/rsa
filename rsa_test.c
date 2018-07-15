@@ -6,24 +6,130 @@
 #include <sys/time.h>
 #include <math.h>
 
-#if ENC_LEVEL(128) /* 16 bytes */
-#define PHRASE "Testing 128 bits"
-#elif ENC_LEVEL(256) /* 32 bytes */
-#define PHRASE "Validation of 256 bit encryption"
-#elif ENC_LEVEL(512) /* 64 bytes */
-#define PHRASE "Ilan A. Smith 512 bits encryption / decryption validation " \
-    "string"
-#else /* ENC_LEVEL(1024) 128 bytes */
-#define PHRASE "Ilan A. Smith 1024 bit encryption / decryption validation " \
-    "string\n used for testing whether or not the RSA key needs regenerating"
-#endif
-
 #define B (8)
 #define K (1024)
 #define M (K*K)
 
+enum {
+    DISABLE_UCHAR = 1<<0,
+    DISABLE_USHORT = 1<<1,
+    DISABLE_ULONG = 1<<2,
+    DISABLE_ULLONG_64 = 1<<3,
+    DISABLE_ULLONG_128 = 1<<4,
+    DISABLE_ULLONG_256 = 1<<5,
+    DISABLE_ULLONG_512 = 1<<6,
+    DISABLE_ULLONG_1024 = 1<<7,
+    DISABLE_ULLONG = DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | 
+	DISABLE_ULLONG_256 | DISABLE_ULLONG_512 | DISABLE_ULLONG_1024,
+    DISABLE_TIME_FUNCTIONS = 1<<8
+};
+
+typedef struct code2str_t {
+    int code;
+    char *str;
+    int disabled;
+} code2str_t;
+
+static code2str_t el2phrase[] = {
+    {64, ""},
+    {128, "Testing 128 bits"},
+    {256, "Validation of 256 bit encryption"},
+    {512, "Ilan A. Smith 512 bits encryption / decryption validation string"},
+    {1024, "Ilan A. Smith 1024 bit encryption / decryption validation string\n"
+	" used for varifying that encryption is identical to decryption."},
+    {-1}
+};
+
+static code2str_t el2data[] = {
+    {128, 
+	"0000000000000000011001010111001101100001011010000111000000100000"
+	"0111010001101001011000100010000000110001001100110010000001100001"
+    },
+    {1024, 
+	"0110011101101110011010010111010001100001011100100110010101101110"
+	"0110010101100111011001010111001000100000011100110110010001100101"
+	"0110010101101110001000000111100101100101011010110010000001000001"
+	"0101001101010010001000000110010101101000011101000010000001110100"
+	"0110111101101110001000000111001001101111001000000111001001100101"
+	"0110100001110100011001010110100001110111001000000110011101101110"
+	"0110100101110100011100110110010101110100001000000111001001101111"
+	"0110011000100000011001000110010101110011011101010010000000001010"
+	"0110011101101110011010010111001001110100011100110010000001101110"
+	"0110111101101001011101000110000101100100011010010110110001100001"
+	"0111011000100000011011100110111101101001011101000111000001111001"
+	"0111001001100011011001010110010000100000001011110010000001101110"
+	"0110111101101001011101000111000001111001011100100110001101101110"
+	"0110010100100000011101000110100101100010001000000011010000110010"
+	"0011000000110001001000000110100001110100011010010110110101010011"
+	"0010000000101110010000010010000001101110011000010110110001001001" },
+    {-1}
+};
+
+static code2str_t el2p1[] = {
+    {128, "1011010001000100100011101100011110010000011010011010110111110101"},
+    {1024, 
+	"1000000100010100111001000110011011001010010011110011011101111000"
+	"1000101011110100100010011000110010100101000011011100000111110011"
+	"0000010110101011001110110110111000001000100100101101000001110010"
+	"1100100101101110101110011010111101001100101111011000111101001110"
+	"1011110001010001001111110100001011010010110111111110010011011110"
+	"0010001111000101011011011111011111110110111011111100011111101000"
+	"1010011010001100001011110101000101101010111111110000111001101100"
+	"0111101001110110011110010000110010001110011001101001001110101111"
+    },
+    {-1}
+};
+
+static code2str_t el2p2[] = {
+    {128, "1101010011111100001011111011000100101111111100000011010110111001"},
+    {1024, 
+	"1000001111101111010111100000010010011011010010010100001011100000"
+	"1010101100111111010000000001011010000001000100011010110011000011"
+	"0011100111100100101100001000110010101010111110111110001000010011"
+	"1001110101111100110010110111100100101000110100111100110101101101"
+	"1111110011101101110011101101110100001010101100100010000111011110"
+	"0111110011000111110101110111100001111111111101110111000010001011"
+	"1000010111000010111111011110100100111001011011001010110011010000"
+	"0001010001100100011000110110000100110001111011010111110101101001"
+    },
+    {-1}
+};
+
+static code2str_t el2e[] = {
+    {128, 
+	"0111101001111100100110010101111100000001011011001001000000100000"
+	"0001110001111101011010101011111001011001011110110110001001100101"	
+    },
+    {1024, 
+	"0000010000011100101101000001011101101100000110010100010111010110"
+	"0100001000111101001111010111010001001010110001110100000111101111"
+	"0101010100111011010100101111010101100110000000100101000111010100"
+	"0101100100000000011001010011110100010101001000001000000111101000"
+	"0110010101000101111101110000001000111111110000000001101101111001"
+	"0010111111101000110111011001100101100011100011011111100101101001"
+	"0110111100011111100110110011001001100010111011010101011010011100"
+	"0011011001011110001100001000101101001100000111011100100010111100"
+	"0010111000000111111101101110101100110110110110111111000111110110"
+	"0010111000000111010011000010010001011100111110111010101001000101"
+	"0101010010000001100001011001111100001110000001100011100000001010"
+	"0101110110101100011001011010010100001000000000001000100000111110"
+	"0010010000111000010101001000011100110100000011010010101000010101"
+	"0011111010110010100111101010001100111010010011010001100000111110"
+	"0010010000010001100010001000111001011101110011110101000000011000"
+	"0111001100111100101111110110110000111001010101010111001000101001"
+    },
+    {-1}
+};
+
 static unit_test_t tests;
 int init_reset;
+
+static char *code2str(code2str_t *list, int code)
+{
+    for (; list->code != -1 && list->code != code; list++);
+
+    return list->code == -1 ? "" : list->str;
+}
 
 static char *p_u64(u64 *ptr)
 {
@@ -238,9 +344,15 @@ static void p_local_timer(void)
 static int test001(void)
 {
     p_comment("bit_sz_u64 = %d", bit_sz_u64);
+#if defined(UCHAR) || defined(USHORT) || defined(ULONG)
     p_comment("block_sz_u1024 = %d", block_sz_u1024);
     p_comment("encryption_level = bit_sz_u64*block_sz_u1024 = %d*%d = %d", 
 	bit_sz_u64, block_sz_u1024, encryption_level);
+#else
+    p_comment("encryption_level = %d", encryption_level);
+    p_comment("block_sz_u1024 = encryption_level/bit_sz_u64 = %d/%d = %d", 
+	encryption_level, bit_sz_u64, block_sz_u1024);
+#endif
 
 #if defined(UCHAR)
     return !(bit_sz_u64==8 && block_sz_u1024==16 && encryption_level==128);
@@ -248,18 +360,23 @@ static int test001(void)
     return !(bit_sz_u64==16 && block_sz_u1024==16 && encryption_level==256);
 #elif defined(ULONG)
     return !(bit_sz_u64==32 && block_sz_u1024==16 && encryption_level==512);
-#elif ENC_LEVEL(64)
-    return !(bit_sz_u64==64 && block_sz_u1024==1 && encryption_level==64);
-#elif ENC_LEVEL(128)
-    return !(bit_sz_u64==64 && block_sz_u1024==2 && encryption_level==128);
-#elif ENC_LEVEL(256)
-    return !(bit_sz_u64==64 && block_sz_u1024==4 && encryption_level==256);
-#elif ENC_LEVEL(512)
-    return !(bit_sz_u64==64 && block_sz_u1024==8 && encryption_level==512);
-#elif ENC_LEVEL(1024)
-    return !(bit_sz_u64==64 && block_sz_u1024==16 && encryption_level==1024);
 #else
-    return -1;
+    switch (encryption_level)
+    {
+    case 64:
+	return !(bit_sz_u64==64 && block_sz_u1024==1 && encryption_level==64);
+    case 128:
+	return !(bit_sz_u64==64 && block_sz_u1024==2 && encryption_level==128);
+    case 256:
+	return !(bit_sz_u64==64 && block_sz_u1024==4 && encryption_level==256);
+    case 512:
+	return !(bit_sz_u64==64 && block_sz_u1024==8 && encryption_level==512);
+    case 1024:
+	return !(bit_sz_u64==64 && block_sz_u1024==16 && 
+	    encryption_level==1024);
+    default:
+	return -1;
+    }
 #endif
 }
 
@@ -456,6 +573,8 @@ static int test017(void)
 
     number_reset(&res);
     if (number_init_str(&a, 
+	"11111111" /* buffer */
+
 	"11111111"
 	"11111111"
 	"11111111"
@@ -619,6 +738,8 @@ static int test028(void)
     u1024_t a, res;
 
     if (number_init_str(&a,
+	"11111111" /* buffer */
+
 	"11111111"
 	"11111111"
 	"11111111"
@@ -636,6 +757,8 @@ static int test028(void)
 	"11111111"
 	"11111111"
 	) || number_init_str(&res,
+	"11111111" /* buffer */
+
 	"11111111"
 	"11111111"
 	"11111111"
@@ -1359,7 +1482,7 @@ static int test056(void)
 	number_mul(&yb, &y, &b);
 	number_add(&sum, &xa, &yb);
 
-	tmp_x = x;
+	number_assign(tmp_x, x);
 	number_absolute_value(&x, &x);
 	number_absolute_value(&abs_y, &y);
 	number_mod(&mod_y, &abs_y, &a);
@@ -2054,7 +2177,7 @@ static int rsa_pre_encrypt(u1024_t *input, u64 *multiplier, u1024_t *encryptor,
 
     if (!number_is_greater_or_equal(input, n))
     {
-	*encryptor = *input;
+	number_assign(*encryptor, *input);
 	*multiplier = (u64)0;
 	return 0;
     }
@@ -2079,7 +2202,7 @@ static int rsa_post_decrypt(u1024_t *output, u64 multiplier,
 	number_add(output, output, decryption);
     }
     else
-	*output = *decryption;
+	number_assign(*output, *decryption);
 
     return *((u64*)&output->arr + block_sz_u1024) ? -1 : 0;
 }
@@ -2092,9 +2215,9 @@ static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d,
     u64 q;
 
     if (!data)
-	number_str2num(&input, PHRASE);
+	number_str2num(&input, code2str(el2phrase, encryption_level));
     else
-	input = *data;
+	number_assign(input, *data);
     number_reset(&encryption);
     number_reset(&decryption);
 
@@ -2237,7 +2360,7 @@ static int test110(void)
 { 
     u1024_t p1, p2, n, e, d, data;
 	
-    number_str2num(&data, PHRASE);
+    number_str2num(&data, code2str(el2phrase, encryption_level));
 
     number_init_str(&p1, 
 	"0101010000011110100111111100011110011111100101010000011100011001"
@@ -2290,101 +2413,27 @@ static int test116(void)
     int i, iter;
     char *quantity;
 
-#if ENC_LEVEL(128)
-    iter = (K*B)/(bit_sz_u64 * block_sz_u1024);;
-    quantity = "1KB";
-#elif ENC_LEVEL(1024)
-    iter = K/(bit_sz_u64 * block_sz_u1024);;
-    quantity = "128B";
-#endif
+    switch (encryption_level)
+    {
+    case 128:
+	iter = (K*B)/(bit_sz_u64 * block_sz_u1024);
+	quantity = "1KB";
+	break;
+    case 1024:
+	iter = K/(bit_sz_u64 * block_sz_u1024);
+	quantity = "128B";
+	break;
+    default:
+	p_comment("encryption_level %d not supported by this test", 
+	    encryption_level);
+	return -1;
+    }
 
-    number_init_str(&data, 
-#if ENC_LEVEL(128)
-	"0000000000000000011001010111001101100001011010000111000000100000"
-	"0111010001101001011000100010000000110001001100110010000001100001"
-#elif ENC_LEVEL(1024)
-	"0110011101101110011010010111010001100001011100100110010101101110"
-	"0110010101100111011001010111001000100000011100110110010001100101"
-	"0110010101101110001000000111100101100101011010110010000001000001"
-	"0101001101010010001000000110010101101000011101000010000001110100"
-	"0110111101101110001000000111001001101111001000000111001001100101"
-	"0110100001110100011001010110100001110111001000000110011101101110"
-	"0110100101110100011100110110010101110100001000000111001001101111"
-	"0110011000100000011001000110010101110011011101010010000000001010"
-	"0110011101101110011010010111001001110100011100110010000001101110"
-	"0110111101101001011101000110000101100100011010010110110001100001"
-	"0111011000100000011011100110111101101001011101000111000001111001"
-	"0111001001100011011001010110010000100000001011110010000001101110"
-	"0110111101101001011101000111000001111001011100100110001101101110"
-	"0110010100100000011101000110100101100010001000000011010000110010"
-	"0011000000110001001000000110100001110100011010010110110101010011"
-	"0010000000101110010000010010000001101110011000010110110001001001"
-#else
-	""
-#endif
-	);
-
-    number_init_str(&p1, 
-#if ENC_LEVEL(128)
-	"1011010001000100100011101100011110010000011010011010110111110101"
-#elif ENC_LEVEL(1024)
-	"1000000100010100111001000110011011001010010011110011011101111000"
-	"1000101011110100100010011000110010100101000011011100000111110011"
-	"0000010110101011001110110110111000001000100100101101000001110010"
-	"1100100101101110101110011010111101001100101111011000111101001110"
-	"1011110001010001001111110100001011010010110111111110010011011110"
-	"0010001111000101011011011111011111110110111011111100011111101000"
-	"1010011010001100001011110101000101101010111111110000111001101100"
-	"0111101001110110011110010000110010001110011001101001001110101111"
-#else
-	""
-#endif
-	);
-
-    number_init_str(&p2,
-#if ENC_LEVEL(128)
-	"1101010011111100001011111011000100101111111100000011010110111001"
-#elif ENC_LEVEL(1024)
-	"1000001111101111010111100000010010011011010010010100001011100000"
-	"1010101100111111010000000001011010000001000100011010110011000011"
-	"0011100111100100101100001000110010101010111110111110001000010011"
-	"1001110101111100110010110111100100101000110100111100110101101101"
-	"1111110011101101110011101101110100001010101100100010000111011110"
-	"0111110011000111110101110111100001111111111101110111000010001011"
-	"1000010111000010111111011110100100111001011011001010110011010000"
-	"0001010001100100011000110110000100110001111011010111110101101001"
-#else
-	""
-#endif
-	);
-
+    number_init_str(&data, code2str(el2data, encryption_level));
+    number_init_str(&p1, code2str(el2p1, encryption_level));
+    number_init_str(&p2, code2str(el2p2, encryption_level));
     number_mul(&n, &p1, &p2);
-
-    number_init_str(&e,
-#if ENC_LEVEL(128)
-	"0111101001111100100110010101111100000001011011001001000000100000"
-	"0001110001111101011010101011111001011001011110110110001001100101"
-#elif ENC_LEVEL(1024)
-	"0000010000011100101101000001011101101100000110010100010111010110"
-	"0100001000111101001111010111010001001010110001110100000111101111"
-	"0101010100111011010100101111010101100110000000100101000111010100"
-	"0101100100000000011001010011110100010101001000001000000111101000"
-	"0110010101000101111101110000001000111111110000000001101101111001"
-	"0010111111101000110111011001100101100011100011011111100101101001"
-	"0110111100011111100110110011001001100010111011010101011010011100"
-	"0011011001011110001100001000101101001100000111011100100010111100"
-	"0010111000000111111101101110101100110110110110111111000111110110"
-	"0010111000000111010011000010010001011100111110111010101001000101"
-	"0101010010000001100001011001111100001110000001100011100000001010"
-	"0101110110101100011001011010010100001000000000001000100000111110"
-	"0010010000111000010101001000011100110100000011010010101000010101"
-	"0011111010110010100111101010001100111010010011010001100000111110"
-	"0010010000010001100010001000111001011101110011110101000000011000"
-	"0111001100111100101111110110110000111001010101010111001000101001"
-#else
-	""
-#endif
-	);
+    number_init_str(&e, code2str(el2e, encryption_level));
 
     p_comment("encrypting %s of data:", quantity);
     local_timer_start();
@@ -2459,7 +2508,7 @@ static int test120(void)
 
     rsa_key_generator(&p1, &p2, &n, &e, &d, 1);
 
-    number_str2num(&input, PHRASE);
+    number_str2num(&input, code2str(el2phrase, encryption_level));
     p_comment("data: \"%s\"", &input);
 
     p_comment("encrypting...");
@@ -2503,92 +2552,11 @@ static int test125(void)
     mb = 5;
     iter = (mb * M*B)/(bit_sz_u64 * block_sz_u1024);
 
-    number_init_str(&data, 
-#if ENC_LEVEL(128)
-	"0000000000000000011001010111001101100001011010000111000000100000"
-	"0111010001101001011000100010000000110001001100110010000001100001"
-#elif ENC_LEVEL(1024)
-	"0110011101101110011010010111010001100001011100100110010101101110"
-	"0110010101100111011001010111001000100000011100110110010001100101"
-	"0110010101101110001000000111100101100101011010110010000001000001"
-	"0101001101010010001000000110010101101000011101000010000001110100"
-	"0110111101101110001000000111001001101111001000000111001001100101"
-	"0110100001110100011001010110100001110111001000000110011101101110"
-	"0110100101110100011100110110010101110100001000000111001001101111"
-	"0110011000100000011001000110010101110011011101010010000000001010"
-	"0110011101101110011010010111001001110100011100110010000001101110"
-	"0110111101101001011101000110000101100100011010010110110001100001"
-	"0111011000100000011011100110111101101001011101000111000001111001"
-	"0111001001100011011001010110010000100000001011110010000001101110"
-	"0110111101101001011101000111000001111001011100100110001101101110"
-	"0110010100100000011101000110100101100010001000000011010000110010"
-	"0011000000110001001000000110100001110100011010010110110101010011"
-	"0010000000101110010000010010000001101110011000010110110001001001"
-#else
-	""
-#endif
-	);
-
-    number_init_str(&p1, 
-#if ENC_LEVEL(128)
-	"1011010001000100100011101100011110010000011010011010110111110101"
-#elif ENC_LEVEL(1024)
-	"1000000100010100111001000110011011001010010011110011011101111000"
-	"1000101011110100100010011000110010100101000011011100000111110011"
-	"0000010110101011001110110110111000001000100100101101000001110010"
-	"1100100101101110101110011010111101001100101111011000111101001110"
-	"1011110001010001001111110100001011010010110111111110010011011110"
-	"0010001111000101011011011111011111110110111011111100011111101000"
-	"1010011010001100001011110101000101101010111111110000111001101100"
-	"0111101001110110011110010000110010001110011001101001001110101111"
-#else
-	""
-#endif
-	);
-
-    number_init_str(&p2,
-#if ENC_LEVEL(128)
-	"1101010011111100001011111011000100101111111100000011010110111001"
-#elif ENC_LEVEL(1024)
-	"1000001111101111010111100000010010011011010010010100001011100000"
-	"1010101100111111010000000001011010000001000100011010110011000011"
-	"0011100111100100101100001000110010101010111110111110001000010011"
-	"1001110101111100110010110111100100101000110100111100110101101101"
-	"1111110011101101110011101101110100001010101100100010000111011110"
-	"0111110011000111110101110111100001111111111101110111000010001011"
-	"1000010111000010111111011110100100111001011011001010110011010000"
-	"0001010001100100011000110110000100110001111011010111110101101001"
-#else
-	""
-#endif
-	);
+    number_init_str(&data, code2str(el2data, encryption_level));
+    number_init_str(&p1, code2str(el2p1, encryption_level));
+    number_init_str(&p2, code2str(el2p2, encryption_level));
     number_mul(&n, &p1, &p2);
-
-    number_init_str(&e,
-#if ENC_LEVEL(128)
-	"0111101001111100100110010101111100000001011011001001000000100000"
-	"0001110001111101011010101011111001011001011110110110001001100101"
-#elif ENC_LEVEL(1024)
-	"0000010000011100101101000001011101101100000110010100010111010110"
-	"0100001000111101001111010111010001001010110001110100000111101111"
-	"0101010100111011010100101111010101100110000000100101000111010100"
-	"0101100100000000011001010011110100010101001000001000000111101000"
-	"0110010101000101111101110000001000111111110000000001101101111001"
-	"0010111111101000110111011001100101100011100011011111100101101001"
-	"0110111100011111100110110011001001100010111011010101011010011100"
-	"0011011001011110001100001000101101001100000111011100100010111100"
-	"0010111000000111111101101110101100110110110110111111000111110110"
-	"0010111000000111010011000010010001011100111110111010101001000101"
-	"0101010010000001100001011001111100001110000001100011100000001010"
-	"0101110110101100011001011010010100001000000000001000100000111110"
-	"0010010000111000010101001000011100110100000011010010101000010101"
-	"0011111010110010100111101010001100111010010011010001100000111110"
-	"0010010000010001100010001000111001011101110011110101000000011000"
-	"0111001100111100101111110110110000111001010101010111001000101001"
-#else
-	""
-#endif
-	);
+    number_init_str(&e, code2str(el2e, encryption_level));
 
     p_comment("encrypting %dMB of data:", mb);
     local_timer_start();
@@ -2896,30 +2864,22 @@ static test_t rsa_tests[] =
     {
 	description: "number_dec2bin()",
 	func: test007,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_dec2bin() - edge conditions",
 	func: test008,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_dec2bin() - max size number",
 	func: test009,
-#ifndef ULLONG
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
     {
 	description: "number_dec2bin() - edge conditions",
 	func: test010,
-#ifndef ULLONG
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
     {
 	description: "number_init_random() - compare many numbers",
@@ -2933,45 +2893,35 @@ static test_t rsa_tests[] =
     {
 	description: "number_add() - edge condition",
 	func: test017,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_add() - functionality",
 	func: test018,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_add() - random numbers",
 	func: test019,
-#ifdef TIME_FUNCTIONS
-	disabled: 1,
-#endif
+	disabled: DISABLE_TIME_FUNCTIONS,
     },
     {
 	description: "number_add() - testing new implementation",
 	func: test020,
-#ifdef TIME_FUNCTIONS
-	disabled: 1,
-#endif
+	disabled: DISABLE_TIME_FUNCTIONS,
     },
     /* right and left shifting */
     {
 	description: "number_shift_right_once() - basic functionality",
 	func: test025,
-#if !defined(ULLONG) || !ENC_LEVEL(128)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_256 | DISABLE_ULLONG_512 | 
+	    DISABLE_ULLONG_1024,
     },
     {
 	description: "number_shift_right()",
 	func: test026,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_shift_left() - functionality",
@@ -2980,451 +2930,359 @@ static test_t rsa_tests[] =
     {
 	description: "number_shift_left() - edge condition",
 	func: test028,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_shift_left() - edge conditions, "
 	    "random numbers",
 	func: test029,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     /* number multiplication  */
     {
 	description: "number_mul() - multiplicand > multiplier",
 	func: test031,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_mul() - multiplicand < multiplier",
 	func: test032,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_mul() - big numbers",
 	func: test033,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "(2x3x11x13x17x19)^10 x (5x7x23x29x31x37x41)^11",
 	func: test034,
-#if !defined(ULLONG) || !ENC_LEVEL(1024)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
+	    DISABLE_ULLONG_512,
     },
     {
 	description: "multiply the first 75 primes (and again by the 4th)",
 	func: test035,
-#if !defined(ULLONG) || !ENC_LEVEL(1024)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
+	    DISABLE_ULLONG_512,
     },
     /* number subtraction */
     {
 	description: "number_is_greater() and number_is_equal()",
 	func: test041,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_is_greater() u1024_t.arr.buffer != 0",
 	func: test042,
-#if !defined(ULLONG) || !ENC_LEVEL(1024)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
+	    DISABLE_ULLONG_512,
     },
     {
 	description: "number_sub() - basic functionality",
 	func: test043,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_sub() - advanced functionality",
 	func: test044,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_sub() - subtacting from zero",
 	func: test045,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "negative numbers",
 	func: test046,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_absolute_value()",
 	func: test047,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "negative and absolute numbers",
 	func: test048,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     /* number devision */
     {
 	description: "number_dev() - basic functionality",
 	func: test051,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_dev()",
 	func: test052,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_dev() - deviding a number by a larger number",
 	func: test053,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "deviding a 475 bit number by 29",
 	func: test054,
-#if !defined(ULLONG) || !ENC_LEVEL(1024)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
+	    DISABLE_ULLONG_512,
     },
     {
 	description: "number_mod() sanity test",
 	func: test055,
-#ifndef ULLONG
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
     {
 	description: "number_extended_euclid_gcd()",
 	func: test056,
-#ifdef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR,
     },
     {
 	description: "number_modular_multiplicative_inverse()",
 	func: test057,
-#ifndef ULLONG
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
     /* finding most significant bit */
     {
 	description: "number_find_most_significant_set_bit()",
 	func: test061,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_find_most_significant_set_bit()",
 	func: test062,
-#ifndef ULLONG
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
     /* naive modular multiplication */
     {
 	description: "number_modular_multiplication_naive()",
 	func: test063,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "naive modular multiplication and exponentiation",
 	func: test064,
-#ifndef USHORT
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG,
     },
     /* naive modular exponentiation */
     {
 	description: "number_modular_exponentiation_naive() - basic "
 	    "functionality",
 	func: test066,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_modular_exponentiation_naive() - advanced",
 	func: test067,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_modular_exponentiation_naive()",
 	func: test068,
-#ifdef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR,
     },
     {
 	description: "number_modular_exponentiation_naive() - large power of 2",
 	func: test069,
-#ifndef ULLONG
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
     /* setting montgomery factor: 2^(2(encryption_level+2)) */
     {
 	description: "number_montgomery_factor_set()",
 	func: test071,
-#if !defined(ULLONG) || !ENC_LEVEL(1024)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128  | DISABLE_ULLONG_256 | 
+	    DISABLE_ULLONG_512,
     },
     {
 	description: "number_montgomery_factor_set() - for a random number",
 	func: test072,
-#ifdef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR,
     },
     /* montgomery modular multiplication */
     {
 	description: "number_modular_multiplication_montgomery()",
 	func: test076,
-#ifdef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR,
     },
     {
 	description: "number_modular_multiplication_montgomery()",
 	func: test077,
-#ifdef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR,
     },
     /* montgomery modular exponentiation */
     {
 	description: "number_modular_exponentiation_montgomery()",
 	func: test081,
-#ifdef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR,
     },
     {
 	description: "number_modular_exponentiation_montgomery()",
 	func: test082,
-#ifdef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR,
     },
     {
 	description: "number_modular_exponentiation_montgomery()",
 	func: test083,
-#ifdef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR,
     },
     {
 	description: "number_modular_exponentiation_montgomery()",
 	func: test084,
-#ifdef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR,
     },
     {
 	description: "exponentiation modolo a larg number",
 	func: test085,
-#if !defined(ULLONG) || !ENC_LEVEL(1024)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
+	    DISABLE_ULLONG_512,
     },
     {
 	description: "2^(encryption_level - 1)",
 	func: test086,
-#if !defined(ULLONG) || defined(TIME_FUNCTIONS)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_TIME_FUNCTIONS,
     },
     /* primality testing */
     {
 	description: "number_witness() - basic functionality",
 	func: test091,
-#ifndef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_is_prime(7) - basic functionality",
 	func: test092,
-#ifndef USHORT
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_is_prime(9)",
 	func: test093,
-#ifndef USHORT
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_is_prime(17) - basic functionality",
 	func: test094,
-#ifndef USHORT
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_is_prime(99991)",
 	func: test095,
-#ifndef USHORT
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
 	description: "number_is_prime() primes in [3, 999]",
 	func: test096,
-#if !defined(USHORT) && !ENC_LEVEL(128)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_ULONG | DISABLE_ULLONG_64 | 
+	    DISABLE_ULLONG_256 | DISABLE_ULLONG_512 | DISABLE_ULLONG_1024,
     },
     {
 	description: "number_is_prime(10,726,904,659) - large prime",
 	func: test097,
-#ifdef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR,
     },
     {
 	description: "number_is_prime(55,350,776,431,903,243) - very large "
 	    "prime",
 	func: test098,
-#ifdef UCHAR
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR,
     },
     {
 	description: "number_is_prime(94R(71)9) - 475 bit prime",
 	func: test099,
-#if !defined(ULLONG) || !ENC_LEVEL(1024) || defined(TIME_FUNCTIONS)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
+	    DISABLE_ULLONG_512 | DISABLE_TIME_FUNCTIONS,
     },
     {
 	description: "number_is_prime("
 	    "2,285,760,293,497,823,444,790,323,455,592,340,983,477) - very "
 	    "large non prime",
 	func: test100,
-#ifndef ULLONG
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
     /* RSA key generation, encryption and decryption */
     {
 	description: "coprimality testing",
 	func: test106,
-#ifndef ULLONG
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
     {
 	description: "number_find_prime()",
 	func: test107,
-#if !defined(ULLONG)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
     {
-	description: "encryption - decryption with length(n=p1xp2)=1023 bits",
+	description: "encryption - decryption with length(n=p1xp2)=1024 bits",
 	func: test108,
-#if !defined(ULLONG) || !ENC_LEVEL(1024)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
+	    DISABLE_ULLONG_512,
     },
     {
 	description: "encryption - decryption: overflow during "
 	    "num_montgomery_factor cration",
 	func: test109,
-#if !defined(ULLONG) || !ENC_LEVEL(128)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_256 | DISABLE_ULLONG_512 | 
+	    DISABLE_ULLONG_1024,
     },
     {
 	description: "number_str2num()",
 	func: test110,
-#if !defined(ULLONG) || !ENC_LEVEL(128)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_256 | DISABLE_ULLONG_512 | 
+	    DISABLE_ULLONG_1024,
     },
     {
 	description: "mul, add and shift",
 	func: test112,
-#if !defined(ULLONG) || !ENC_LEVEL(128)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_256 | DISABLE_ULLONG_512 | 
+	    DISABLE_ULLONG_1024,
     },
     {
 	description: "multiple encryption",
 	func: test116,
-#if !defined(ULLONG) || (!ENC_LEVEL(128) && !ENC_LEVEL(1024))
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_256 | DISABLE_ULLONG_512,
     },
     {
 	description: "complete RSA test - key generation, encryption and "
 	    "decryption",
 	func: test117,
-#if !defined(ULLONG) || defined(TIME_FUNCTIONS)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_TIME_FUNCTIONS,
     },
     {
 	description: "multiple RSA key generation (" MULTIPLE_RSA 
 	    " iterations)",
 	func: test118,
-#if !defined(ULLONG) || !ENC_LEVEL(128) || defined(TIME_FUNCTIONS)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_256 | DISABLE_ULLONG_512 | 
+	    DISABLE_ULLONG_1024 | DISABLE_TIME_FUNCTIONS,
     },
     /* symmetric/asymmetric key combination */
     {
 	description: "complete RSA + symmetric key test - key generation, "
 	    "encryption and decryption",
 	func: test120,
-#if !defined(ULLONG) || defined(TIME_FUNCTIONS)
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_TIME_FUNCTIONS,
     },
     {
 	description: "multiple encryption using symmetric/asymmetric key "
 	    "combination",
 	func: test125,
-#if !defined(ULLONG) || (!ENC_LEVEL(128) && !ENC_LEVEL(1024))
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
+	    DISABLE_ULLONG_64 | DISABLE_ULLONG_256 | DISABLE_ULLONG_512,
     },
 
     /* RSA io */
@@ -3432,9 +3290,7 @@ static test_t rsa_tests[] =
 	description: "test fread() and fwrite()",
 	known_issue: "wrong result for sizeof(test58_t)",
 	func: test130,
-#ifndef ULLONG
-	disabled: 1,
-#endif
+	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
 #if 0
     {
@@ -3478,10 +3334,52 @@ static char *p_u64_type(void)
     return u64_type_str;
 }
 
+static void rsa_tests_init(int argc, char *argv[])
+{
+#if defined(UCHAR) || defined(USHORT) || defined(ULONG)
+    block_sz_u1024 = 16;
+    encryption_level = bit_sz_u64 * block_sz_u1024;
+#else
+    encryption_level = ENC_LEVEL;
+    block_sz_u1024 = encryption_level / bit_sz_u64;
+#endif
+}
+
 static void rsa_pre_test(void)
 {
     init_reset = 1;
     number_random_seed = 0;
+}
+
+static int rsa_is_disabled(int flags)
+{
+#if defined TIME_FUNCTIONS
+    if (flags & DISABLE_TIME_FUNCTIONS)
+	return 1;
+#endif
+#if defined(UCHAR)
+    return flags & DISABLE_UCHAR;
+#elif defined(USHORT)
+    return flags & DISABLE_USHORT;
+#elif defined(ULONG)
+    return flags & DISABLE_ULONG;
+#else /* ULLONG */
+    switch (encryption_level)
+    {
+    case 64:
+	return flags & DISABLE_ULLONG_64;
+    case 128:
+	return flags & DISABLE_ULLONG_128;
+    case 256:
+	return flags & DISABLE_ULLONG_256;
+    case 512:
+	return flags & DISABLE_ULLONG_512;
+    case 1024:
+	return flags & DISABLE_ULLONG_1024;
+    default:
+	return 1;
+    }
+#endif
 }
 
 int main(int argc, char *argv[])
@@ -3492,6 +3390,8 @@ int main(int argc, char *argv[])
     tests.size = ARRAY_SZ(rsa_tests);
     tests.list_comment = comment;
     tests.summery_comment = comment;
+    tests.tests_init = rsa_tests_init;
+    tests.is_disabled = rsa_is_disabled;
     tests.pre_test = rsa_pre_test;
 
     return unit_test(argc, argv, &tests);

@@ -7,6 +7,9 @@
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX_APP_NAME_SZ 256
 
+#define UT_DISABLED(tests, t) ((tests)->is_disabled && \
+    (tests)->is_disabled((t)->disabled))
+
 /* io functionality */
 int vscanf(const char *format, va_list ap);
 static int first_comment;
@@ -201,10 +204,11 @@ static int test_getargs(int argc, char *argv[], int *from, int *to, int max)
     return 0;
 }
 
-static int is_list_tests(int argc, char *argv[], int size, test_t *arr, 
-    char *list_comment)
+static int is_list_tests(int argc, char *argv[], unit_test_t *tests)
 {
-    int i;
+    int i, size = tests->size;
+    char *list_comment = tests->list_comment;
+    test_t *arr = tests->arr;
 
     if (argc != 2 || strcmp(argv[1], "list"))
 	return 0;
@@ -215,13 +219,14 @@ static int is_list_tests(int argc, char *argv[], int size, test_t *arr,
     for (i = 0; i < size - 1; i++)
     {
 	test_t *t =  &arr[i];
+	int is_disabled = UT_DISABLED(tests, t);
 
 	printf("%i. ", i + 1);
-	p_colour(t->disabled ? C_GREY : C_NORMAL, "%s", 
+	p_colour(is_disabled ? C_GREY : C_NORMAL, "%s", 
 	    t->description);
-	if (t->disabled)
+	if (is_disabled)
 	    p_colour(C_CYAN, " (disabled)");
-	if (!t->disabled && t->known_issue)
+	else if (t->known_issue)
 	{
 	    p_colour(C_BLUE, " (known issue: ");
 	    p_colour(C_GREY, t->known_issue);
@@ -239,7 +244,10 @@ int unit_test(int argc, char *argv[], unit_test_t *tests)
     int from, to, max = tests->size, ret;
     int  total = 0, disabled = 0, passed = 0, failed = 0, known_issues = 0;
 
-    if (is_list_tests(argc, argv, tests->size, tests->arr, tests->list_comment))
+    if (tests->tests_init)
+	tests->tests_init(argc, argv);
+
+    if (is_list_tests(argc, argv, tests))
 	return 0;
 
     if (test_getargs(argc, argv, &from, &to, max - 1))
@@ -250,7 +258,7 @@ int unit_test(int argc, char *argv[], unit_test_t *tests)
 	first_comment = 1;
 	total++;
 	printf("%i. %s: ", from + total, t->description);
-	if (t->disabled)
+	if (UT_DISABLED(tests, t))
 	{
 	    disabled++;
 	    p_colour(C_CYAN, "disabled\n");
