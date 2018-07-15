@@ -211,8 +211,8 @@ Exit:
     }
     else
     {
-	printf("private key: %s\n", private_name);
-	printf("public key: %s\n", public_name);
+	rsa_printf(0, 0, "private key: %s\n", private_name);
+	rsa_printf(0, 0, "public key: %s\n", public_name);
     }
 
     return ret;
