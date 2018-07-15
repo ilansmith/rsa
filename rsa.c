@@ -599,7 +599,7 @@ static void keyname_display_verbose_idx(rsa_key_link_t *list, int idx)
     int is_ambiguous = 0;
 
     keyname_display_init(lnk, idx);
-    printf("\n");
+    printf("files\n");
 
     for (plist = list; plist; plist = plist->next)
 	is_ambiguous += keyname_display_single_verbose(plist, lnk, idx, 0);
