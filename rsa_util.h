@@ -13,9 +13,15 @@
 #define ARRAY_SZ(arr) (sizeof(arr) / sizeof(arr[0]))
 #define IS_WHITESPACE(c) ((c) == ' ' || (c) == '\t')
 
+#ifdef RSA_COLOURS
 #define C_GREY "\033[00;37m"
 #define C_NORMAL "\033[00;00;00m"
 #define C_HIGHLIGHT "\033[01m"
+#else
+#define C_GREY ""
+#define C_NORMAL ""
+#define C_HIGHLIGHT ""
+#endif
 #define C_INDENTATION_FMT "\r\E[%dC%%s"
 
 #ifdef MERSENNE_TWISTER
