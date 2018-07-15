@@ -23,18 +23,6 @@ static void verbose_encryption(int is_full, char *key_name, int level,
 	fflush(stdout);
 }
 
-static int rsa_encrypt_seed(rsa_key_t *key, FILE *ciphertext)
-{
-	u1024_t seed;
-
-	if (rsa_key_enclev_set(key, rsa_encryption_level) || 
-		number_seed_set_random(&seed)) {
-		return -1;
-	}
-	rsa_encode(&seed, &seed, &key->exp, &key->n);
-	return rsa_write_u1024_full(ciphertext, &seed);
-}
-
 static int rsa_encrypt_length(rsa_key_t *key, FILE *ciphertext)
 {
 	u1024_t length;
@@ -133,7 +121,7 @@ static int rsa_encrypt_prolog(rsa_key_t **key, FILE **plaintext,
 	/* assert that resulting files will not be LFS and open RSA public
 	 * key */
 	if (rsa_assert_non_lfs(is_full) || 
-		!(*key = rsa_key_open(RSA_KEY_TYPE_PUBLIC))) {
+		!(*key = rsa_key_open_type(RSA_KEY_TYPE_PUBLIC))) {
 		return -1;
 	}
 
