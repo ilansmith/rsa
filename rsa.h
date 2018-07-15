@@ -47,10 +47,7 @@ typedef enum {
     RSA_OPT_LEVEL,
     RSA_OPT_RSAENC,
     RSA_OPT_FILE,
-#if 0
-    RSA_OPT_PATH,
-    RSA_OPT_STDIN,
-#endif
+    RSA_OPT_ENC_INFO_ONLY,
     RSA_OPT_MAX
 } rsa_opt_t;
 
