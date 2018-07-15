@@ -10,44 +10,51 @@
 #define RSA_OPT_CODE(X) (options[X].code)
 #define RSA_OPT_SHORT(X) (options[X].short_opt)
 #define RSA_OPT_LONG(X) (options[X].long_opt)
+#define RSA_OPT_ARG_REQUIREMENT(X) (options[X].arg_requirement)
 #define RSA_OPT_DESC(X) (options[X].description)
 
 #define RSA_OPT_ERROR 0x0
 #define RSA_OPT_HELP 0x1
+#if !RSA_MASTER
+#define RSA_OPT_VENDOR 0x02
+#endif
 #if RSA_MASTER || RSA_ENCRYPTER
-#define RSA_OPT_ENCRYPT 0x2
+#define RSA_OPT_ENCRYPT 0x04
 #endif
 #if RSA_MASTER || RSA_DECRYPTER
-#define RSA_OPT_DECRYPT 0x4
-#define RSA_OPT_GENERATE_KEY 0x8
+#define RSA_OPT_DECRYPT 0x08
+#define RSA_OPT_GENERATE_KEY 0x10
 #endif
-#if !RSA_MASTER
-#define RSA_OPT_VENDOR 0xa
-#endif
+#define RSA_OPT_FILE 0x20
 
 typedef struct opt_t {
     int code;
     char short_opt;
     char *long_opt;
+    int arg_requirement;
     char *description;
 } opt_t;
 
+static char *input_file_name;
+
 static opt_t options[] = {
-    {RSA_OPT_HELP, 'h', "help", "print this message and exit"},
+    {RSA_OPT_HELP, 'h', "help", no_argument, "print this message and exit"},
+#if !RSA_MASTER
+    {RSA_OPT_VENDOR, 'v', "vendor", no_argument, "vendor owning the keys"},
+#endif
 #if RSA_MASTER || RSA_ENCRYPTER
-    {RSA_OPT_ENCRYPT, 'e', "encrypt", "encrypt a message"},
+    {RSA_OPT_ENCRYPT, 'e', "encrypt", no_argument, "encrypt a message"},
 #endif
 #if RSA_MASTER || RSA_DECRYPTER
-    {RSA_OPT_DECRYPT, 'd', "decrypt", "decrypt a message"},
-    {RSA_OPT_GENERATE_KEY, 'k', "generate-key", "generate RSA public and "
-	"private keys"},
+    {RSA_OPT_DECRYPT, 'd', "decrypt", no_argument, "decrypt a message"},
+    {RSA_OPT_GENERATE_KEY, 'k', "generate-key", no_argument, 
+	"generate RSA public and private keys"},
 #endif
-#if !RSA_MASTER
-    {RSA_OPT_VENDOR, 'v', "vendor", "vendor owning the keys"},
-#endif
+    {RSA_OPT_FILE, 'f', "file", required_argument, "specify an input file, if "
+	"not set standard input is used"},
 };
 
-static int opt_idx_by_code(int opt)
+static int opt_index(int opt)
 {
     int idx;
 
@@ -73,55 +80,78 @@ static int opt_short2code(int opt)
     return RSA_OPT_ERROR;
 }
 
-static void optstring_init(char *str, ...)
+static int optstring_init(char *str, ...)
 {
     va_list ap;
-    char cstr[2] = {0, 0};
+    char cstr[4] = {0, 0, 0, 0};
+    int req, ret = 0;
 
     bzero(str, sizeof(str));
     va_start(ap, str);
     while ((cstr[0] = va_arg(ap, int)))
+    {
+	switch (req = va_arg(ap, int))
+	{
+	case no_argument:
+	    break;
+	case optional_argument: /* fall through */
+	    cstr[2] = ':';
+	case required_argument:
+	    cstr[1] = ':';
+	    break;
+	default:
+	    ret = -1;
+	    goto Exit;
+	}
 	strcat(str, cstr);
+	bzero(cstr, sizeof(cstr));
+    }
+Exit:
     va_end(ap);
+    return ret;
 }
 
 static int parse_args(int argc, char *argv[])
 {
+#define RSA_OPT_LONG_REGISTER(OPT)\
+    RSA_OPT_LONG(opt_index(OPT)), RSA_OPT_ARG_REQUIREMENT(opt_index(OPT)), \
+    NULL, RSA_OPT_SHORT(opt_index(OPT))
+#define RSA_OPT_SHORT_REGISTER(OPT) \
+    RSA_OPT_SHORT(opt_index(OPT)), RSA_OPT_ARG_REQUIREMENT(opt_index(OPT))
+
+
     int opt, rsa_opt = 0;
     char optstring[OPTSTR_MAX_LEN];
     struct option longopts[] = {
-	{RSA_OPT_LONG(opt_idx_by_code(RSA_OPT_HELP)), no_argument, NULL, 
-	    RSA_OPT_SHORT(opt_idx_by_code(RSA_OPT_HELP))},
+	{RSA_OPT_LONG_REGISTER(RSA_OPT_HELP)},
+#if !RSA_MASTER
+	{RSA_OPT_LONG_REGISTER(RSA_OPT_VENDOR)},
+#endif
 #if RSA_MASTER || RSA_ENCRYPTER
-	{RSA_OPT_LONG(opt_idx_by_code(RSA_OPT_ENCRYPT)), no_argument, NULL, 
-	    RSA_OPT_SHORT(opt_idx_by_code(RSA_OPT_ENCRYPT))},
+	{RSA_OPT_LONG_REGISTER(RSA_OPT_ENCRYPT)},
 #endif
 #if RSA_MASTER || RSA_DECRYPTER
-	{RSA_OPT_LONG(opt_idx_by_code(RSA_OPT_DECRYPT)), no_argument, NULL, 
-	    RSA_OPT_SHORT(opt_idx_by_code(RSA_OPT_DECRYPT))},
-	{RSA_OPT_LONG(opt_idx_by_code(RSA_OPT_GENERATE_KEY)), no_argument, 
-	    NULL, RSA_OPT_SHORT(opt_idx_by_code(RSA_OPT_GENERATE_KEY))},
+	{RSA_OPT_LONG_REGISTER(RSA_OPT_DECRYPT)},
+	{RSA_OPT_LONG_REGISTER(RSA_OPT_GENERATE_KEY)},
 #endif
-#if !RSA_MASTER
-	{RSA_OPT_LONG(opt_idx_by_code(RSA_OPT_VENDOR)), no_argument, NULL, 
-	    RSA_OPT_SHORT(opt_idx_by_code(RSA_OPT_VENDOR))},
-#endif
+	{RSA_OPT_LONG_REGISTER(RSA_OPT_FILE)},
 	{0, 0, 0, 0}
     };
 
     optstring_init(optstring, 
-	    RSA_OPT_SHORT(opt_idx_by_code(RSA_OPT_HELP)),
+	RSA_OPT_SHORT_REGISTER(RSA_OPT_HELP),
+#if !RSA_MASTER
+	RSA_OPT_SHORT_REGISTER(RSA_OPT_VENDOR),
+#endif
 #if RSA_MASTER || RSA_ENCRYPTER
-	    RSA_OPT_SHORT(opt_idx_by_code(RSA_OPT_ENCRYPT)),
+	RSA_OPT_SHORT_REGISTER(RSA_OPT_ENCRYPT),
 #endif
 #if RSA_MASTER || RSA_DECRYPTER
-	    RSA_OPT_SHORT(opt_idx_by_code(RSA_OPT_DECRYPT)),
-	    RSA_OPT_SHORT(opt_idx_by_code(RSA_OPT_GENERATE_KEY)),
+	RSA_OPT_SHORT_REGISTER(RSA_OPT_DECRYPT),
+	RSA_OPT_SHORT_REGISTER(RSA_OPT_GENERATE_KEY),
 #endif
-#if !RSA_MASTER
-	    RSA_OPT_SHORT(opt_idx_by_code(RSA_OPT_VENDOR)),
-#endif
-	    NULL);
+	RSA_OPT_SHORT_REGISTER(RSA_OPT_FILE),
+	NULL);
 
     while ((opt = getopt_long_only(argc, argv, optstring, longopts, NULL)) != 
 	-1)
@@ -131,6 +161,11 @@ static int parse_args(int argc, char *argv[])
 	case RSA_OPT_HELP:
 	    rsa_opt |= RSA_OPT_HELP;
 	    break;
+#if !RSA_MASTER
+	case RSA_OPT_VENDOR:
+	    rsa_opt |= RSA_OPT_VENDOR;
+	    break;
+#endif
 #if RSA_MASTER || RSA_ENCRYPTER
 	case RSA_OPT_ENCRYPT:
 	    rsa_opt |= RSA_OPT_ENCRYPT;
@@ -144,11 +179,10 @@ static int parse_args(int argc, char *argv[])
 	    rsa_opt |= RSA_OPT_GENERATE_KEY;
 	    break;
 #endif
-#if !RSA_MASTER
-	case RSA_OPT_VENDOR:
-	    rsa_opt |= RSA_OPT_VENDOR;
+	case RSA_OPT_FILE:
+	    input_file_name = optarg;
+	    rsa_opt |= RSA_OPT_FILE;
 	    break;
-#endif
 	default:
 	    rsa_opt = RSA_OPT_ERROR;
 	    goto Exit;
@@ -197,7 +231,7 @@ static void output_error(void)
 
 static void output_options(void)
 {
-#define OPTION_GAP 20
+#define OPTION_GAP 13
 #define POPTION(S, L, DESC) printf("  -%c, --%-*s %s\n", S, OPTION_GAP, L, DESC)
 
     int i;
@@ -250,20 +284,24 @@ int main(int argc, char *argv[])
     case RSA_OPT_HELP:
 	output_help(argv[0]);
 	break;
+#if !RSA_MASTER
+    case RSA_OPT_VENDOR:
+	rsa_vendor();
+	break;
+#endif
 #if RSA_MASTER || RSA_ENCRYPTER
     case RSA_OPT_ENCRYPT:
+	break;
+    case RSA_OPT_ENCRYPT | RSA_OPT_FILE:
 	break;
 #endif
 #if RSA_MASTER || RSA_DECRYPTER
     case RSA_OPT_DECRYPT:
 	break;
+    case RSA_OPT_DECRYPT | RSA_OPT_FILE:
+	break;
     case RSA_OPT_GENERATE_KEY:
 	rsa_key_generate();
-	break;
-#endif
-#if !RSA_MASTER
-    case RSA_OPT_VENDOR:
-	rsa_vendor();
 	break;
 #endif
     case RSA_OPT_ERROR:
