@@ -232,14 +232,10 @@ int parse_args(int argc, char *argv[], int *flags,
 
 static char *app_name(char *path)
 {
-#define MAX_APP_NAME_LEN 10
-
-    char *ptr = NULL;
-    static char name[MAX_APP_NAME_LEN];
+    char *ptr;
 
     for (ptr = path + strlen(path) - 1; ptr >= path && *ptr != '/'; ptr--);
-    snprintf(name, MAX_APP_NAME_LEN, "%s", ++ptr);
-    return name;
+    return ++ptr;
 }
 
 static void rsa_usage(char *path)
