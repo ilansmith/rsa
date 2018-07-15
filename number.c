@@ -675,7 +675,7 @@ void number_sub1(u1024_t *num)
     number_sub(num, num, &num_1);
 }
 
-STATIC void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
+void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
     int i;
     u1024_t tmp_res, multiplicand = *num1, multiplier = *num2;

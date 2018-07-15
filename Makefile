@@ -10,9 +10,10 @@
 #   determine which functions are to be timed by assigning either ENABLED or 
 #   DISSABLED in number.c:func_table[].
 
+ALL_TARGETS=rsa unit_test
 CFLAGS=-Wall -g
 TARGET_OBJS=number.o
-TARGET=
+TARGET=rsa
 
 ifeq ($(DEBUG),y)
 
@@ -41,6 +42,8 @@ endif
 endif
 endif
 endif
+else #not debug
+TARGET_OBJS+=main.o rsa_key.o
 endif
 
 .PHONY: all clean cleanall
@@ -54,8 +57,10 @@ $(TARGET): $(TARGET_OBJS)
 
 test.o: test.c rsa.h
 number.o: number.c rsa.h
+main.o: main.c rsa.h
+rsa_key.o: rsa_key.c rsa.h
 
 clean:
 	rm -rf *.o
 cleanall: clean
-	rm -rf $(TARGET) tags
+	rm -rf $(ALL_TARGETS) tags

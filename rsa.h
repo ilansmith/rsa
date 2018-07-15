@@ -22,6 +22,12 @@ typedef unsigned long long u64;
 #define STATIC static
 #endif
 
+#define RSA_PTASK_START(FMT, ...) printf(FMT ":\n", ##__VA_ARGS__); \
+    fflush(stdout)
+#define RSA_PSUB_TASK(FMT, ...) printf("  " FMT "... ", ##__VA_ARGS__); \
+    fflush(stdout)
+#define RSA_PDONE printf("done\n"); fflush(stdout)
+
 typedef struct u1024_t {
     u64 seg_00; /* bits:   0 -   63 */
     u64 seg_01; /* bits:  64 -  127 */
@@ -57,6 +63,8 @@ void number_find_prime(u1024_t *num);
 int number_radix(u1024_t *num_radix, u1024_t *num_n);
 void number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num, 
     u1024_t *mod);
+
+void rsa_key(void);
 
 #ifdef DEBUG
 void number_reset(u1024_t *num);
