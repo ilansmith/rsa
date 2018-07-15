@@ -139,19 +139,33 @@ int rsa_set_key_name(char *name)
 int rsa_set_file_name(char *name)
 {
     struct stat st;
+    int ret = -1;
 
     if (strlen(name) >= sizeof(file_name))
     {
 	rsa_error_message(RSA_ERR_FNAME_LEN, name);
-	return -1;
+	goto Exit;
     }
     if (stat(name, &st))
     {
 	rsa_error_message(RSA_ERR_FILE_NOT_EXIST, name);
-	return -1;
+	goto Exit;
+    }
+    if (S_ISDIR(st.st_mode))
+    {
+	rsa_error_message(RSA_ERR_FILE_IS_DIR, name);
+	goto Exit;
+    }
+    if (!S_ISREG(st.st_mode))
+    {
+	rsa_error_message(RSA_ERR_FILE_NOT_REG, name);
+	goto Exit;
     }
     sprintf(file_name, "%s", name);
-    return 0;
+    ret = 0;
+
+Exit:
+    return ret;
 }
 
 static int parse_args_finalize(int *flags, rsa_handler_t *handler)
