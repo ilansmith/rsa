@@ -23,7 +23,7 @@ ALL_TARGETS=$(RSA) $(RSA)_$(ENC) $(RSA)_$(DEC) $(TEST)_$(RSA)
 
 ifeq ($(TESTS),y) #debug mode: create unit tests
 TARGET=$(TEST)_$(RSA)
-test_rsa: rsa_test.o rsa_num.o rsa_io.o
+test_rsa: rsa_test.o rsa_num.o
 	gcc -o $@ $^ -lm
 else # creat rsa applications
 ifeq ($(SIG),) # create master
@@ -62,11 +62,7 @@ else
 ifeq ($(U64),ULLONG)
 CFLAGS+=-DULLONG
 else
-ifeq ($(U64),) # default
-CFLAGS+=-DALL_TESTS
-else
-$(error undefined type for u64) # error!
-endif
+$(error please define U64= {UCHAR or USHORT or ULONG or ULLONG}) # error!
 endif
 endif
 endif
