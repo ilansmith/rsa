@@ -6,8 +6,6 @@
 #include "rsa.h"
 
 static opt_t options_master[] = {
-	{RSA_OPT_FILE, 'f', "file", required_argument, ARG " is the input file "
-		"to encrypt/decrypt"},
 	{RSA_OPT_ENCRYPT, 'e', "encrypt", no_argument, "encrypt the data file "
 		"stated by --file"},
 	{RSA_OPT_LEVEL, 'l', "level", required_argument, "set encryption level "
@@ -70,11 +68,8 @@ static int parse_args_finalize_master(unsigned int *flags, int actions)
 		return -1;
 	}
 	/* test for non compatible options with encrypt/decrypt */
-	else if ((*flags & (OPT_FLAG(RSA_OPT_ENCRYPT) |
-		OPT_FLAG(RSA_OPT_DECRYPT))) &&
-		!(*flags & OPT_FLAG(RSA_OPT_FILE))) {
-		rsa_error_message(RSA_ERR_NOFILE);
-		return -1;
+	if (*flags & (OPT_FLAG(RSA_OPT_ENCRYPT) | OPT_FLAG(RSA_OPT_DECRYPT))) {
+		*flags |= OPT_FLAG(RSA_OPT_FILE);
 	}
 
 	return 0;
@@ -84,11 +79,6 @@ static int parse_args_master(int opt, unsigned int *flags)
 {
 	switch (opt_short2code(options_master, opt))
 	{
-	case RSA_OPT_FILE:
-		OPT_ADD(flags, RSA_OPT_FILE);
-		if (rsa_set_file_name(optarg))
-			return -1;
-		break;
 	case RSA_OPT_ENCRYPT:
 		OPT_ADD(flags, RSA_OPT_ENCRYPT);
 		break;

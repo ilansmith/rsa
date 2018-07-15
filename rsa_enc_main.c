@@ -5,8 +5,6 @@
 #include "rsa.h"
 
 static opt_t options_encrypter[] = {
-	{RSA_OPT_FILE, 'f', "file", required_argument, ARG " is the input file "
-		"to encrypt"},
 	{RSA_OPT_LEVEL, 'l', "level", required_argument, "set encryption level "
 		"to 128(default), 256, 512 or 1024"},
 	{RSA_OPT_RSAENC, 'r', "rsa", no_argument, "full RSA encryption. if "
@@ -34,14 +32,7 @@ static int parse_args_finalize_encrypter(unsigned int *flags, int actions)
 		*flags |= OPT_FLAG(RSA_OPT_RSAENC);
 
 	if (!actions)
-		*flags |= OPT_FLAG(RSA_OPT_ENCRYPT);
-
-	/* test for non compatible options with encrypt */
-	if ((*flags & OPT_FLAG(RSA_OPT_ENCRYPT)) &&
-		!(*flags & OPT_FLAG(RSA_OPT_FILE))) {
-		rsa_error_message(RSA_ERR_NOFILE);
-		return -1;
-	}
+		*flags |= OPT_FLAG(RSA_OPT_ENCRYPT) | OPT_FLAG(RSA_OPT_FILE);
 
 	return 0;
 }
@@ -50,11 +41,6 @@ static int parse_args_encrypter(int opt, unsigned int *flags)
 {
 	switch (opt_short2code(options_encrypter, opt))
 	{
-	case RSA_OPT_FILE:
-		OPT_ADD(flags, RSA_OPT_FILE);
-		if (rsa_set_file_name(optarg))
-			return -1;
-		break;
 	case RSA_OPT_LEVEL:
 		OPT_ADD(flags, RSA_OPT_LEVEL);
 		if (rsa_encryption_level_set(optarg))

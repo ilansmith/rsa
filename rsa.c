@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <libgen.h>
 #include <errno.h>
 #if RSA_MASTER
 #include "rsa_enc.h"
@@ -177,7 +178,8 @@ Exit:
 	return ret;
 }
 
-static int parse_args_finalize(unsigned int *flags, rsa_handler_t *handler)
+static int parse_args_finalize(int argc, char *argv[], unsigned int *flags,
+	rsa_handler_t *handler)
 {
 	int actions = 0;
 
@@ -196,57 +198,20 @@ static int parse_args_finalize(unsigned int *flags, rsa_handler_t *handler)
 		return -1;
 	}
 
-	return handler->ops_handler_finalize(flags, actions);
-}
+	if (handler->ops_handler_finalize(flags, actions))
+		return -1;
 
-int parse_args(int argc, char *argv[], unsigned int *flags, 
-	rsa_handler_t *handler)
-{
-	int opt, code;
-
-	optargs_init(handler->options);
-	while ((opt = getopt_long(argc, argv, optstring, longopts,
-		NULL)) != -1) {
-		switch (code = opt_short2code(options_common, opt))
-		{
-		case RSA_OPT_HELP:
-		case RSA_OPT_KEY_SCAN:
-		case RSA_OPT_PATH:
-			OPT_ADD(flags, code);
-			break;
-		case RSA_OPT_KEY_SET_DEFAULT:
-			OPT_ADD(flags, RSA_OPT_KEY_SET_DEFAULT);
-			if (optarg && rsa_set_key_name(optarg))
-				return -1;
-			break;
-		case RSA_OPT_QUITE:
-		case RSA_OPT_VERBOSE:
-			OPT_ADD(flags, code);
-			rsa_verbose_set(code == RSA_OPT_VERBOSE ?
-				V_VERBOSE : V_QUIET);
-			break;
-		default:
-		{
-			rsa_errno_t err;
-
-			if ((err = handler->ops_handler(opt, flags)) !=
-				RSA_ERR_NONE) {
-				return err;
-			}
-		}
-		break;
-		}
+	if ((*flags & OPT_FLAG(RSA_OPT_FILE)) &&
+			rsa_set_file_name(argv[argc-1])) {
+		return -1;
 	}
 
-	return parse_args_finalize(flags, handler);
+	return 0;
 }
 
 static void rsa_usage(char *path)
 {
-	char *ptr;
-
-	for (ptr = path + strlen(path) - 1; ptr >= path && *ptr != '/'; ptr--);
-	printf("usage: %s [ OPTIONS ]\n\n", ++ptr);
+	printf("usage: %s [ OPTIONS ] [ FILE ]\n\n", basename(path));
 }
 
 int rsa_error(char *app)
@@ -318,6 +283,53 @@ static void rsa_help(char *path, opt_t *options_private)
 	rsa_options(options_private);
 
 	printf("\nIAS, February 2007\n");
+}
+
+int parse_args(int argc, char *argv[], unsigned int *flags, 
+	rsa_handler_t *handler)
+{
+	int opt, code;
+
+	if (argc == 1) {
+		rsa_help(argv[0], handler->options);
+		return -1;
+	}
+
+	optargs_init(handler->options);
+	while ((opt = getopt_long(argc, argv, optstring, longopts,
+		NULL)) != -1) {
+		switch (code = opt_short2code(options_common, opt))
+		{
+		case RSA_OPT_HELP:
+		case RSA_OPT_KEY_SCAN:
+		case RSA_OPT_PATH:
+			OPT_ADD(flags, code);
+			break;
+		case RSA_OPT_KEY_SET_DEFAULT:
+			OPT_ADD(flags, RSA_OPT_KEY_SET_DEFAULT);
+			if (optarg && rsa_set_key_name(optarg))
+				return -1;
+			break;
+		case RSA_OPT_QUITE:
+		case RSA_OPT_VERBOSE:
+			OPT_ADD(flags, code);
+			rsa_verbose_set(code == RSA_OPT_VERBOSE ?
+				V_VERBOSE : V_QUIET);
+			break;
+		default:
+		{
+			rsa_errno_t err;
+
+			if ((err = handler->ops_handler(opt, flags)) !=
+				RSA_ERR_NONE) {
+				return err;
+			}
+		}
+		break;
+		}
+	}
+
+	return parse_args_finalize(argc, argv, flags, handler);
 }
 
 int rsa_set_key_data(char *name)

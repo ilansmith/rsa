@@ -5,8 +5,6 @@
 #include "rsa.h"
 
 static opt_t options_decrypter[] = {
-	{RSA_OPT_FILE, 'f', "file", required_argument, ARG " is the input file "
-		"to decrypt"},
 	{RSA_OPT_ORIG_FILE, 'o', "original", no_argument, "keep the original "
 		"file. if this option is not set the file will be deleted "
 		"after it has been decrypted"},
@@ -22,14 +20,7 @@ static opt_t options_decrypter[] = {
 static int parse_args_finalize_decrypter(unsigned int *flags, int actions)
 {
 	if (!actions && !(*flags & OPT_FLAG(RSA_OPT_KEYGEN)))
-		*flags |= OPT_FLAG(RSA_OPT_DECRYPT);
-
-	/* test for non compatible options with encrypt/decrypt */
-	if ((*flags & OPT_FLAG(RSA_OPT_DECRYPT)) &&
-		!(*flags & OPT_FLAG(RSA_OPT_FILE))) {
-		rsa_error_message(RSA_ERR_NOFILE);
-		return -1;
-	}
+		*flags |= OPT_FLAG(RSA_OPT_DECRYPT) | OPT_FLAG(RSA_OPT_FILE);
 
 	return 0;
 }
@@ -38,11 +29,6 @@ static int parse_args_decrypter(int opt, unsigned int *flags)
 {
 	switch (opt_short2code(options_decrypter, opt))
 	{
-	case RSA_OPT_FILE:
-		OPT_ADD(flags, RSA_OPT_FILE);
-		if (rsa_set_file_name(optarg))
-			return -1;
-		break;
 	case RSA_OPT_KEYGEN:
 		OPT_ADD(flags, RSA_OPT_KEYGEN);
 		if (rsa_set_key_data(optarg))
