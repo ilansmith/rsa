@@ -96,16 +96,32 @@ typedef unsigned long long u64;
 #define INLINE inline
 #endif /*  TESTS */
 
+#define ENC_LEVEL(X) (EL==(X))
+
+#define ENC_LEVEL_1024 (ENC_LEVEL(1024))
+#define ENC_LEVEL_512 (ENC_LEVEL(512) || ENC_LEVEL_1024)
+#define ENC_LEVEL_256 (ENC_LEVEL(256) || ENC_LEVEL_512)
+#define ENC_LEVEL_128 (ENC_LEVEL(128) || ENC_LEVEL_256)
+#define ENC_LEVEL_64 (ENC_LEVEL(64) || ENC_LEVEL_128)
+
 typedef struct u1024_t {
-    /* number */
+#if ENC_LEVEL_64
     u64 seg_00; /* bits:   0 -   63 */
+#endif
+#if ENC_LEVEL_128
     u64 seg_01; /* bits:  64 -  127 */
+#endif
+#if ENC_LEVEL_256
     u64 seg_02; /* bits: 128 -  191 */
     u64 seg_03; /* bits: 192 -  255 */
+#endif
+#if ENC_LEVEL_512
     u64 seg_04; /* bits: 256 -  319 */
     u64 seg_05; /* bits: 320 -  383 */
     u64 seg_06; /* bits: 384 -  447 */
     u64 seg_07; /* bits: 448 -  511 */
+#endif
+#if ENC_LEVEL_1024
     u64 seg_08; /* bits: 512 -  575 */
     u64 seg_09; /* bits: 576 -  639 */
     u64 seg_10; /* bits: 640 -  703 */
@@ -114,7 +130,8 @@ typedef struct u1024_t {
     u64 seg_13; /* bits: 832 -  895 */
     u64 seg_14; /* bits: 896 -  959 */
     u64 seg_15; /* bits: 960 - 1023 */
-    u64 seg_16; /* buffer */
+#endif
+    u64 buffer; /* buffer */
 } u1024_t;
 
 #define RSA_MASTER (!defined(RSA_ENC) && !defined(RSA_DEC))
@@ -139,7 +156,6 @@ typedef struct u1024_t {
 
 typedef struct {
     u64 prime_initializer;
-    u64 exp_initializer;
     u1024_t prime;
     u1024_t exp;
     u1024_t power_of_prime;

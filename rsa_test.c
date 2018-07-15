@@ -16,6 +16,11 @@
 #define C_NORMAL "\033[00;00;00m"
 #define C_HIGHLIGHT "\033[01;38m"
 
+#define CURSOR_POS_SAVE "\033[s"
+#define CURSOR_POS_RESTORE "\033[u"
+#define CURSOR_MOV_UP "\033[%dA"
+#define CURSOR_MOV_DOWN "\033[%dB"
+
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
 /* io functionality */
@@ -116,7 +121,6 @@ static int s_comment(char *comment, char *fmt, ...)
     va_start(va, fmt);
     ret += vio_colour(vprintf, C_GREY, comment, NULL);
     ret += (scn = to_vscanf(fmt, va)) ? scn : printf("\n");
-
     va_end(va);
 
     return ret;
@@ -1123,6 +1127,27 @@ static int test041(void)
 
 static int test042(void)
 {
+    u1024_t num_a, num_b;
+
+    if (number_init_str(&num_a, 
+	"0000000000000000000000000000000000000000000000000000000000000001"
+	"0010001100111000111110100101010000100011001001001011101011010000"
+	"0000110001011000001010011110111000010001001101011011101110111000"
+	) || 
+	number_init_str(&num_b, 
+	"1001010111111010010110110100111100101011011010001100001111100101"
+	"0101011011100010100010101000010101001110000100100110111100001101"
+	))
+    {
+	printf("initializing num_547, num_547_again or num_252 failed\n");
+	return -1;
+    }
+
+    return !number_is_greater(&num_a, &num_b);
+}
+
+static int test043(void)
+{
     u1024_t a, b, c, res;
 
     if (number_init_str(&a, 
@@ -1170,7 +1195,7 @@ static int test042(void)
     return !number_is_equal(&c, &res);
 }
 
-static int test043(void)
+static int test044(void)
 {
     u1024_t a, b, c, res;
 
@@ -1190,7 +1215,7 @@ static int test043(void)
     return !number_is_equal(&c, &res);
 }
 
-static int test044(void)
+static int test045(void)
 {
     u1024_t a, b, c, res;
 
@@ -1223,7 +1248,7 @@ static int test044(void)
     return !number_is_equal(&c, &res);
 }
 
-static int test045(void)
+static int test046(void)
 {
     u1024_t num_0, num_1, num_4, num_x, num_res;
     
@@ -1238,7 +1263,7 @@ static int test045(void)
     return !number_is_equal(&num_x, &num_res);
 }
 
-static int test046(void)
+static int test047(void)
 {
     u1024_t num_a, num_abs, num_5;
 
@@ -1251,7 +1276,7 @@ static int test046(void)
     return !(number_is_equal(&num_abs, &num_5));
 }
 
-static int test047(void)
+static int test048(void)
 {
     u1024_t num_min, num_abs, num_0, num_1;
     int is_1_gt_0, is_min1_gt_0, is_abs_min1_gt_0, ret = 0;
@@ -1314,6 +1339,23 @@ static int test052(void)
 
 static int test053(void)
 {
+    u1024_t a, b, q, r, res_q, res_r;
+
+    if (number_init_str(&a, "11111100") ||  /* 252 */
+	number_init_str(&b, "1000100011") || /* 547 */
+	number_init_str(&res_q, "0") || /* 0 */
+	number_init_str(&res_r, "11111100")) /* 252 */
+    {
+	printf("initializing a or b failed\n");
+	return -1;
+    }
+
+    number_dev(&q, &r, &a, &b);
+    return !(number_is_equal(&q, &res_q) && number_is_equal(&r, &res_r));
+}
+
+static int test054(void)
+{
     u1024_t num_n, num_29, num_res, num_rem, res;
     char prime[144];
     int i;
@@ -1347,7 +1389,7 @@ static int test053(void)
     return !(number_is_equal(&num_res, &res));
 }
 
-static int test054(void)
+static int test055(void)
 {
     u1024_t num_0, num_big1, num_big2, num_5, num_mod1, num_mod2;
     int res1, res2;
@@ -1371,7 +1413,7 @@ static int test054(void)
     return !(res1 && !res2);
 }
 
-static int test055(void)
+static int test056(void)
 {
 #define PRIME 11
 
@@ -1427,7 +1469,7 @@ static int test055(void)
 #undef PRIME
 }
 
-static int test056(void)
+static int test057(void)
 {
     u1024_t a, b, n, axb, num_1;
     u64 i, prime = 13;
@@ -1600,7 +1642,6 @@ static int test069(void)
     exp = 260;
 #endif
 
-
     number_small_dec2num(&res, r);
     number_small_dec2num(&num_n, n);
     number_small_dec2num(&num_base, base);
@@ -1714,16 +1755,18 @@ static int test084(void)
 static int test085(void)
 { 
     int res; 
-    u1024_t n, p1, p2, num_2, num_4, num_7, num_16, buf1, buf2;
+    u1024_t n, p1, p2, num_2, num_4, num_7, buf1, buf2, res1, res2;
 
     number_reset(&num_2);
     number_reset(&num_4);
     number_reset(&num_7);
-    number_reset(&num_16);
+    number_reset(&res1);
+    number_reset(&res2);
     *(u64 *)&num_2 = 2;
     *(u64 *)&num_4 = 4;
     *(u64 *)&num_7 = 7;
-    *(u64 *)&num_16 = 16;
+    *(u64 *)&res1 = (u64)2;
+    *(u64 *)&res2 = (u64)16;
 
     number_init_str(&p1, 
 	"0111000000011110000111011010101001000111011111101010101011101110"
@@ -1735,7 +1778,6 @@ static int test085(void)
 	"1000010100011110111010111010000110001111011000000010100101101101"
 	"0110010100101100001101001110000101101101010101011101101101001101");
 
-
     number_init_str(&p2,
 	"0101011010000010111100110110101110011001011100010100010111011110"
 	"0100100000010010001100010101011100001110101100011011001001001011"
@@ -1746,31 +1788,26 @@ static int test085(void)
 	"1111100111011001010011011001110101111101001101100110010010000101"
 	"0001010011111101100111100001110101001111000000111001011101010001");
 
-    p_comment("calculating n = p1*p2...");
     number_mul(&n, &p1, &p2);
-
-    p_comment("2^4 %% 7 = ");
     number_modular_exponentiation_montgomery(&buf1, &num_2, &num_4, &num_7);
-    p_u1024(&buf1);
-    p_comment("2^4 %% n = ");
     number_modular_exponentiation_montgomery(&buf2, &num_2, &num_4, &n);
-    p_u1024(&buf2);
-    res = memcmp(&buf1, &num_2, sizeof(u1024_t)) || 
-	memcmp(&buf2, &num_16, sizeof(u1024_t));
+    res = memcmp(&res1, &buf1, sizeof(u1024_t)) || 
+	memcmp(&res2, &buf2, sizeof(u1024_t));
 
     return res;
 }
 
 static int test086(void)
 {
-    u1024_t pow, two, bit_sz;
+    u1024_t res, pow, two, bit_sz;
 
+    number_reset(&res);
+    *((u64 *)&res + BLOCK_SZ_U1024 - 1) = MSB_PT(u64);
     number_small_dec2num(&two, (u64)2);
     number_small_dec2num(&bit_sz, (u64)(BIT_SZ_U1024 - 1));
 
     number_exponentiation(&pow, &two, &bit_sz);
-    p_u1024(&pow);
-    return 0;
+    return !number_is_equal(&res, &pow);
 }
 
 static int test091(void)
@@ -2012,46 +2049,152 @@ static int test107(void)
     return 0;
 }
 
-static int test108(void)
+static int rsa_key_generator_do(void)
 {
-    u1024_t p1, p2, n, e, d, phi;
+    char c = 0;
+    int is_do;
 
-    local_timer_start();
-    p_comment("finding large prime p1...");
-    number_find_prime(&p1);
-    p_comment("finding large prime p2...");
-    number_find_prime(&p2);
-    p_comment("calculating n = p1*p2...");
-    number_mul(&n, &p1, &p2);
-    p_comment("calculating phi = (p1-1)*(p2-1)...");
-    number_sub1(&p1);
-    number_sub1(&p2);
-    number_mul(&phi, &p1, &p2);
-    p_comment("generating puglic key: (e, n) - where e is coprime with phi...");
-    number_init_random_coprime(&e, &phi);
-    p_comment("calculating private key: (d, n) - where d is the multiplicative "
-	"inverse of e mod phi...");
-    number_modular_multiplicative_inverse(&d, &e, &phi);
-    p_comment("calculating the montgomery converter constant...");
-    number_montgomery_factor_set(&n, NULL);
-    local_timer_stop();
-    p_local_timer();
+    if (!ask_user)
+	return 1;
 
-    return 0;
+    s_comment("do you want to perform this test? [Y/n] ", "%c",	&c);
+    if (!(is_do = (c != 'n' && c != 'N')))
+	p_comment("skipping...");
+    return is_do;
 }
 
-static int test109(void)
-{ 
-    int res; 
-    u1024_t n, p1, e, d, p1_sub, p2_sub, phi, p2, buf1, buf2, buf3;
-    char *phrase = "This is a 1024 bit long phrase conisiting of 125 "
-	"alphanumeric characters, punctuation,\na '\\n' and a terminating "
-	"'\\0' character.";
+static void rsa_key_generator(u1024_t *p1, u1024_t *p2, u1024_t *n, u1024_t *e, 
+    u1024_t *d, int is_print)
+{
+    u1024_t p1_sub1, p2_sub1, phi;
+    int iter = 0;
+    static int init;
+    static u1024_t min;
 
-    number_reset(&buf1);
-    number_reset(&buf2);
-    number_reset(&buf3);
-    memcpy(&buf1, phrase, strlen(phrase));
+    if (!init)
+    {
+	u64 *ptr;
+
+	for (ptr = (u64*)&min; ptr < (u64*)&min + BLOCK_SZ_U1024; ptr++)
+	    *ptr = 1;
+	init = 1;
+    }
+
+    do
+    {
+	if (is_print)
+	{
+	    local_timer_start();
+	    p_comment("finding large prime p1...");
+	}
+	number_find_prime(p1);
+	if (is_print)
+	    p_comment("finding large prime p2...");
+	number_find_prime(p2);
+
+	if (is_print)
+	    p_comment("calculating n = p1*p2...");
+	number_mul(n, p1, p2);
+
+	p1_sub1 = *p1;
+	p2_sub1 = *p2;
+	number_sub1(&p1_sub1);
+	number_sub1(&p2_sub1);
+	if (is_print)
+	    p_comment("calculating phi = (p1-1)*(p2-1)...");
+	number_mul(&phi, &p1_sub1, &p2_sub1);
+
+	if (is_print)
+	{
+	    p_comment("generating puglic key: (e, n) - where e is coprime with "
+		"phi...");
+	}
+	number_init_random_coprime(e, &phi);
+	if (is_print)
+	{
+	    p_comment("calculating private key: (d, n) - where d is the "
+		"multiplicative inverse of e mod phi...");
+	}
+	number_modular_multiplicative_inverse(d, e, &phi);
+	if (is_print)
+	{
+	    local_timer_stop();
+	    p_local_timer();
+	}
+
+	iter++;
+    }
+    while (!number_is_greater_or_equal(n, &min));
+
+    if (iter > 1)
+	p_comment("key generation required %d iterations", iter);
+}
+
+static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d, 
+    u1024_t *data, int is_print)
+{
+    int res;
+    u1024_t input, output, encryption, decryption, q, r;
+#if ENC_LEVEL(128) /* 16 bytes */
+#define PHRASE "Testing 128 bits"
+#elif ENC_LEVEL(256) /* 32 bytes */
+#define PHRASE "Ilan A. Smith 256 bit validation"
+#elif ENC_LEVEL(512) /* 64 bytes */
+#define PHRASE "Ilan A. Smith 512 bits encryption / decryption validation " \
+    "string"
+#else /* ENC_LEVEL(1024) 128 bytes */
+#define PHRASE "Ilan A. Smith 1024 bit encryption / decryption validation " \
+    "string\n used for testing whether or not the RSA key needs regenerating"
+#endif
+
+    if (!data)
+    {
+	number_reset(&input);
+	strcpy((char*)&input, PHRASE);
+    }
+    else
+	input = *data;
+    number_reset(&encryption);
+    number_reset(&decryption);
+
+    /* RSA requires that input is in Zn, that is: 1 <= input < n */
+    number_dev(&q, &r, &input, n);
+
+    if (is_print)
+    {
+	p_comment("encrypting input...");
+	local_timer_start();
+    }
+    number_modular_exponentiation_montgomery(&encryption, &r, e, n);
+    if (is_print)
+    {
+	local_timer_stop();
+	p_local_timer();
+
+	p_comment("decrypting encrypted input...");
+	local_timer_start();
+    }
+    number_modular_exponentiation_montgomery(&decryption, &encryption, d, n);
+    if (is_print)
+    {
+	local_timer_stop();
+	p_local_timer();
+    }
+
+    number_mul(&output, &q, n);
+    number_add(&output, &output, &decryption);
+    res = memcmp(&input, &output, sizeof(u1024_t));
+    if (is_print)
+    {
+	p_comment("decryption of encrypted data %s data",  res ? 
+	    "does not equal" : "equals");
+    }
+    return res;
+}
+
+static int test108(void)
+{ 
+    u1024_t p1, p2, n, e, d;
 
     number_init_str(&p1, 
 	"1000000100010100111001000110011011001010010011110011011101111000"
@@ -2062,7 +2205,6 @@ static int test109(void)
 	"0010001111000101011011011111011111110110111011111100011111101000"
 	"1010011010001100001011110101000101101010111111110000111001101100"
 	"0111101001110110011110010000110010001110011001101001001110101111");
-
 
     number_init_str(&p2,
 	"1000001111101111010111100000010010011011010010010100001011100000"
@@ -2075,13 +2217,6 @@ static int test109(void)
 	"0001010001100100011000110110000100110001111011010111110101101001");
     p_comment("calculating n = p1*p2...");
     number_mul(&n, &p1, &p2);
-
-    p1_sub = p1;
-    p2_sub = p2;
-    number_sub1(&p1_sub);
-    number_sub1(&p2_sub);
-    p_comment("calculating phi = (p1-1)*(p2-1)...");
-    number_mul(&phi, &p1_sub, &p2_sub);
 
     number_init_str(&e,
 	"0000010000011100101101000001011101101100000110010100010111010110"
@@ -2125,97 +2260,92 @@ static int test109(void)
      * - number_modular_multiplication_naive cannot be used since e and d are
      *   ~1024 bit number and cannot be multiplied naively in a 1024 bit buffer.
      */
-    p_comment("encrypting buf1 -> buf2...");
-    local_timer_start();
-    number_modular_exponentiation_montgomery(&buf2, &buf1, &e, &n);
-    local_timer_stop();
-    p_local_timer();
-    p_comment("decrypting buf2 -> buf3...");
-    local_timer_start();
-    number_modular_exponentiation_montgomery(&buf3, &buf2, &d, &n);
-    local_timer_stop();
-    p_local_timer();
-
-    res = memcmp(&buf1, &buf3, sizeof(u1024_t));
-    p_comment("buf1 %s= buf3",  res ? "!" : "=");
-
-    return res;
+    return rsa_encryptor_decryptor(&n, &e, &d, NULL, 1);
 }
 
-static int is_test110_do(void)
-{
-    char c = 0;
+static int test109(void)
+{ 
+    u1024_t p1, p2, n, e, d, data;
+	
+    number_init_str(&data, 
+	"0000000000000000011001010111001101100001011010000111000000100000"
+	"0111010001101001011000100010000000110001001100110010000001100001");
 
-    if (!ask_user)
-	return 1;
+    number_init_str(&p1, 
+	"1011010001000100100011101100011110010000011010011010110111110101");
 
-    s_comment("do you want to perform this test (approx 5 min.)? [Y/n] ", "%c",
-	&c);
-    return !(c == 'n' || c == 'N');
-}
-
-static int test110(void)
-{
-    int res;
-    u1024_t n, e, d, buf1, buf2, buf3;
-    u1024_t p1, p2, p1_sub, p2_sub, phi;
-    char *phrase = "This is a 1024 bit long phrase conisiting of 125 "
-	"alphanumeric characters, punctuation,\na '\\n' and a terminating "
-	"'\\0' character.";
-
-    if (!is_test110_do())
-    {
-	p_comment("skipping...");
-	return 0;
-    }
-
-    number_reset(&buf1);
-    number_reset(&buf2);
-    number_reset(&buf3);
-    memcpy(&buf1, phrase, strlen(phrase));
-
-    local_timer_start();
-    p_comment("finding large prime p1...");
-    number_find_prime(&p1);
-    p_comment("finding large prime p2...");
-    number_find_prime(&p2);
-
+    number_init_str(&p2,
+	"1101010011111100001011111011000100101111111100000011010110111001");
     p_comment("calculating n = p1*p2...");
     number_mul(&n, &p1, &p2);
 
-    p1_sub = p1;
-    p2_sub = p2;
-    number_sub1(&p1_sub);
-    number_sub1(&p2_sub);
-    p_comment("calculating phi = (p1-1)*(p2-1)...");
-    number_mul(&phi, &p1_sub, &p2_sub);
+    number_init_str(&e,
+	"0111101001111100100110010101111100000001011011001001000000100000"
+	"0001110001111101011010101011111001011001011110110110001001100101"
+	);
 
-    p_comment("generating puglic key: (e, n) - where e is coprime with phi...");
-    number_init_random_coprime(&e, &phi);
-    p_comment("calculating private key: (d, n) - where d is the multiplicative "
-	"inverse of e mod phi...");
-    number_modular_multiplicative_inverse(&d, &e, &phi);
-    local_timer_stop();
-    p_local_timer();
+    number_init_str(&d,
+	"0111000000010010110011101110101101110000100000100111100001001100"
+	"0000011111100001111000110100100111101000111010111110101011101101"
+	);
 
-    p_comment("phrase: '%s'", phrase);
-    p_comment("encrypting...");
-    local_timer_start();
-    number_modular_exponentiation_montgomery(&buf2, &buf1, &e, &n);
-    local_timer_stop();
-    p_local_timer();
+    return rsa_encryptor_decryptor(&n, &e, &d, &data, 1);
+}
 
-    p_comment("decrypting...");
-    local_timer_start();
-    number_modular_exponentiation_montgomery(&buf3, &buf2, &d, &n);
-    local_timer_stop();
-    p_local_timer();
+static int test111(void)
+{
+    u1024_t p1, p2, n, e, d;
 
-    res = memcmp(&buf1, &buf3, sizeof(u1024_t));
-    p_comment("decryption %smatche%s the original",  res ? "does not " : "", 
-	res ? "" : "s");
+    rsa_key_generator(&p1, &p2, &n, &e, &d, 1);
+    return rsa_encryptor_decryptor(&n, &e, &d, NULL, 1);
+}
 
-    return res;
+static int test112(void)
+{
+#define MULTIPLE_RSA "1000"
+#define LEN 50 
+
+    u1024_t p1, p2, n, e, d;
+    int i, timeout, iter;
+    char *err = NULL;
+
+    if (!rsa_key_generator_do())
+	return 0;
+
+    iter = strtol(MULTIPLE_RSA, &err, 10);
+    if (*err)
+    {
+	p_comment("MULTIPLE_RSA (%s) must be an integer string", MULTIPLE_RSA);
+	return -1;
+    }
+    timeout = iter/LEN;
+    io_init();
+    for (i = 1; i <= iter; i++)
+    {
+	rsa_key_generator(&p1, &p2, &n, &e, &d, 0);
+	if (rsa_encryptor_decryptor(&n, &e, &d, NULL, 0))
+	    goto error;
+	if (!(i%(iter/LEN)))
+	    vio_colour(vprintf, C_GREY, ".", NULL);
+    }
+    fprintf(stdout, "\n");
+    return 0;
+
+error:
+    p_comment("\niteration %d failed", i + 1);
+    p_comment("p1:");
+    p_u1024(&p1);
+    p_comment("p2:");
+    p_u1024(&p2);
+    p_comment("n:");
+    p_u1024(&n);
+    p_comment("e:");
+    p_u1024(&e);
+    p_comment("d:");
+    p_u1024(&d);
+
+    return -1;
+#undef LEN
 }
 
 typedef struct test116_t {
@@ -2613,14 +2743,14 @@ static test_t rsa_tests[] =
     {
 	description: "(2x3x11x13x17x19)^10 x (5x7x23x29x31x37x41)^11",
 	func: test034,
-#ifndef ULLONG
+#if !defined(ULLONG) || !ENC_LEVEL(1024)
 	disabled: 1,
 #endif
     },
     {
 	description: "multiply the first 75 primes (and again by the 4th)",
 	func: test035,
-#ifndef ULLONG
+#if !defined(ULLONG) || !ENC_LEVEL(1024)
 	disabled: 1,
 #endif
     },
@@ -2633,43 +2763,50 @@ static test_t rsa_tests[] =
 #endif
     },
     {
-	description: "number_sub() - basic functionality",
+	description: "number_is_greater() u1024_t.buffer != 0",
 	func: test042,
-#ifndef UCHAR
+#if !defined(ULLONG) || !ENC_LEVEL(1024)
 	disabled: 1,
 #endif
     },
     {
-	description: "number_sub() - advanced functionality",
+	description: "number_sub() - basic functionality",
 	func: test043,
 #ifndef UCHAR
 	disabled: 1,
 #endif
     },
     {
-	description: "number_sub() - subtacting from zero",
+	description: "number_sub() - advanced functionality",
 	func: test044,
 #ifndef UCHAR
 	disabled: 1,
 #endif
     },
     {
-	description: "negative numbers",
+	description: "number_sub() - subtacting from zero",
 	func: test045,
 #ifndef UCHAR
 	disabled: 1,
 #endif
     },
     {
-	description: "number_absolute_value()",
+	description: "negative numbers",
 	func: test046,
 #ifndef UCHAR
 	disabled: 1,
 #endif
     },
     {
-	description: "negative and absolute numbers",
+	description: "number_absolute_value()",
 	func: test047,
+#ifndef UCHAR
+	disabled: 1,
+#endif
+    },
+    {
+	description: "negative and absolute numbers",
+	func: test048,
 #ifndef UCHAR
 	disabled: 1,
 #endif
@@ -2690,29 +2827,36 @@ static test_t rsa_tests[] =
 #endif
     },
     {
-	description: "deviding a 475 bit number by 29",
+	description: "number_dev() - deviding a number by a larger number",
 	func: test053,
-#ifndef ULLONG
+#ifndef UCHAR
+	disabled: 1,
+#endif
+    },
+    {
+	description: "deviding a 475 bit number by 29",
+	func: test054,
+#if !defined(ULLONG) || !ENC_LEVEL(1024)
 	disabled: 1,
 #endif
     },
     {
 	description: "number_mod() sanity test",
-	func: test054,
+	func: test055,
 #ifndef ULLONG
 	disabled: 1,
 #endif
     },
     {
 	description: "number_extended_euclid_gcd()",
-	func: test055,
+	func: test056,
 #ifdef UCHAR
 	disabled: 1,
 #endif
     },
     {
 	description: "number_modular_multiplicative_inverse()",
-	func: test056,
+	func: test057,
 #ifndef ULLONG
 	disabled: 1,
 #endif
@@ -2781,7 +2925,7 @@ static test_t rsa_tests[] =
     {
 	description: "number_montgomery_factor_set()",
 	func: test071,
-#ifndef ULLONG
+#if !defined(ULLONG) || !ENC_LEVEL(1024)
 	disabled: 1,
 #endif
     },
@@ -2839,7 +2983,7 @@ static test_t rsa_tests[] =
     {
 	description: "exponentiation modolo a larg number",
 	func: test085,
-#ifndef ULLONG
+#if !defined(ULLONG) || !ENC_LEVEL(1024)
 	disabled: 1,
 #endif
     },
@@ -2911,7 +3055,7 @@ static test_t rsa_tests[] =
     {
 	description: "number_is_prime(94R(71)9) - 475 bit prime",
 	func: test099,
-#if !defined(ULLONG) || defined(TIME_FUNCTIONS)
+#if !defined(ULLONG) || !ENC_LEVEL(1024) || defined(TIME_FUNCTIONS)
 	disabled: 1,
 #endif
     },
@@ -2940,25 +3084,33 @@ static test_t rsa_tests[] =
 #endif
     },
     {
-	description: "create rsa key",
+	description: "encryption - decryption with length(n=p1xp2)=1023 bits",
 	func: test108,
-#ifndef ULLONG
+#if !defined(ULLONG) || !ENC_LEVEL(1024)
 	disabled: 1,
 #endif
     },
-    /* RSA encryption and decriyption */
     {
-	description: "encryption - decryption with length(n=p1xp2)=1023 bits",
+	description: "encryption - decryption: overflow during "
+	    "num_montgomery_factor cration",
 	func: test109,
-#ifndef ULLONG
+#if !defined(ULLONG) || !ENC_LEVEL(128)
 	disabled: 1,
 #endif
     },
     {
 	description: "complete RSA test - key generation, encryption and "
 	    "decryption",
-	func: test110,
+	func: test111,
 #if !defined(ULLONG) || defined(TIME_FUNCTIONS)
+	disabled: 1,
+#endif
+    },
+    {
+	description: "multiple RSA key generation (" MULTIPLE_RSA 
+	    " iterations)",
+	func: test112,
+#if !defined(ULLONG) || !ENC_LEVEL(128) || defined(TIME_FUNCTIONS)
 	disabled: 1,
 #endif
     },
@@ -3155,17 +3307,17 @@ int main(int argc, char *argv[])
 	total++;
 	printf("%i. %s", total + from, t->description);
 	printf(": ");
-	if (!all_tests && t->disabled)
-	{
-	    disabled++;
-	    p_colour(C_CYAN, "disabled\n");
-	    continue;
-	}
 	if (t->known_issue)
 	{
 	    p_colour(C_BLUE, "known issue: ");
 	    p_colour(C_NORMAL, "%s\n", t->known_issue);
 	    known_issues++;
+	    continue;
+	}
+	if (!all_tests && t->disabled)
+	{
+	    disabled++;
+	    p_colour(C_CYAN, "disabled\n");
 	    continue;
 	}
 	if (!t->func)
