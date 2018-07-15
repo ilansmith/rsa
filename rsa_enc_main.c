@@ -8,7 +8,7 @@ static opt_t options_encrypter[] = {
     {RSA_OPT_FILE, 'f', "file", required_argument, ARG " is the input file to "
 	"encrypt"},
     {RSA_OPT_LEVEL, 'l', "level", required_argument, "set encryption level to "
-	"128, 256, 512 or 1024(default)."},
+	"128(default), 256, 512 or 1024."},
     {RSA_OPT_RSAENC, 'r', "rsa", no_argument, "full RSA encryption. if this "
 	"flag is not set, encryption will be done using a symmetric "
 	"key and only it will be RSA encrypted"},

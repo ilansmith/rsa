@@ -11,7 +11,7 @@ static opt_t options_master[] = {
     {RSA_OPT_ENCRYPT, 'e', "encrypt", no_argument, "encrypt the data file "
 	"stated by --file"},
     {RSA_OPT_LEVEL, 'l', "level", required_argument, "set encryption level to "
-	"128, 256, 512 or 1024(default). this  switch implies encryption"},
+	"128(default), 256, 512 or 1024. this  switch implies encryption"},
     {RSA_OPT_RSAENC, 'r', "rsa", no_argument, "full RSA encryption. if this "
 	"flag is not set, encryption/decryption will be done using a symmetric "
 	"key and only it will be RSA encrypted/decrypted. this switch implies "
