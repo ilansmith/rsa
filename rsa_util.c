@@ -5,8 +5,12 @@
 #include <unistd.h>
 #include "rsa_util.h"
 
-static verbose_t rsa_verbose;
+#define RSA_TIMELINE_LEN 80
+
 typedef int (* io_func_t)(void *ptr, int size, int nmemb, FILE *stream);
+
+static verbose_t rsa_verbose;
+static double timeline_inc;
 
 int code2code(code2code_t *list, int code)
 {
@@ -294,3 +298,44 @@ char *rsa_highlight_str(char *fmt, ...)
     return ret;
 }
 
+int rsa_timeline_init(int len)
+{
+    char fmt[20];
+    int block_num = (len-1)/(block_sz_u1024*sizeof(u64)) + 1;
+
+    if (rsa_verbose == V_QUIET || block_num < 2)
+	return 0;
+
+    timeline_inc = (double)block_num/RSA_TIMELINE_LEN;
+    sprintf(fmt, "[%%-%ds]\r[", RSA_TIMELINE_LEN);
+
+    printf(fmt, "");
+    fflush(stdout);
+
+    return 1;
+}
+
+void rsa_timeline(void)
+{
+    static int blocks, dots;
+    static double timeline;
+
+    if (!timeline_inc || ++blocks < timeline)
+	return;
+
+    while (timeline < blocks && dots < RSA_TIMELINE_LEN)
+    {
+	dots++;
+	timeline += timeline_inc;
+	printf(".");
+    }
+    fflush(stdout);
+}
+
+void rsa_timeline_uninit(void)
+{
+    if (!timeline_inc)
+	return;
+    printf("\n");
+    fflush(stdout);
+}
