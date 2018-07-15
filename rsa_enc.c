@@ -83,10 +83,7 @@ static int rsa_encrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
 {
     /* open RSA public key */
     if (!(*key = rsa_key_open_encrypt(is_full)))
-    {
-	rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__, __LINE__);
 	return -1;
-    }
 
     /* open file to encrypt */
     if (!(*data = fopen(file_name, "r")))
