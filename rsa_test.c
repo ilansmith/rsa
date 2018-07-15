@@ -162,16 +162,12 @@ static char *p_u64(u64 *ptr)
 
 static void p_u1024(u1024_t *num)
 {
-    int i = BLOCK_SZ_U1024;
-    u64 *last_seg = (u64*)num + i;
+    int i = block_sz_u1024;
     u64 *ptr;
 
     p_comment("tp: %d", num->top);
-    p_comment("bf: %s", p_u64(last_seg));
-    last_seg--;
-    i--;
-
-    for (ptr = last_seg; ptr >= (u64*)num; ptr--)
+    p_comment("bf: %s", p_u64((u64*)&num->arr + i--));
+    for (ptr = (u64*)&num->arr + i; ptr >= (u64*)&num->arr; ptr--)
     {
 	p_comment("%2i: %s", i, p_u64(ptr));
 	i--;
@@ -2184,7 +2180,7 @@ static int rsa_post_decrypt(u1024_t *output, u64 multiplier,
     else
 	*output = *decryption;
 
-    return output->buffer ? -1 : 0;
+    return *((u64*)&output->arr + block_sz_u1024) ? -1 : 0;
 }
 
 static int rsa_encryptor_decryptor(u1024_t *n, u1024_t *e, u1024_t *d, 
@@ -3140,7 +3136,7 @@ static test_t rsa_tests[] =
 #endif
     },
     {
-	description: "number_is_greater() u1024_t.buffer != 0",
+	description: "number_is_greater() u1024_t.arr.buffer != 0",
 	func: test042,
 #if !defined(ULLONG) || !ENC_LEVEL(1024)
 	disabled: 1,
