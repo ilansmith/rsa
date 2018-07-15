@@ -7,27 +7,38 @@
 /* unit_test.h should be included after the tested code's header files so that
  * if it defines any of the following definitions it should get precedence */
 
-#ifndef C_CYAN
+#ifdef RSA_COLOURS
+#undef C_CYAN
 #define C_CYAN "\033[01;36m"
-#endif
-#ifndef C_RED
+#undef C_RED
 #define C_RED "\033[01;31m"
-#endif
-#ifndef C_GREEN
+#undef C_GREEN
 #define C_GREEN "\033[01;32m"
-#endif
-#ifndef C_BLUE
+#undef C_BLUE
 #define C_BLUE "\033[01;34m"
-#endif
-#ifndef C_GREY
+#undef C_GREY
 #define C_GREY "\033[00;37m"
-#endif
-#ifndef C_NORMAL
+#undef C_NORMAL
 #define C_NORMAL "\033[00;00;00m"
-#endif
-#ifndef C_HIGHLIGHT
+#undef C_HIGHLIGHT
 #define C_HIGHLIGHT "\033[01m"
+#else
+#undef C_CYAN
+#define C_CYAN ""
+#undef C_RED
+#define C_RED ""
+#undef C_GREEN
+#define C_GREEN ""
+#undef C_BLUE
+#define C_BLUE ""
+#undef C_GREY
+#define C_GREY ""
+#undef C_NORMAL
+#define C_NORMAL ""
+#undef C_HIGHLIGHT
+#define C_HIGHLIGHT ""
 #endif
+
 #ifndef CURSOR_POS_SAVE
 #define CURSOR_POS_SAVE "\033[s"
 #endif
