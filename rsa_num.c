@@ -83,40 +83,31 @@ STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 static void INLINE number_shift_right_once(u1024_t *num)
 {
     u64 *seg;
-    int next_overflow, prev_overflow;
 
     TIMER_START(FUNC_NUMBER_SHIFT_RIGHT_ONCE);
     /* shifting is done from the buffer u64 to accomodate for 
      * number_montgomery_product()
      */
-    for (seg = (u64 *)num + BLOCK_SZ_U1024, prev_overflow = 0; 
-	seg >= (u64 *)num; seg--)
+    for (seg = (u64 *)num; seg < (u64 *)num + BLOCK_SZ_U1024; seg++)
     {
-	next_overflow = (int)(*seg & (u64)1);
 	*seg = *seg >> 1;
-	if (prev_overflow)
-	    *seg = *seg | MSB_PT(u64);
-	prev_overflow = next_overflow;
+	*seg = (*(seg+1) & (u64)1) ? *seg | MSB_PT(u64) : *seg & ~MSB_PT(u64);
     }
+    *seg = *seg >> 1;
     TIMER_STOP(FUNC_NUMBER_SHIFT_RIGHT_ONCE);
 }
 
 static void INLINE number_shift_left_once(u1024_t *num)
 {
-    u64 mask_lsb = (u64)~1;
-    u64 *seg = (u64 *)num + BLOCK_SZ_U1024;
+    u64 *seg;
 
     TIMER_START(FUNC_NUMBER_SHIFT_LEFT_ONCE);
-    *seg = *seg << 1;
-    *seg = *seg & mask_lsb;
-    seg--;
-    while (seg >= (u64 *)num)
+    for (seg = (u64*)num + BLOCK_SZ_U1024; seg > (u64*)num; seg--)
     {
-	*(seg + 1) += *seg & MSB_PT(u64) ? 1 : 0;
 	*seg = *seg << 1;
-	*seg = *seg & mask_lsb;
-	seg--;
+	*seg = *(seg-1) & MSB_PT(u64) ? *seg | (u64)1 : *seg & ~(u64)1;
     }
+    *seg = *seg << 1;
     TIMER_STOP(FUNC_NUMBER_SHIFT_LEFT_ONCE);
 }
 
@@ -324,19 +315,6 @@ STATIC int INLINE number_is_greater_or_equal(u1024_t *num1, u1024_t *num2)
     TIMER_STOP(FUNC_NUMBER_IS_GREATER_OR_EQUAL);
     return ret;
 }
-#if 0
-/* return: num1 > num2 */
-STATIC int INLINE number_is_greater(u1024_t *num1, u1024_t *num2)
-{
-    return memcmp(num1, num2, sizeof(u1024_t)) < 0;
-}
-
-/* return: num1 >= num2 */
-STATIC int INLINE number_is_greater_or_equal(u1024_t *num1, u1024_t *num2)
-{
-    return memcmp(num1, num2, sizeof(u1024_t)) <= 0;
-}
-#endif
 
 /* return: num1 == num2 */
 STATIC int INLINE number_is_equal(u1024_t *num1, u1024_t *num2)
