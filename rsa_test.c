@@ -31,7 +31,7 @@ static code2str_t el2phrase[] = {
     {256, "Validation of 256 bit encryption"},
     {512, "Ilan A. Smith 512 bits encryption / decryption validation string"},
     {1024, "Ilan A. Smith 1024 bit encryption / decryption validation string\n"
-	" used for varifying that encryption is identical to decryption."},
+	" used for verifying that encryption is identical to decryption."},
     {-1}
 };
 
@@ -1433,8 +1433,8 @@ static int test055(void)
     res1 = number_is_equal(&num_mod1, &num_0);
     res2 = number_is_equal(&num_mod2, &num_0);
 
-    p_comment("coprime(%s, 5) = %s", big_num1_str, res1 ? "no" : "yes");
-    p_comment("coprime(%s, 5) = %s", big_num2_str, res2 ? "no" : "yes");
+    p_comment("co prime(%s, 5) = %s", big_num1_str, res1 ? "no" : "yes");
+    p_comment("co prime(%s, 5) = %s", big_num2_str, res2 ? "no" : "yes");
 
     return !(res1 && !res2);
 }
@@ -1711,7 +1711,7 @@ static int test076(void)
     number_small_dec2num(&res, (u64)4);
     number_small_dec2num(&num_5, (u64)5);
     number_small_dec2num(&num_8, (u64)8);
-    number_small_dec2num(&num_9, (u64)9); /* modulus must be coprime with 2 */
+    number_small_dec2num(&num_9, (u64)9); /* modulus must be co prime with 2 */
     number_modular_multiplication_montgomery(&num_4, &num_5, &num_8, &num_9);
     return !number_is_equal(&num_4, &res);
 }
@@ -2101,7 +2101,7 @@ static int test106(void)
 	if (res_num_p || !res_num_inc)
 	    res = 1;
 
-	p_comment("coprime("NUM_P", %llu) = %s, coprime("NUM_INC", %llu) = "
+	p_comment("co prime("NUM_P", %llu) = %s, co prime("NUM_INC", %llu) = "
 	    "%s", primes[i], res_num_p ? "no" : "yes", primes[i], res_num_inc ? 
 	    " no" : "yes");
     }
@@ -2182,8 +2182,8 @@ static void rsa_key_generator(u1024_t *p1, u1024_t *p2, u1024_t *n, u1024_t *e,
 
 	if (is_print)
 	{
-	    p_comment("generating puglic key: (e, n) - where e is coprime with "
-		"phi...");
+	    p_comment("generating public key: (e, n) - where e is co prime "
+		"with phi...");
 	}
 	number_init_random_coprime(e, &phi);
 	if (is_print)
@@ -2220,7 +2220,7 @@ static int rsa_pre_encrypt(u1024_t *input, u64 *multiplier, u1024_t *encryptor,
     number_dev(&q, encryptor, input, n);
     *multiplier = *(u64*)&q;
 
-    /* varify that q can be represented by a u64 */
+    /* verify that q can be represented by a u64 */
     number_shift_right(&q, bit_sz_u64);
     number_reset(&num_0);
     return !number_is_equal(&q, &num_0);
@@ -3028,7 +3028,7 @@ static test_t rsa_tests[] =
 	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
-	description: "number_sub() - subtacting from zero",
+	description: "number_sub() - subtracting from zero",
 	func: test045,
 	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
@@ -3059,12 +3059,12 @@ static test_t rsa_tests[] =
 	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
-	description: "number_dev() - deviding a number by a larger number",
+	description: "number_dev() - dividing a number by a larger number",
 	func: test053,
 	disabled: DISABLE_USHORT | DISABLE_ULONG | DISABLE_ULLONG,
     },
     {
-	description: "deviding a 475 bit number by 29",
+	description: "dividing a 475 bit number by 29",
 	func: test054,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
 	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
@@ -3180,7 +3180,7 @@ static test_t rsa_tests[] =
 	disabled: DISABLE_UCHAR,
     },
     {
-	description: "exponentiation modolo a larg number",
+	description: "exponentiation modulo a large number",
 	func: test086,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
 	    DISABLE_ULLONG_64 | DISABLE_ULLONG_128 | DISABLE_ULLONG_256 | 
@@ -3192,7 +3192,7 @@ static test_t rsa_tests[] =
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
 	    DISABLE_TIME_FUNCTIONS,
     },
-    /* primality testing */
+    /* prime testing */
     {
 	description: "number_witness() - basic functionality",
 	func: test091,
@@ -3263,7 +3263,7 @@ static test_t rsa_tests[] =
     },
     /* RSA key generation, encryption and decryption */
     {
-	description: "coprimality testing",
+	description: "co prime testing",
 	func: test106,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG,
     },
@@ -3281,7 +3281,7 @@ static test_t rsa_tests[] =
     },
     {
 	description: "encryption - decryption: overflow during "
-	    "num_montgomery_factor cration",
+	    "num_montgomery_factor creation",
 	func: test109,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT | DISABLE_ULONG | 
 	    DISABLE_ULLONG_64 | DISABLE_ULLONG_256 | DISABLE_ULLONG_512 | 

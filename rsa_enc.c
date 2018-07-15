@@ -15,8 +15,8 @@ static void verbose_encryption(int is_full, char *key_name, int level,
     rsa_printf(1, 0, "encryption method: %s", is_full ? "full" : "quick");
     rsa_printf(1, 0, "key: %s", key_name);
     rsa_printf(1, 0, "encryption level: %d", level);
-    rsa_printf(1, 0, "encrytping: %s", data);
-    rsa_printf(1, 0, "ciphertext: %s", cipher);
+    rsa_printf(1, 0, "encrypting: %s", data);
+    rsa_printf(1, 0, "cipher: %s", cipher);
     fflush(stdout);
 }
 
@@ -125,7 +125,7 @@ static int rsa_encrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
 	return -1;
     }
 
-    /* open ciphertext file */
+    /* open cipher file */
     sprintf(newfile_name, "%s.enc", file_name);
     if (!(is_enable = is_fwrite_enable(newfile_name)) || 
 	!(*cipher = fopen(newfile_name, "w")))
