@@ -16,7 +16,7 @@
 
 #define OPTSTR_MAX_LEN 10
 #define RSA_KEYPATH "RSA_KEYPATH"
-#define MULTIPLE_ENTRIES_STR "the following keys have multiple entires\n"
+#define MULTIPLE_ENTRIES_STR "the following keys have multiple entries\n"
 
 #define  MIN(x, y) ((x) < (y) ? (x) : (y))
 

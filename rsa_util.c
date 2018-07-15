@@ -142,7 +142,7 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 	rsa_vstrcat(msg, "invalid encryption level - %s", ap);
 	break;
     case RSA_ERR_OPTARG:
-	/* fall through - error message provided by getopt_long()*/
+	/* fall through - error message provided by getopt_long() */
     default:
 	return;
     }
