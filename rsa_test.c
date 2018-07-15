@@ -2280,8 +2280,7 @@ static int rsa_post_decrypt(u1024_t *output, u64 multiplier,
 		number_small_dec2num(&num_multipier, multiplier);
 		number_mul(output, &num_multipier, n);
 		number_add(output, output, decryption);
-	}
-	else {
+	} else {
 		number_assign(*output, *decryption);
 	}
 

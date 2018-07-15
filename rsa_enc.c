@@ -108,8 +108,7 @@ static int rsa_assert_non_lfs(int is_full)
 		length += number_size(encryption_levels[0]) + 
 			((file_size + arr_sz - 1)/arr_sz) *
 			number_size(encryption_level);
-	}
-	else {
+	} else {
 		/* encrypted data has same length as original data */
 		length += file_size;
 	}

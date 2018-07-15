@@ -204,8 +204,7 @@ static int test_getargs(int argc, char *argv[], int *from, int *to, int max)
 
 	if (argc == 2) {
 		*to = *from;
-	}
-	else { /* argc == 3 */
+	} else { /* argc == 3 */
 		if (test_getarg(argv[2], to, *from, max)) {
 			test_usage(argv[0]);
 			return -1;
@@ -237,8 +236,7 @@ static int is_list_tests(int argc, char *argv[], unit_test_t *tests)
 				t->description);
 		if (is_disabled) {
 			p_colour(C_CYAN, " (disabled)");
-		}
-		else if (t->known_issue) {
+		} else if (t->known_issue) {
 			p_colour(C_BLUE, " (known issue: ");
 			p_colour(C_GREY, t->known_issue);
 			p_colour(C_BLUE, ")");
@@ -291,8 +289,7 @@ int unit_test(int argc, char *argv[], unit_test_t *tests)
 		if ((ret = t->func())) {
 			p_colour(C_RED, "Failed");
 			failed++;
-		}
-		else {
+		} else {
 			p_colour(C_GREEN, "OK");
 			passed++;
 		}
