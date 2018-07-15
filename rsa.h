@@ -18,7 +18,6 @@
 #include <stdarg.h>
 
 typedef enum {
-    FUNC_NUMBER_RESET,
     FUNC_NUMBER_INIT_RANDOM,
     FUNC_NUMBER_FIND_MOST_SIGNIFICANT_SET_BIT,
     FUNC_NUMBER_SHIFT_LEFT_ONCE,
@@ -40,7 +39,7 @@ typedef enum {
     FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE,
     FUNC_NUMBER_EXPONENTIATION,
     FUNC_NUMBER_MODULAR_EXPONENTIATION_NAIVE,
-    FUNC_NUMBER_RADIX,
+    FUNC_NUMBER_MONTGOMERY_FACTOR_SET,
     FUNC_NUMBER_MONTGOMERY_PRODUCT,
     FUNC_NUMBER_MODULAR_EXPONENTIATION_MONTGOMERY,
     FUNC_NUMBER_IS_ODD,
@@ -69,7 +68,7 @@ typedef enum {
 #define U64_TYPE unsigned short
 #elif defined(ULONG)
 #define U64_TYPE unsigned long
-#elif defined(ULLONG) || defined(ALL_TESTS)
+#elif defined(ULLONG)
 #define U64_TYPE unsigned long long
 #if !defined(ULLONG)
 #define ULLONG
@@ -78,7 +77,7 @@ typedef enum {
 
 typedef U64_TYPE u64;
 #define STATIC
-#define INLINE inline
+#define INLINE
 
 #ifdef TIME_FUNCTIONS
 inline void timer_start(func_cnt_t func);
@@ -115,36 +114,22 @@ typedef struct u1024_t {
     u64 seg_13; /* bits: 832 -  895 */
     u64 seg_14; /* bits: 896 -  959 */
     u64 seg_15; /* bits: 960 - 1023 */
-    /* buffer */
-    u64 seg_16;
-    u64 seg_17;
-    u64 seg_18;
-    u64 seg_19;
-    u64 seg_20;
-    u64 seg_21;
-    u64 seg_22;
-    u64 seg_23;
-    u64 seg_24;
-    u64 seg_25;
-    u64 seg_26;
-    u64 seg_27;
-    u64 seg_28;
-    u64 seg_29;
-    u64 seg_30;
-    u64 seg_31;
+    u64 seg_16; /* buffer */
 } u1024_t;
 
 #define RSA_MASTER (!defined(RSA_ENC) && !defined(RSA_DEC))
 #define RSA_ENCRYPTER (!defined(RSA_DEC) && !RSA_MASTER)
 #define RSA_DECRYPTER (!defined(RSA_ENC) && !RSA_MASTER)
 
-#define BYTES_SZ(X) (sizeof(X))
-#define BITS_SZ(X) (BYTES_SZ(X) * 8)
-#define ARRAY_SZ(X) (sizeof(X) / sizeof((X)[0]))
-#define MSB_PT(X) ~((X) - 1 >> 1)
+#define BIT_SZ_U64 (sizeof(u64)<<3)
+#define BIT_SZ_U1024 ((sizeof(u1024_t)-sizeof(u64))<<3)
+#define BLOCK_SZ_U1024 (BIT_SZ_U1024/BIT_SZ_U64)
 
-#define NUMBER_IS_NEGATIVE(X) (((u64)(MSB_PT(u64)) & \
-    *((u64 *)(X) + (BYTES_SZ(u1024_t) / BYTES_SZ(u64) - 1))) ? 1 : 0)
+#define ARRAY_SZ(X) (sizeof(X) / sizeof((X)[0]))
+#define MSB_PT(X) ((X)(~((X)-1 >> 1)))
+
+#define NUMBER_IS_NEGATIVE(X) ((MSB_PT(u64) & \
+    *((u64 *)(X) + (BLOCK_SZ_U1024 - 1))) ? 1 : 0)
 
 #define RSA_PTASK_START(FMT, ...) printf(FMT ":\n", ##__VA_ARGS__); \
     fflush(stdout)
@@ -163,11 +148,10 @@ typedef struct {
 void number_reset(u1024_t *num);
 void number_sub1(u1024_t *num);
 void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2);
-int number_init_random(u1024_t *num);
+int number_init_random(u1024_t *num, int bit_len);
 void number_init_random_coprime(u1024_t *num, u1024_t *coprime);
 void number_find_prime(u1024_t *num);
-int number_radix(u1024_t *num_radix, u1024_t *num_n);
-int number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor);
+void number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor);
 void number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num,
     u1024_t *mod);
 int number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a,
@@ -204,14 +188,16 @@ int, rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 
 #ifdef TESTS
 extern int init_reset;
+extern u1024_t num_montgomery_n, num_montgomery_factor;
 
-u1024_t num_montgomery_n, num_montgomery_factor;
 int number_init_str(u1024_t *num, char *init_str);
 void number_add(u1024_t *res, u1024_t *num1, u1024_t *num2);
 void number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2);
 void number_shift_left(u1024_t *num, int n);
 void number_shift_right(u1024_t *num, int n);
 int number_is_greater(u1024_t *num1, u1024_t *num2);
+int number_is_greater_or_equal(u1024_t *num1, u1024_t *num2);
+int number_is_equal(u1024_t *num1, u1024_t *num2);
 int number_dec2bin(u1024_t *num_bin, char *str_dec);
 void number_dev(u1024_t *num_q, u1024_t *num_r, u1024_t *num_dividend,
     u1024_t *num_divisor);
@@ -228,7 +214,6 @@ int number_modular_multiplication_naive(u1024_t *num_res,
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n);
 int number_modular_multiplication_montgomery(u1024_t *num_res,
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n);
-int number_is_equal(u1024_t *a, u1024_t *b);
 void number_generate_coprime(u1024_t *num_coprime,
     u1024_t *num_increment);
 void number_exponentiation(u1024_t *res, u1024_t *num_base,
