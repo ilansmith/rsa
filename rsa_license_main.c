@@ -1,8 +1,18 @@
 #include <time.h>
+#if defined(__linux__)
 #include <unistd.h>
 #include <getopt.h>
 #include <libgen.h>
+#else
+#include "getopt.h"
+#endif
 #include "rsa_license.h"
+
+#if defined(__linux__)
+#define TIME_LIMIT_FMT "%lu"
+#else
+#define TIME_LIMIT_FMT "%llu"
+#endif
 
 #define FILE_FORMAT_VERSION 1
 #define VENDOR_NAME_MAX_LENGTH 64
@@ -56,6 +66,16 @@ struct rsa_license_data {
 	char vendor_name[VENDOR_NAME_MAX_LENGTH];
 	time_t time_limit;
 };
+
+#if !defined(__linux__)
+static char *basename(char *path)
+{
+	char *ptr;
+
+	for (ptr = path + strlen(path) - 1; ptr >= path && *ptr != '\\'; ptr--);
+	return ++ptr;
+}
+#endif
 
 static void usage(char *app)
 {
@@ -301,7 +321,7 @@ static int rsa_license_create_rivermax(char **buf, size_t *len, void *data)
 	}
 
 	if (rsa_encrypt_time_limit(&_buf, &_len, license_data->time_limit)) {
-		printf("failed to encrypt time limit: %lu\n",
+		printf("failed to encrypt time limit: " TIME_LIMIT_FMT "\n",
 			license_data->time_limit);
 		goto error;
 	}
@@ -818,7 +838,8 @@ int license_test(void)
 	}
 	printf("file format version extract: %llu\n", license_data.version);
 	printf("vendor name extract: %s\n", license_data.vendor_name);
-	printf("valid through extract: 0x%lx\n", license_data.time_limit);
+	printf("valid through extract: 0x" TIME_LIMIT_FMT "\n",
+		license_data.time_limit);
 
 	ret = 0;
 
