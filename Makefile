@@ -1,4 +1,4 @@
-# to build rsa unit tests compile with TESTS=y.
+# to build rsa unit tests compile with CONFIG_TESTS=y.
 #
 # - set u64 type definition by compiling with:
 #   U64=UCHAR    for unsigned char
@@ -6,7 +6,7 @@
 #   U64=UINT     for unsigned long
 #   U64=ULLONG   for unsigned long long (default)
 # 
-# - to enable function timing feature compile with TIME_FUNCTIONS=y.
+# - to enable function timing feature compile with CONFIG_TIME_FUNCTIONS=y.
 #
 # - RSA encryption level can be set if U64 is set to ULLONG. This is done as
 #   follows: 
@@ -19,7 +19,7 @@
 #
 # normal compilation will produce rsa_enc (encrypter) and rsa_dec (decrypter).
 # To compile a master utility (both encrypter and decrypter) compile with
-# MASTER=y
+# CONFIG_MASTER=y
 
 CC=gcc
 TARGET_OBJS=rsa_num.o rsa_util.o
@@ -37,33 +37,33 @@ LFLAGS=-lm
 
 # Takuji Nishimura and Makoto Matsumoto's 64-bit version of Mersenne Twister 
 # pseudo random number generator
-ifeq ($(MERSENNE_TWISTER),)
-  MERSENNE_TWISTER=y
+ifeq ($(CONFIG_MERSENNE_TWISTER),)
+  CONFIG_MERSENNE_TWISTER=y
 endif
-ifeq ($(MERSENNE_TWISTER),y)
+ifeq ($(CONFIG_MERSENNE_TWISTER),y)
   TARGET_OBJS+=mt19937_64.o
-  CFLAGS+=-DMERSENNE_TWISTER
+  CFLAGS+=-DCONFIG_MERSENNE_TWISTER
 endif
 
 # enable/disable output colouring (enabled by default)
-ifeq ($(RSA_COLOURS),)
-  RSA_COLOURS=y
+ifeq ($(CONFIG_RSA_COLOURS),)
+  CONFIG_RSA_COLOURS=y
 endif
-ifeq ($(RSA_COLOURS),y)
-  CFLAGS+=-DRSA_COLOURS
+ifeq ($(CONFIG_RSA_COLOURS),y)
+  CFLAGS+=-DCONFIG_RSA_COLOURS
 endif
 
 # set unit test configuration
-ifeq ($(TESTS),y)
+ifeq ($(CONFIG_TESTS),y)
 
   TARGETS=$(TARGET_RSA_TEST)
-  CFLAGS+=-DTESTS
+  CFLAGS+=-DCONFIG_TESTS
 
   # enable/disable function timing
-  ifeq ($(TIME_FUNCTIONS),y)
-    CFLAGS+=-DTIME_FUNCTIONS
+  ifeq ($(CONFIG_TIME_FUNCTIONS),y)
+    CFLAGS+=-DCONFIG_TIME_FUNCTIONS
   endif
-  ifeq ($(PROFILING),y)
+  ifeq ($(CONFIG_PROFILING),y)
     CFLAGS+=-pg
     LFLAGS+=-pg
   endif
@@ -95,7 +95,7 @@ ifeq ($(TESTS),y)
   endif
 
   # enable/disable debug mode (disabled by default)
-  ifeq ($(DEBUG),y)
+  ifeq ($(CONFIG_DEBUG),y)
     CFLAGS+=-O0 -g
   else
     CFLAGS+=-O3
@@ -107,7 +107,7 @@ else # create rsa applications
   TARGET_OBJS+=rsa.o
   TARGET_OBJS_rsa_enc=rsa_enc.o 
   TARGET_OBJS_rsa_dec=rsa_dec.o 
-  ifeq ($(MASTER),y) # master encrypter/decrypter
+  ifeq ($(CONFIG_MASTER),y) # master encrypter/decrypter
     TARGETS=$(TARGET_RSA)
     CFLAGS+=-DRSA_MASTER
     TARGET_OBJS_rsa=$(TARGET_OBJS_rsa_enc) $(TARGET_OBJS_rsa_dec) rsa_main.o
@@ -161,7 +161,7 @@ define hl
 endef
 
 define help_print_tool
-  @printf "$(call hl,%-16s) - %s.\n" $1 $2
+  @printf "$(call hl,%-23s) - %s.\n" $1 $2
 endef
 
 help:
@@ -181,13 +181,13 @@ help:
 	@printf "without the need to repeat the entire build command line.\n"
 	@printf "\n"
 	@printf "If no '$(call hl,OPTIONS)' are provided then $(call hl,$(TARGET_RSA_ENC)) and $(call hl,$(TARGET_RSA_DEC)) are built.\n"
-	@printf "If $(call hl,MASTER=y), then a master utility is built (enc/dec combined in one).\n"
+	@printf "If $(call hl,CONFIG_MASTER=y), then a master utility is built (enc/dec combined in one).\n"
 	@printf "\n"
-	@printf "Set $(call hl,MERSENNE_TWISTER=y) (default) to use Takuji Nishimura and Makoto Matsumoto's\n"
-	@printf "64-bit version Mersenne Twister PRNG (Pseudorandom Number Generator).\n"
-	@printf "If $(call hl,MERSENNE_TWISTER=n) then random(3) is used as a PRNG instead.\n"
+	@printf "Set $(call hl,CONFIG_MERSENNE_TWISTER=y) (default) to use Takuji Nishimura and Makoto\n"
+	@printf "Matsumoto's 64-bit version Mersenne Twister PRNG (Pseudorandom Number Generator).\n"
+	@printf "If $(call hl,CONFIG_MERSENNE_TWISTER=n) then random(3) is used as a PRNG instead.\n"
 	@printf "\n"
-	@printf "If $(call hl,TESTS=y), then $(call hl,$(TARGET_RSA_TEST)) is built (rsa unit tests). In this case:\n"
+	@printf "If $(call hl,CONFIG_TESTS=y), then $(call hl,$(TARGET_RSA_TEST)) is built (rsa unit tests). In this case:\n"
 	$(call help_print_tool,"U64=UCHAR","define u64 as unsigned char")
 	$(call help_print_tool,"U64=USHORT","define u64 as unsigned short")
 	$(call help_print_tool,"U64=UINT","define u64 as unsigned int")
@@ -202,10 +202,11 @@ help:
 	@printf "\n"
 	@printf "Note that different sets of unit tests are enabled for different values of $(call hl,U64).\n"
 	@printf "\n"
-	$(call help_print_tool,"TIME_FUNCTIONS=y","time functions for profiling)"
-	$(call help_print_tool,"PROFILING=y","build unit tests for profling with gprof(1)")
-	$(call help_print_tool,"DEBUG=y","build without optimizations and generate debug symbos")
+	$(call help_print_tool,"CONFIG_TIME_FUNCTIONS=y","time functions for profiling)"
+	$(call help_print_tool,"CONFIG_PROFILING=y","build unit tests for profling with gprof(1)")
+	$(call help_print_tool,"CONFIG_DEBUG=y","build without optimizations and generate debug symbols")
 	@printf "\n"
-	@printf "Enhanced colour output is enabled by default or explicitly if $(call hl,RSA_COLOURS=y) is set.\n"
-	@printf "To build without enhanced colour output use $(call hl,RSA_COLOURS=n).\n"
+	@printf "Enhanced colour output is enabled by default or explicitly if\n"
+	@printf "$(call hl,CONFIG_RSA_COLOURS=y) is set.\n"
+	@printf "To build without enhanced colour output use $(call hl,CONFIG_RSA_COLOURS=n).\n"
 

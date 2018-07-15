@@ -216,7 +216,7 @@ static void p_u1024(u1024_t *num)
 	}
 }
 
-#ifdef TIME_FUNCTIONS /* function timing */
+#ifdef CONFIG_TIME_FUNCTIONS /* function timing */
 #define MAX_IO_BUF 256
 #define REM(buf) (sizeof(buf) - strlen(buf))
 
@@ -312,7 +312,7 @@ static struct timeval tv1, tv2;
 
 static inline void local_timer_start(void)
 {
-#ifdef TIME_FUNCTIONS
+#ifdef CONFIG_TIME_FUNCTIONS
 	int i;
 
 	for (i = 0; i < FUNC_COUNT; i++) {
@@ -338,7 +338,7 @@ static inline void local_timer_start(void)
 
 static inline void local_timer_stop(void)
 {
-#ifdef TIME_FUNCTIONS
+#ifdef CONFIG_TIME_FUNCTIONS
 	timer.stop.tv_sec = 0;
 	timer.stop.tv_usec = 0;
 	gettimeofday(&timer.stop, NULL);
@@ -353,7 +353,7 @@ static void p_local_timer(void)
 	double total_time;
 	char *fmt = "computation time: %.3lg seconds";
 
-#ifdef TIME_FUNCTIONS
+#ifdef CONFIG_TIME_FUNCTIONS
 	int i;
 	char buf[MAX_IO_BUF];
 
@@ -3246,7 +3246,7 @@ static void rsa_pre_test(void)
 
 static int rsa_is_disabled(int flags)
 {
-#if defined TIME_FUNCTIONS
+#if defined CONFIG_TIME_FUNCTIONS
 	if (flags & DISABLE_TIME_FUNCTIONS)
 		return 1;
 #endif

@@ -48,7 +48,7 @@ typedef enum {
 	FUNC_COUNT
 } func_cnt_t;
 
-#ifdef TESTS
+#ifdef CONFIG_TESTS
 #if defined(UCHAR)
 #define U64_TYPE unsigned char
 #elif defined(USHORT)
@@ -66,24 +66,24 @@ typedef U64_TYPE u64;
 #define STATIC
 #define INLINE
 
-#ifdef TIME_FUNCTIONS
+#ifdef CONFIG_TIME_FUNCTIONS
 inline void timer_start(func_cnt_t func);
 inline void timer_stop(func_cnt_t func);
 #define TIMER_START(FUNC) timer_start(FUNC)
 #define TIMER_STOP(FUNC) timer_stop(FUNC)
-#else /* NOT TIME_FUNCTIONS */
+#else /* NOT CONFIG_TIME_FUNCTIONS */
 #define TIMER_START(FUNC)
 #define TIMER_STOP(FUNC)
-#endif /* TIME_FUNCTIONS */
-#else /* NOT TESTS */
+#endif /* CONFIG_TIME_FUNCTIONS */
+#else /* NOT CONFIG_TESTS */
 #define TIMER_START(FUNC)
 #define TIMER_STOP(FUNC)
 typedef unsigned long long u64;
 #define STATIC static
 #define INLINE inline
-#endif /* TESTS */
+#endif /* CONFIG_TESTS */
 
-#ifdef MERSENNE_TWISTER
+#ifdef CONFIG_MERSENNE_TWISTER
 typedef unsigned long long prng_seed_t;
 #else
 typedef unsigned int prng_seed_t;
@@ -255,7 +255,7 @@ int number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a,
 int number_str2num(u1024_t *num, char *str);
 void number_small_dec2num(u1024_t *num_n, u64 dec);
 
-#ifdef TESTS
+#ifdef CONFIG_TESTS
 extern int init_reset;
 extern u1024_t num_montgomery_n;
 extern prng_seed_t number_random_seed;

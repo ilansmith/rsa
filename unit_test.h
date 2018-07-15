@@ -7,7 +7,7 @@
 /* unit_test.h should be included after the tested code's header files so that
  * if it defines any of the following definitions it should get precedence */
 
-#ifdef RSA_COLOURS
+#ifdef CONFIG_RSA_COLOURS
 #undef C_CYAN
 #define C_CYAN "\033[01;36m"
 #undef C_RED

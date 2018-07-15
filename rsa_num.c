@@ -6,7 +6,7 @@
 #include <string.h>
 #include <math.h>
 
-#ifdef MERSENNE_TWISTER
+#ifdef CONFIG_MERSENNE_TWISTER
 #include "mt19937_64.h"
 #endif
 
@@ -154,7 +154,7 @@ static prng_seed_t number_seed_set(prng_seed_t seed)
 			(prng_seed_t)tv.tv_sec * (prng_seed_t)tv.tv_usec;
 	}
 
-#ifdef MERSENNE_TWISTER
+#ifdef CONFIG_MERSENNE_TWISTER
 	init_genrand64(number_random_seed);
 #else
 	srandom(number_random_seed);
@@ -192,7 +192,7 @@ int INLINE number_init_random(u1024_t *num, int blocks)
 	/* initiate the low u64 blocks of num */
 	for (i = 0; i < blocks; i++) {
 		*((u64*)&num->arr + i) = RSA_RANDOM();
-#if !defined(MERSENNE_TWISTER) && defined(ULLONG)
+#if !defined(CONFIG_MERSENNE_TWISTER) && defined(ULLONG)
 		/* random() returns a long int so another call is required to
 		 * fill the block's higher bits */
 		*((u64*)&num->arr + i) |= (u64)random()<<(bit_sz_u64/2);
@@ -745,7 +745,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 		{37}, {41}
 	};
 
-#ifdef TESTS
+#ifdef CONFIG_TESTS
 	if (init_reset) {
 		number_generate_coprime_init = 0;
 		init_reset = 0;
@@ -945,7 +945,7 @@ int number_str2num(u1024_t *num, char *str)
 	return 0;
 }
 
-#ifdef TESTS
+#ifdef CONFIG_TESTS
 STATIC void number_shift_right(u1024_t *num, int n)
 {
 	int i;
