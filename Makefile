@@ -81,16 +81,20 @@ ifeq ($(TESTS),y)
     CFLAGS+=-DENC_LEVEL=$(ENC_LEVEL)
   endif
 
-  TARGET_OBJS+=unit_test.o
+  TARGET_OBJS_rsa_test+=unit_test.o rsa_test.o
 
 else # create rsa applications
+  TARGET_OBJS+=rsa.o
+  TARGET_OBJS_rsa_enc=rsa_enc.o 
+  TARGET_OBJS_rsa_dec=rsa_dec.o 
   ifeq ($(MASTER),y) # master encrypter/decrypter
     TARGETS=rsa
     CFLAGS+=-DRSA_MASTER
-    TARGET_OBJS+=rsa_enc.o rsa_dec.o
+    TARGET_OBJS_rsa=$(TARGET_OBJS_rsa_enc) $(TARGET_OBJS_rsa_dec) rsa_main.o
   else # create separate encrypter/decrypter
     TARGETS=rsa_enc rsa_dec
-    TARGET_OBJS+=rsa.o
+    TARGET_OBJS_rsa_enc+=rsa_enc_main.o
+    TARGET_OBJS_rsa_dec+=rsa_dec_main.o
   endif
 
   CFLAGS+=-DULLONG -g
@@ -102,13 +106,13 @@ endif
 .PHONY: all clean cleanapps cleantags cleanconf cleanall config
 
 all: $(TARGETS)
-rsa_test: $(TARGET_OBJS) rsa_test.o
+rsa_test: $(TARGET_OBJS) $(TARGET_OBJS_rsa_test)
 	$(CC) -o $@ $(LFLAGS) $^
-rsa: $(TARGET_OBJS) rsa.o
+rsa: $(TARGET_OBJS) $(TARGET_OBJS_rsa)
 	$(CC) -o $@ $(LFLAGS) $^
-rsa_enc: $(TARGET_OBJS) rsa_enc.o
+rsa_enc: $(TARGET_OBJS) $(TARGET_OBJS_rsa_enc)
 	$(CC) -o $@ $(LFLAGS) $^
-rsa_dec: $(TARGET_OBJS) rsa_dec.o
+rsa_dec: $(TARGET_OBJS) $(TARGET_OBJS_rsa_dec)
 	$(CC) -o $@ $(LFLAGS) $^
 
 config:
