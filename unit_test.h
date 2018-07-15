@@ -57,6 +57,8 @@ typedef struct {
     int size;
     char *list_comment;
     char *summery_comment;
+    void (*tests_init)(int argc, char *argv[]);
+    int (*is_disabled)(int flags);
     void (*pre_test)(void);
 } unit_test_t;
 

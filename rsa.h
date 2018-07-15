@@ -93,46 +93,10 @@ typedef unsigned long long prng_seed_t;
 typedef unsigned int prng_seed_t;
 #endif
 
-#define ENC_LEVEL(X) (EL==(X))
-
-#define ENC_LEVEL_1024 (ENC_LEVEL(1024))
-#define ENC_LEVEL_512 (ENC_LEVEL(512) || ENC_LEVEL_1024)
-#define ENC_LEVEL_256 (ENC_LEVEL(256) || ENC_LEVEL_512)
-#define ENC_LEVEL_128 (ENC_LEVEL(128) || ENC_LEVEL_256)
-#define ENC_LEVEL_64 (ENC_LEVEL(64) || ENC_LEVEL_128)
+#define RSA_NUMBER_ARRAY_SZ 17
 
 typedef struct {
-#if ENC_LEVEL_64
-    u64 seg_00; /* bits:   0 -   63 */
-#endif
-#if ENC_LEVEL_128
-    u64 seg_01; /* bits:  64 -  127 */
-#endif
-#if ENC_LEVEL_256
-    u64 seg_02; /* bits: 128 -  191 */
-    u64 seg_03; /* bits: 192 -  255 */
-#endif
-#if ENC_LEVEL_512
-    u64 seg_04; /* bits: 256 -  319 */
-    u64 seg_05; /* bits: 320 -  383 */
-    u64 seg_06; /* bits: 384 -  447 */
-    u64 seg_07; /* bits: 448 -  511 */
-#endif
-#if ENC_LEVEL_1024
-    u64 seg_08; /* bits: 512 -  575 */
-    u64 seg_09; /* bits: 576 -  639 */
-    u64 seg_10; /* bits: 640 -  703 */
-    u64 seg_11; /* bits: 704 -  767 */
-    u64 seg_12; /* bits: 768 -  831 */
-    u64 seg_13; /* bits: 832 -  895 */
-    u64 seg_14; /* bits: 896 -  959 */
-    u64 seg_15; /* bits: 960 - 1023 */
-#endif
-    u64 buffer; /* buffer */
-} u1024_arr_t;
-
-typedef struct {
-    u1024_arr_t arr;
+    u64 arr[RSA_NUMBER_ARRAY_SZ];
     int top;
 } u1024_t;
 
@@ -164,7 +128,6 @@ extern u1024_t NUM_10;
 extern int bit_sz_u64;
 extern int encryption_level;
 extern int block_sz_u1024;
-extern int sizeof_u1024;
 
 typedef struct {
     u64 prime_initializer;
@@ -224,7 +187,15 @@ int rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
     } while (0); \
 }
 
-#define number_reset(num) memset((num), 0, sizeof_u1024)
+#define number_reset(num) { \
+    do { \
+	int i; \
+	for (i = 0; i <= block_sz_u1024; i++) \
+	    (num)->arr[i] = 0; \
+	(num)->top = 0; \
+    } \
+    while (0); \
+}
 
 #define number_shift_right_once(num) { \
     do { \
@@ -270,7 +241,7 @@ int rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 }
 
 /* return: num1 > num2  or ret_on_equal if num1 == num2 */
-#define number_compare(num1, num2, ret_on_equal) ({ \
+#define number_compare(num1, num2, ret_on_equal) ( { \
     int ret; \
     do { \
 	if ((num1)->top == (num2)->top) \
@@ -322,6 +293,16 @@ int rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
 	    seg2 = (u64*)&(num2)->arr + block_sz_u1024; \
 	    seg >= (u64*)&(res)->arr; *seg-- = *seg1-- ^ *seg2--); \
 	number_top_set(res); \
+    } \
+    while (0); \
+}
+
+#define number_assign(to, from) { \
+    do { \
+	int i; \
+	for (i = 0; i <= block_sz_u1024; i++) \
+	    (to).arr[i] = (from).arr[i]; \
+	(to).top = (from).top; \
     } \
     while (0); \
 }
