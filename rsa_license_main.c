@@ -1,7 +1,11 @@
 #include <time.h>
+#if defined(__linux__)
 #include <unistd.h>
 #include <getopt.h>
 #include <libgen.h>
+#else
+#include "getopt.h"
+#endif
 #include "rsa_license.h"
 
 #define FILE_FORMAT_VERSION 1
@@ -55,7 +59,15 @@ struct rsa_license_data {
 	time_t time_limit;
 };
 
-void usage(char *app)
+static char *basename(char *path)
+{
+	char *ptr;
+
+	for (ptr = path + strlen(path) - 1; ptr >= path && *ptr != '\\'; ptr--);
+	return ++ptr;
+}
+
+static void usage(char *app)
 {
 	printf("Usage: %s [ACTION] [OPTIONS]\n", app);
 	printf("\n");
