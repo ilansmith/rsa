@@ -158,7 +158,7 @@ static char *p_u64(u64 *ptr)
 
 static void p_u1024(u1024_t *num)
 {
-    int i = ((sizeof(u1024_t) - sizeof(int)) / sizeof(u64)) - 1;
+    int i = BLOCK_SZ_U1024;
     u64 *last_seg = (u64*)num + i;
     u64 *ptr;
 
