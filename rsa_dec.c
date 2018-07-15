@@ -229,14 +229,6 @@ static void verbose_decryption(int is_full, char *key_name, int level,
     fflush(stdout);
 }
 
-static rsa_key_t *rsa_key_open_decrypt(void)
-{
-    char keyname[MAX_FILE_NAME_LEN];
-
-    sprintf(keyname, "%s/%s.prv", key_path_get(), RSA_KEYLINK_PREFIX);
-    return rsa_key_open(keyname, RSA_KEY_TYPE_PRIVATE);
-}
-
 static int rsa_decrypte_header_common(rsa_key_t *key, FILE *cipher, 
     int *is_full)
 {
@@ -255,7 +247,7 @@ static int rsa_decrypte_header_common(rsa_key_t *key, FILE *cipher,
 
     if (memcmp(key->name, keydata + 1, strlen(key->name)))
     {
-	rsa_error_message(RSA_ERR_KEY_MISMATCH, file_name, 
+	rsa_error_message(RSA_ERR_KEY_STAT_PRV_DEF, file_name, 
 	    rsa_highlight_str(key->name));
 	return -1;
     }
@@ -291,10 +283,10 @@ static int rsa_decrypte_header_common(rsa_key_t *key, FILE *cipher,
 static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher, 
     int *is_full)
 {
-    int file_name_len;
+    int file_name_len, is_enable;
 
     /* open RSA private key */
-    if (!(*key = rsa_key_open_decrypt()))
+    if (!(*key = rsa_key_open(RSA_KEY_TYPE_PRIVATE)))
 	return -1;
 
     /* open file to decrypt */
@@ -319,12 +311,13 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **data, FILE **cipher,
 	snprintf(newfile_name, file_name_len - 3, "%s", file_name);
     else
 	sprintf(newfile_name, "%s.dec", file_name);
-    if (!is_fwrite_enable(newfile_name) || 
+    if (!(is_enable = is_fwrite_enable(newfile_name)) || 
 	!(*data = fopen(newfile_name, "w")))
     {
 	rsa_key_close(*key);
 	fclose(*cipher);
-	rsa_error_message(RSA_ERR_FOPEN, newfile_name);
+	if (is_enable)
+	    rsa_error_message(RSA_ERR_FOPEN, newfile_name);
 	return -1;
     }
 

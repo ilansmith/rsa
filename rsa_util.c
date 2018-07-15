@@ -131,11 +131,22 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 	rsa_vstrcat(msg, "key %s does not exist in the key directory", ap);
 	break;
     case RSA_ERR_KEYMULTIENTRIES:
-	rsa_vstrcat(msg, "multiple entries for %s key %s - not setting", ap);
+	rsa_vstrcat(msg, "multiple entries for %s key %s - aborting...", ap);
 	break;
-    case RSA_ERR_KEY_STAT:
-	rsa_vstrcat(msg, "could not find RSA key %s, please varify that it is "
-	    "set", ap);
+    case RSA_ERR_KEY_STAT_PUB_DEF:
+	rsa_strcat(msg, "no default RSA public key is set, please either set "
+	    "one or state the key to be used");
+	break;
+    case RSA_ERR_KEY_STAT_PUB_DYN:
+	rsa_vstrcat(msg, "RSA public key %s could not be found", ap);
+	break;
+    case RSA_ERR_KEY_STAT_PRV_DEF:
+	rsa_vstrcat(msg, "%s was not encrypted by the default key's (%s) "
+	    "corresponding public key", ap);
+	break;
+    case RSA_ERR_KEY_STAT_PRV_DYN:
+	rsa_vstrcat(msg, "could not find a private key with which to decrypt "
+	    "%s", ap);
 	break;
     case RSA_ERR_KEY_CORRUPT:
 	rsa_vstrcat(msg, "RSA key %s is corrupt", ap);
@@ -146,9 +157,6 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
     case RSA_ERR_KEY_TYPE:
 	rsa_vstrcat(msg, "%s is linked to a %s key while a %s key is required", 
 	    ap);
-	break;
-    case RSA_ERR_KEY_MISMATCH:
-	rsa_vstrcat(msg, "the file %s was not encrypted by public key: %s", ap);
 	break;
     case RSA_ERR_LEVEL:
 	rsa_vstrcat(msg, "invalid encryption level - %s", ap);
