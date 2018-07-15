@@ -15,7 +15,7 @@ static opt_t options_encrypter[] = {
 };
 
 /* encryption task is to be performed */
-static rsa_errno_t parse_args_finalize_encrypter(int *flags, int actions)
+static int parse_args_finalize_encrypter(int *flags, int actions)
 {
     if (!actions)
 	*flags |= OPT_FLAG(RSA_OPT_ENCRYPT);
@@ -24,37 +24,47 @@ static rsa_errno_t parse_args_finalize_encrypter(int *flags, int actions)
     if ((*flags & OPT_FLAG(RSA_OPT_ENCRYPT)) && 
 	!(*flags & OPT_FLAG(RSA_OPT_FILE)))
     {
-	return RSA_ERR_NOFILE;
+	rsa_error_message(RSA_ERR_NOFILE);
+	return -1;
     }
 
-    return RSA_ERR_NONE;
+    return 0;
 }
 
-static rsa_errno_t parse_args_encrypter(int opt, int *flags)
+static int parse_args_encrypter(int opt, int *flags)
 {
     switch (opt_short2code(options_encrypter, opt))
     {
     case RSA_OPT_FILE:
-	OPT_ADD(flags, RSA_OPT_FILE, rsa_set_file_name(optarg));
+	OPT_ADD(flags, RSA_OPT_FILE);
+	if (rsa_set_file_name(optarg))
+	{
+	    rsa_error_message(RSA_ERR_FNAME_LEN, optarg);
+	    return -1;
+	}
 	break;
     case RSA_OPT_LEVEL:
 	OPT_ADD(flags, RSA_OPT_LEVEL);
 	if (rsa_encryption_level_set(optarg))
-	    return RSA_ERR_LEVEL;
+	{
+	    rsa_error_message(RSA_ERR_LEVEL, optarg);
+	    return -1;
+	}
 	break;
     case RSA_OPT_RSAENC:
 	OPT_ADD(flags, RSA_OPT_RSAENC);
 	break;
     default:
-	return RSA_ERR_OPTARG;
+	rsa_error_message(RSA_ERR_OPTARG);
+	return -1;
     }
 
-    return RSA_ERR_NONE;
+    return 0;
 }
 
 int main(int argc, char *argv[])
 {
-    int err, action, flags = 0;
+    int action, flags = 0;
     rsa_handler_t encrypter_handler = {
 	.keytype = RSA_KEY_TYPE_PUBLIC,
 	.options = options_encrypter,
@@ -62,11 +72,8 @@ int main(int argc, char *argv[])
 	.ops_handler_finalize = parse_args_finalize_encrypter,
     };
 
-    if ((err = parse_args(argc, argv, &flags, &encrypter_handler)) != 
-	RSA_ERR_NONE)
-    {
-	return rsa_error(argv[0], err);
-    }
+    if (parse_args(argc, argv, &flags, &encrypter_handler))
+	return rsa_error(argv[0]);
 
     action = rsa_action_get(flags, RSA_OPT_ENCRYPT, NULL);
     switch (action)

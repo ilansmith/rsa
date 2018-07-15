@@ -13,14 +13,16 @@
 #define	RSA_TBD(msg) printf("TBD: %s\n", (msg))
 #define OPT_FLAG(OPT) (1 << (OPT))
 
-#define OPT_ADD(flags, OPT, ...) { \
+#define OPT_ADD(flags, OPT) \
     do { \
 	if (*(flags) & OPT_FLAG(OPT)) \
-	    return RSA_ERR_ARGREP; \
-	*(flags) |= OPT_FLAG(OPT), \
-	##__VA_ARGS__; \
-    } while (0); \
-}
+	{ \
+	    rsa_error_message(RSA_ERR_ARGREP); \
+	    return -1; \
+	} \
+	*(flags) |= OPT_FLAG(OPT); \
+    } \
+    while (0)
      
 typedef enum {
     /* actions */
@@ -55,22 +57,33 @@ typedef struct opt_t {
 typedef struct {
     char keytype;
     opt_t *options;
-    rsa_errno_t (* ops_handler)(int code, int *flags);
-    rsa_errno_t (* ops_handler_finalize)(int *flags, int actions);
+    int (* ops_handler)(int code, int *flags);
+    int (* ops_handler_finalize)(int *flags, int actions);
 } rsa_handler_t ;
+
+typedef struct rsa_key_t {
+    struct rsa_key_t *next;
+    char type;
+    char name[KEY_ID_MAX_LEN];
+    char path[MAX_FILE_NAME_LEN];
+    FILE *file;
+    int level;
+} rsa_key_t;
 
 extern char key_id[KEY_ID_MAX_LEN];
 
 int opt_short2code(opt_t *options, int opt);
-rsa_errno_t parse_args(int argc, char *argv[], int *flags, 
-    rsa_handler_t *handler);
-int rsa_error(char *app, rsa_errno_t err);
+int parse_args(int argc, char *argv[], int *flags, rsa_handler_t *handler);
+int rsa_error(char *app);
 int rsa_set_file_name(char *name);
 rsa_opt_t rsa_action_get(int flags, ...);
 int rsa_action_handle_common(rsa_opt_t action, char *app, 
     rsa_handler_t *handler);
 char *key_path_get(void);
 int rsa_set_key_id(char *id);
+rsa_key_t *rsa_key_open(char *path, char accept);
+void rsa_key_close(rsa_key_t *key);
+char *keydata_extract(FILE *key);
 int rsa_encryption_level_set(char *optarg);
 void rsa_encode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);
 void rsa_decode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);

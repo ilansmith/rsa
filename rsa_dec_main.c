@@ -12,7 +12,7 @@ static opt_t options_decrypter[] = {
 };
 
 /* either encryption or decryption task are to be performed */
-static rsa_errno_t parse_args_finalize_decrypter(int *flags, int actions)
+static int parse_args_finalize_decrypter(int *flags, int actions)
 {
     if (!actions && !(*flags & OPT_FLAG(RSA_OPT_KEYGEN)))
 	*flags |= OPT_FLAG(RSA_OPT_DECRYPT);
@@ -21,34 +21,44 @@ static rsa_errno_t parse_args_finalize_decrypter(int *flags, int actions)
     if ((*flags & OPT_FLAG(RSA_OPT_DECRYPT)) 
 	&& !(*flags & OPT_FLAG(RSA_OPT_FILE)))
     {
-	return RSA_ERR_NOFILE;
+	rsa_error_message(RSA_ERR_NOFILE);
+	return -1;
     }
 
-    return RSA_ERR_NONE;
+    return 0;
 }
 
-static rsa_errno_t parse_args_decrypter(int opt, int *flags)
+static int parse_args_decrypter(int opt, int *flags)
 {
     switch (opt_short2code(options_decrypter, opt))
     {
     case RSA_OPT_FILE:
-	OPT_ADD(flags, RSA_OPT_FILE, rsa_set_file_name(optarg));
+	OPT_ADD(flags, RSA_OPT_FILE);
+	if (rsa_set_file_name(optarg))
+	{
+	    rsa_error_message(RSA_ERR_FNAME_LEN, optarg);
+	    return -1;
+	}
 	break;
     case RSA_OPT_KEYGEN:
 	OPT_ADD(flags, RSA_OPT_KEYGEN);
 	if (rsa_set_key_id(optarg))
-	    return RSA_ERR_KEYNAME;
+	{
+	    rsa_error_message(RSA_ERR_KEYNAME, KEY_ID_MAX_LEN - 1);
+	    return -1;
+	}
 	break;
     default:
-	return RSA_ERR_OPTARG;
+	rsa_error_message(RSA_ERR_OPTARG);
+	return -1;
     }
 
-    return RSA_ERR_NONE;
+    return 0;
 }
 
 int main(int argc, char *argv[])
 {
-    int err, action, flags = 0;
+    int action, flags = 0;
     rsa_handler_t decrypter_handler = {
 	.keytype = RSA_KEY_TYPE_PRIVATE,
 	.options = options_decrypter,
@@ -56,11 +66,8 @@ int main(int argc, char *argv[])
 	.ops_handler_finalize = parse_args_finalize_decrypter,
     };
 
-    if ((err = parse_args(argc, argv, &flags, &decrypter_handler)) != 
-	RSA_ERR_NONE)
-    {
-	return rsa_error(argv[0], err);
-    }
+    if (parse_args(argc, argv, &flags, &decrypter_handler))
+	return rsa_error(argv[0]);
 
     action = rsa_action_get(flags, RSA_OPT_DECRYPT, RSA_OPT_KEYGEN, NULL);
     switch (action)

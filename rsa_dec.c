@@ -40,7 +40,10 @@ static int key_files_generate(char *private_name, FILE **private_key,
 
 	if (total_len + i == len)
 	{
-	    rsa_error_message(RSA_ERR_KEYNAME, KEY_ID_MAX_LEN - 2);
+	    char name[MAX_FILE_NAME_LEN];
+
+	    snprintf(name, MAX_FILE_NAME_LEN, "%s.pxx", private_name);
+	    rsa_error_message(RSA_ERR_FNAME_LEN, name);
 	    return -1;
 	}
 

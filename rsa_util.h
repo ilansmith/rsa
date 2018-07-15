@@ -37,6 +37,7 @@ typedef enum {
     RSA_ERR_ARGREP,
     RSA_ERR_NOACTION,
     RSA_ERR_MULTIACTION,
+    RSA_ERR_FNAME_LEN,
     RSA_ERR_NOFILE,
     RSA_ERR_FOPEN,
     RSA_ERR_FILEIO,
@@ -46,8 +47,11 @@ typedef enum {
     RSA_ERR_KEYGEN,
     RSA_ERR_KEYNOTEXIST,
     RSA_ERR_KEYMULTIENTRIES,
+    RSA_ERR_KEY_STAT,
+    RSA_ERR_KEY_CORRUPT,
+    RSA_ERR_KEY_OPEN,
+    RSA_ERR_KEY_TYPE,
     RSA_ERR_LEVEL,
-    RSA_ERR_INTERNAL
 } rsa_errno_t;
 
 int code2code(code2code_t *list, int code);
@@ -66,5 +70,6 @@ int rsa_write_u1024_full(FILE *file, u1024_t *num);
 int rsa_read_str(FILE *file, char *str, int len);
 int rsa_write_str(FILE *file, char *str, int len);
 void rsa_verbose_set(verbose_t level);
+verbose_t rsa_verbose_get(void);
 #endif
 
