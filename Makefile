@@ -17,7 +17,7 @@
 #   ENC_LEVEL=1024 (default)
 #   for a non ULLONG value of U64 ENC_LEVEL=1024.
 #
-# to build signed rsa encoder and decoders compile with SIG='name'.
+# to build signed rsa encoder and decoders compile with VENDOR='name'.
 # a public key created by the rsa_enc application will contain a field with 
 # 'name' signed by the private key and the private key created by the rsa_enc
 # application will contain a field with 'name' encrypted by the public key.
@@ -25,7 +25,7 @@
 # by rsa-enc
 
 CC=gcc
-TARGET_OBJS=rsa_num.o
+TARGET_OBJS=rsa_num.o rsa_util.o
 CONFFILE=rsa.mk
 
 -include $(CONFFILE)
@@ -43,10 +43,10 @@ ifeq ($(MERSENNE_TWISTER),y)
   CFLAGS+=-DMERSENNE_TWISTER
 endif
 
-
 # set unit test configuration
 ifeq ($(TESTS),y)
 
+  TARGETS=rsa_test
   CFLAGS+=-DTESTS -g
 
   # enable/disable function timing
@@ -84,44 +84,36 @@ ifeq ($(TESTS),y)
     CFLAGS+=-DENC_LEVEL=$(ENC_LEVEL)
   endif
 
-  TARGET=test_rsa
-  TARGET_OBJS+=unit_test.o rsa_test.o
+  TARGET_OBJS+=unit_test.o
+
 else # create rsa applications
-  ifeq ($(SIG),) # master encrypter/decrypter
-%.o: %.c rsa.h
-	$(CC) -o $@ $(CFLAGS) -c $<
-
-rsa.o: $(TARGET_OBJS) $(TAILOR_OBJS)
-	$(CC) -o $@ $^
-
-    TARGET=rsa
+  ifeq ($(VENDOR),) # master encrypter/decrypter
+    TARGETS=rsa
+    VENDOR="IAS Master"
+    CFLAGS+=-DRSA_MASTER
+    TARGET_OBJS+=rsa_enc.o rsa_dec.o
   else # create separate encoder/decoder
-rsa_enc.o: %.c rsa_num.h
-	$(CC) -o $@ $(CFLAGS) -DRSA_ENC -c $<
-
-rsa_dec.o: %.c rsa_num.h
-	$(CC) -o $@ $(CFLAGS) -DRSA_DEC -c $<
-
-rsa_%: $(TARGET_OBJS) $(TAILOR_OBJS:.o=%.o)
-	$(CC) -o $@ $^
-
-    TARGET=rsa_enc rsa_dec
-    CFLAGS+=-DSIG=\"$(SIG)\" # ENC/DEC
+    TARGETS=rsa_dec rsa_enc
+    TARGET_OBJS+=rsa.o
   endif
 
-  TAILOR_OBJS=main.o rsa_key.o rsa_io.o
-  CFLAGS+=-DULLONG
+  CFLAGS+=-DULLONG -DVENDOR=\"$(VENDOR)\" -g
 endif
+
+%.o: %.c
+	$(CC) -o $@ $(CFLAGS) -c $<
 
 .PHONY: all clean cleanapps cleantags cleanconf cleanall config
 
-%.o: %.c rsa_num.h
-	$(CC) -o $@ $(CFLAGS) -c $<
-
-all: $(TARGET)
-
-$(TARGET): $(TARGET_OBJS)
-	$(CC) $(LFLAGS) -o $@ $^
+all: $(TARGETS)
+rsa_test: $(TARGET_OBJS) rsa_test.o
+	$(CC) -o $@ $(LFLAGS) $^
+rsa: $(TARGET_OBJS) rsa.o
+	$(CC) -o $@ $(LFLAGS) $^
+rsa_enc: $(TARGET_OBJS) rsa_enc.o
+	$(CC) -o $@ $(LFLAGS) $^
+rsa_dec: $(TARGET_OBJS) rsa_dec.o
+	$(CC) -o $@ $(LFLAGS) $^
 
 config:
 	@echo "doing make config"

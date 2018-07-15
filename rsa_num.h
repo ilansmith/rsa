@@ -100,15 +100,10 @@ typedef struct {
     int top;
 } u1024_t;
 
-#define RSA_MASTER (!defined(RSA_ENC) && !defined(RSA_DEC))
-#define RSA_ENCRYPTER (!defined(RSA_DEC) && !RSA_MASTER)
-#define RSA_DECRYPTER (!defined(RSA_ENC) && !RSA_MASTER)
-
 #define BIT_SZ_U64 (sizeof(u64)<<3)
 #define BLOCK_SZ_U1024 (EL>>6)
 #define BIT_SZ_U1024 (BIT_SZ_U64 * BLOCK_SZ_U1024)
 
-#define ARRAY_SZ(X) (sizeof(X) / sizeof((X)[0]))
 #define MSB(X) ((X)(~((X)-1 >> 1)))
 
 #define NUMBER_IS_NEGATIVE(X) ((MSB(u64) & \
@@ -146,36 +141,7 @@ int number_modular_multiplicative_inverse(u1024_t *inv, u1024_t *num,
     u1024_t *mod);
 int number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a,
     u1024_t *b, u1024_t *n);
-
-void rsa_key_generate(void);
-int rsa_function(char *file_name, int is_decrypt);
-
-int rsa_io_init(void);
-#if RSA_MASTER || RSA_DECRYPTER
-FILE *rsa_file_create_private(void);
-FILE *rsa_file_create_public(void);
-FILE *rsa_open_decryption_file(char *path, char *file_name);
-#endif
-#if RSA_MASTER || RSA_ENCRYPTER
-FILE *rsa_open_encryption_file(char *path, char *file_name);
-#endif
-FILE *rsa_file_open(char *path, char *preffix, char *suffix, int is_slink,
-    int is_new);
-int rsa_file_close(FILE *fp);
-int rsa_file_write_u1024_hi(FILE *fptr, u1024_t *num);
-int rsa_file_read_u1024_hi(FILE *fptr, u1024_t *num);
-int rsa_file_write_u1024_low(FILE *fptr, u1024_t *num);
-int rsa_file_read_u1024_low(FILE *fptr, u1024_t *num);
-int rsa_file_write_u1024(FILE *fptr, u1024_t *num);
-int rsa_file_read_u1024(FILE *fptr, u1024_t *num);
-int str2u1024_t(u1024_t *num, char *str);
-int u1024_t2str(u1024_t *num, char *str);
-int rsa_key_get_params(char *preffix, u1024_t *n, u1024_t *exp,
-    u1024_t *montgomery_factor, int is_decrypt);
 int number_str2num(u1024_t *num, char *str);
-#if RSA_DECRYPTER || RSA_ENCRYPTER
-int rsa_key_get_vendor(u1024_t *vendor, int is_decrypt);
-#endif
 
 #define number_is_odd(num) (*(u64*)&(num)->arr & (u64)1)
 

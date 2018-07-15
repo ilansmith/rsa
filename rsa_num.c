@@ -1,3 +1,4 @@
+#include "rsa_util.h"
 #include "rsa_num.h"
 #include <stdlib.h>
 #include <sys/time.h>
@@ -536,8 +537,8 @@ STATIC int INLINE number_modular_multiplication_montgomery(u1024_t *num_res,
  *   r = MonPro(1, r, n)
  *   return r
  */
-STATIC int INLINE number_modular_exponentiation_montgomery(u1024_t *res, 
-    u1024_t *a, u1024_t *b, u1024_t *n)
+int INLINE number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a, 
+    u1024_t *b, u1024_t *n)
 {
     u1024_t a_nresidue;
     u64 *seg;
