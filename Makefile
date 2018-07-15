@@ -32,7 +32,7 @@ CYGWIN_COMPAT=echo "$1" | sed -e 's/--\|$(MAKE_MODE)//g'
 
 -include $(CONFFILE)
 
-CFLAGS=-Wall -Werror
+CFLAGS=-Wall -Werror -Wno-unused-result
 LFLAGS=-lm
 
 # Takuji Nishimura and Makoto Matsumoto's 64-bit version of Mersenne Twister 

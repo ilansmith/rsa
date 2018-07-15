@@ -300,10 +300,11 @@ char *rsa_highlight_str(char *fmt, ...)
 	va_list ap;
 	static char highlight[MAX_HIGHLIGHT_STR] = C_HIGHLIGHT;
 	char *ret = highlight;
+	int len = strlen(C_HIGHLIGHT);
 
 	va_start(ap, fmt);
-	if (vsnprintf(highlight + strlen(C_HIGHLIGHT), MAX_HIGHLIGHT_STR, fmt,
-		ap) > MAX_HIGHLIGHT_STR - strlen(C_NORMAL)) {
+	if (vsnprintf(highlight + len, MAX_HIGHLIGHT_STR - len, fmt, ap) >
+		MAX_HIGHLIGHT_STR - strlen(C_NORMAL)) {
 		rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__,
 			__LINE__);
 		ret = "";
