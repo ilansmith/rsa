@@ -208,8 +208,7 @@ Exit:
 	if (ret) {
 		remove(private_name);
 		remove(public_name);
-	}
-	else {
+	} else {
 		rsa_printf(0, 0, "private key: %s", private_name);
 		rsa_printf(0, 0, "public key: %s", public_name);
 	}
@@ -338,8 +337,7 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **plaintext,
 			".enc")) {
 			snprintf(newfile_name, file_name_len - 3, "%s",
 				file_name);
-		}
-		else {
+		} else {
 			sprintf(newfile_name, "%s.dec", file_name);
 		}
 		if (!(is_enable = is_fwrite_enable(newfile_name)) ||

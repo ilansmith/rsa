@@ -109,8 +109,7 @@ void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 	if (number_is_greater_or_equal(num1, num2)) {
 		number_assign(num_big, *num1);
 		number_assign(num_small, *num2);
-	}
-	else {
+	} else {
 		number_assign(num_big, *num2);
 		number_assign(num_small, *num1);
 	}
@@ -838,8 +837,7 @@ STATIC void INLINE number_extended_euclid_gcd(u1024_t *gcd, u1024_t *x,
 		number_assign(num_a, *a);
 		number_assign(num_b, *b);
 		change = 0;
-	}
-	else {
+	} else {
 		number_assign(num_a, *b);
 		number_assign(num_b, *a);
 		change = 1;

@@ -314,8 +314,7 @@ char *rsa_highlight_str(char *fmt, ...)
 		rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__,
 			__LINE__);
 		ret = "";
-	}
-	else {
+	} else {
 		strcat(highlight, C_NORMAL);
 	}
 	va_end(ap);

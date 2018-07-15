@@ -156,8 +156,7 @@ int rsa_set_file_name(char *name)
 		if (errno == EOVERFLOW) {
 			rsa_error_message(RSA_ERR_FILE_TOO_LARGE, name,
 				"to open");
-		}
-		else
+		} else
 #endif
 			rsa_error_message(RSA_ERR_FILE_NOT_EXIST, name);
 		goto Exit;
@@ -351,8 +350,7 @@ int rsa_encryption_level_set(char *arg)
 {
 	if (!arg) {
 		rsa_encryption_level = RSA_ENCRYPTION_LEVEL_DEFAULT;
-	}
-	else {
+	} else {
 		char *err;
 		rsa_encryption_level = strtol(arg , &err, 10);
 
@@ -618,8 +616,7 @@ static rsa_key_t *rsa_key_open_dyn(char accept)
 				keyring->keys[idx]->name,
 				strlen(keyring->keys[idx]->name))) {
 				break;
-			}
-			else if (keyring->keys[idx]->next) {
+			} else if (keyring->keys[idx]->next) {
 				rsa_key_t *tmp;
 
 				tmp = keyring->keys[idx];
@@ -814,16 +811,14 @@ static int keyname_display_single(char *fmt, rsa_keyring_t *kr, char *lnkname,
 		if (is_keytype_other && !kr->is_ambiguous[1 - idx])
 			printf(fmt, "");
 		do_print = 0;
-	}
-	else {
+	} else {
 		char name[MAX_HIGHLIGHT_STR + 1];
 
 		sprintf(name, " %s", kr->name);
 		if (!strcmp(kr->keys[idx]->path, lnkname)) {
 			strcat(name, " " KEY_DISPLAY_DEFAULT);
 			printf("%s", rsa_highlight_str(fmt, name));
-		}
-		else {
+		} else {
 			printf(fmt, name);
 		}
 		do_print = 1;
@@ -917,8 +912,7 @@ static void rsa_setkey_symlink_set(rsa_keyring_t *kr, int idx)
 	if (kr->is_ambiguous[idx]) {
 		rsa_warning_message(RSA_ERR_KEYMULTIENTRIES, idx ?
 			"public" : "private", rsa_highlight_str(key_data));
-	}
-	else if (kr->keys[idx]) {
+	} else if (kr->keys[idx]) {
 		remove(lnkname);
 		symlink(kr->keys[idx]->path, lnkname);
 		key_set_display(idx ? "public" : "private");
@@ -1058,8 +1052,7 @@ void rsa_encode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n)
 
 		number_dev(&num_q, &r, data, n);
 		q = *(u64*)&num_q;
-	}
-	else {
+	} else {
 		number_assign(r, *data);
 		q = (u64)0;
 	}
