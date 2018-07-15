@@ -33,14 +33,14 @@ TARGET=$(RSA)_$(ENC) $(RSA)_$(DEC)
 endif
 endif
 
-.PHONY: all clean cleanall
+.PHONY: all clean cleanapps cleantags cleanall
 all: $(TARGET)
 
 CC=gcc
-CFLAGS:=-Wall -g
-TARGET_OBJS:=rsa_num.o
+CFLAGS=-Wall -g
+TARGET_OBJS=rsa_num.o
 
-ifeq ($(DEBUG),y)
+ifeq ($(DEBUG),y) #debug
 TARGET_OBJS+=rsa_test.o
 CFLAGS+=-DDEBUG
 
@@ -66,9 +66,15 @@ endif
 endif
 endif
 else #not debug
-TARGET_OBJS+=rsa_io.o
-TAILOR_OBJS=main.o rsa_key.o
-ifneq ("$(SIG)","")
+TAILOR_OBJS=main.o rsa_key.o rsa_io.o
+
+ifeq ($(SIG),) #master encrypter/decrypter
+%.o: %.c
+	$(CC) -o $@ $(CFLAGS) -c $<
+
+$(RSA): $(TARGET_OBJS) $(TAILOR_OBJS)
+	$(CC) -o $@ $^
+else #separate encrypter and decrypter
 CFLAGS+=-DSIG=\"$(SIG)\"
 
 %_$(ENC).o: %.c
@@ -80,15 +86,16 @@ CFLAGS+=-DSIG=\"$(SIG)\"
 $(RSA)%: $(TARGET_OBJS) $(TAILOR_OBJS:.o=%.o)
 	$(CC) -o $@ $^
 endif
-%.o: %.c
-	$(CC) -o $@ $(CFLAGS) -c $<
-
-$(RSA): $(TARGET_OBJS) $(TAILOR_OBJS:%.o=%.o)
-	$(CC) -o $@ $^
 endif
 
 clean:
 	rm -rf *.o
-cleanall: clean
-	rm -rf $(ALL_TARGETS) tags
+
+cleanapps:
+	rm -rf $(ALL_TARGETS)
+
+cleantags:
+	rm -rf tags
+
+cleanall: clean cleanapps cleantags
 
