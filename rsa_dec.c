@@ -463,8 +463,8 @@ static int rsa_decrypt_full(rsa_key_t *key, FILE *ciphertext, FILE *plaintext)
 int rsa_decrypt(void)
 {
 	rsa_key_t *key;
-	FILE *plaintext, *ciphertext;
-	int ret, is_full;
+	FILE *plaintext = NULL, *ciphertext;
+	int ret = 0, is_full;
 
 	if (rsa_decrypt_prolog(&key, &plaintext, &ciphertext, &is_full))
 		return -1;

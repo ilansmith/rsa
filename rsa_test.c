@@ -2076,7 +2076,6 @@ static int is_475bit_num_prime(char lsb)
 		prime[i + 1] = '4';
 	}
 	prime[142] = lsb;
-	prime[143] = 0;
 
 	/* 475 bits */
 	number_dec2bin(&num_n, prime);
