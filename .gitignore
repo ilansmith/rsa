@@ -18,3 +18,8 @@
 *.app
 
 tags
+
+rsa
+rsa_enc
+rsa_dec
+rsa_test
