@@ -5,6 +5,10 @@
 #include <string.h>
 #include <math.h>
 
+#ifdef MERSENNE_TWISTER
+#include "mt19937_64.h"
+#endif
+
 #define IS_DIGIT(n) ((n)>='0' && (n)<='9')
 #define CHAR_2_INT(c) ((int)((c) - '0'))
 #define COPRIME_PRIME(X) ((X).prime)
@@ -47,7 +51,7 @@ typedef int (* func_modular_multiplication_t) (u1024_t *num_res,
     u1024_t *num_a, u1024_t *num_b, u1024_t *num_n);
 
 STATIC u1024_t num_montgomery_n, num_montgomery_factor, num_res_nresidue;
-STATIC unsigned int number_random_seed;
+STATIC prng_seed_t number_random_seed;
 
 STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
@@ -117,7 +121,7 @@ STATIC void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
     TIMER_STOP(FUNC_NUMBER_ADD);
 }
 
-unsigned int number_seed_set(unsigned int seed)
+prng_seed_t number_seed_set(prng_seed_t seed)
 {
     if (!(number_random_seed = seed))
     {
@@ -126,10 +130,14 @@ unsigned int number_seed_set(unsigned int seed)
 	tv.tv_sec = tv.tv_usec = 0;
 	if (gettimeofday(&tv, NULL))
 	    return 0;
-	number_random_seed = (unsigned int)tv.tv_sec * (unsigned int)tv.tv_usec;
+	number_random_seed = (prng_seed_t)tv.tv_sec * (prng_seed_t)tv.tv_usec;
     }
 
+#ifdef MERSENNE_TWISTER
+    init_genrand64(number_random_seed);
+#else
     srandom(number_random_seed);
+#endif
     return number_random_seed;
 }
 
@@ -151,11 +159,15 @@ int INLINE number_init_random(u1024_t *num, int blocks)
     /* initiate the low u64 blocks of num */
     for (i = 0; i < blocks; i++)
     {
+#ifdef MERSENNE_TWISTER
+	*((u64*)num + i) = (u64)genrand64_int64();
+#else
 	*((u64*)num + i) = (u64)random();
 #ifdef ULLONG
 	/* random() returns a long int so another call is required to fill
 	 * the block's higher bits */
 	*((u64*)num + i) |= (u64)random()<<(bit_sz_u64/2);
+#endif
 #endif
     }
     number_top_set(num);
