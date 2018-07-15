@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <errno.h>
 #if RSA_MASTER
 #include "rsa_enc.h"
 #include "rsa_dec.h"
@@ -33,6 +34,7 @@ char newfile_name[MAX_FILE_NAME_LEN + 4];
 char key_data[KEY_DATA_MAX_LEN];
 int rsa_encryption_level;
 int is_encryption_info_only;
+int file_size;
 
 static opt_t options_common[] = {
     {RSA_OPT_HELP, 'h', "help", no_argument, "print this message and exit"},
@@ -149,7 +151,10 @@ int rsa_set_file_name(char *name)
     }
     if (stat(name, &st))
     {
-	rsa_error_message(RSA_ERR_FILE_NOT_EXIST, name);
+	if (errno == EOVERFLOW)
+	    rsa_error_message(RSA_ERR_FILE_TOO_LARGE, name, "to open");
+	else
+	    rsa_error_message(RSA_ERR_FILE_NOT_EXIST, name);
 	goto Exit;
     }
     if (S_ISDIR(st.st_mode))
@@ -162,6 +167,7 @@ int rsa_set_file_name(char *name)
 	rsa_error_message(RSA_ERR_FILE_NOT_REG, name);
 	goto Exit;
     }
+    file_size = st.st_size;
     sprintf(file_name, "%s", name);
     ret = 0;
 

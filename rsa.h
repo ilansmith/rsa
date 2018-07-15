@@ -81,6 +81,7 @@ extern char file_name[MAX_FILE_NAME_LEN];
 extern char newfile_name[MAX_FILE_NAME_LEN + 4];
 extern int rsa_encryption_level;
 extern int is_encryption_info_only;
+extern int file_size;
 
 int opt_short2code(opt_t *options, int opt);
 int parse_args(int argc, char *argv[], int *flags, rsa_handler_t *handler);
