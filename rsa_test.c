@@ -2940,7 +2940,7 @@ static test_t rsa_tests[] =
 	    DISABLE_ULLONG_256 | DISABLE_ULLONG_512 | DISABLE_ULLONG_1024,
     },
     {
-	description: "number_is_prime the 100000th prime)",
+	description: "number_is_prime (the 100000th prime)",
 	func: test097,
 	disabled: DISABLE_UCHAR | DISABLE_USHORT
     },
