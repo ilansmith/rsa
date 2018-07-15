@@ -1,4 +1,4 @@
-# to build rsa tests compile with DEBUG=y.
+# to build rsa unit tests compile with TESTS=y.
 #
 # - set u64 type definition by compiling with:
 #   U64=UCHAR    for unsigned char (default)
@@ -7,8 +7,6 @@
 #   U64=ULLONG   for unsigned long long
 # 
 # - to enable function timing feature compile with TIME_FUNCTIONS=y.
-#   determine which functions are to be timed by assigning either ENABLED or 
-#   DISSABLED in rsa_num.c:func_table[].
 #
 # to build signed rsa encoder and decoders compile with SIG='name'.
 # a public key created by the rsa_enc application will contain a field with 
@@ -21,14 +19,16 @@ RSA=rsa
 ENC=enc
 DEC=dec
 TEST=test
-ALL_TARGETS=$(RSA) $(RSA)_$(ENC) $(RSA)_$(DEC) $(RSA)_$(TEST)
+ALL_TARGETS=$(RSA) $(RSA)_$(ENC) $(RSA)_$(DEC) $(TEST)_$(RSA)
 
-ifeq ($(DEBUG),y)
-TARGET=$(RSA)_$(TEST)
-else
-ifeq ($(SIG),)
+ifeq ($(TESTS),y) #debug mode: create unit tests
+TARGET=$(TEST)_$(RSA)
+test_rsa: rsa_test.o rsa_num.o rsa_io.o
+	gcc -o $@ $^ -lm
+else # creat rsa applications
+ifeq ($(SIG),) # create master
 TARGET=$(RSA)
-else
+else # create separate encoder/decoder
 TARGET=$(RSA)_$(ENC) $(RSA)_$(DEC)
 endif
 endif
@@ -37,17 +37,19 @@ endif
 all: $(TARGET)
 
 CC=gcc
-CFLAGS=-Wall -g
+CFLAGS=-Wall -Werror
 TARGET_OBJS=rsa_num.o
 
-ifeq ($(DEBUG),y) #debug
+ifeq ($(TESTS),y) #debug mode
 TARGET_OBJS+=rsa_test.o
-CFLAGS+=-DDEBUG
+CFLAGS+=-g -DTESTS
 
+# enable/disable function timing
 ifeq ($(TIME_FUNCTIONS),y)
 CFLAGS+=-DTIME_FUNCTIONS
 endif
 
+# u64 type definition
 ifeq ($(U64),UCHAR)
 CFLAGS+=-DUCHAR
 else
@@ -60,7 +62,11 @@ else
 ifeq ($(U64),ULLONG)
 CFLAGS+=-DULLONG
 else
-CFLAGS+=-DUCHAR
+ifeq ($(U64),) # default
+CFLAGS+=-DALL_TESTS
+else
+$(error undefined type for u64) # error!
+endif
 endif
 endif
 endif
@@ -69,18 +75,18 @@ else #not debug
 TAILOR_OBJS=main.o rsa_key.o rsa_io.o
 
 ifeq ($(SIG),) #master encrypter/decrypter
-%.o: %.c
+%.o: %.c rsa.h
 	$(CC) -o $@ $(CFLAGS) -c $<
 
 $(RSA): $(TARGET_OBJS) $(TAILOR_OBJS)
 	$(CC) -o $@ $^
 else #separate encrypter and decrypter
-CFLAGS+=-DSIG=\"$(SIG)\"
+CFLAGS+=-DSIG=\"$(SIG)\" # ENC/DEC
 
-%_$(ENC).o: %.c
+%_$(ENC).o: %.c rsa.h
 	$(CC) -o $@ $(CFLAGS) -DRSA_ENC -c $<
 
-%_$(DEC).o: %.c
+%_$(DEC).o: %.c rsa.h
 	$(CC) -o $@ $(CFLAGS) -DRSA_DEC -c $<
 
 $(RSA)%: $(TARGET_OBJS) $(TAILOR_OBJS:.o=%.o)

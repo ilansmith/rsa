@@ -23,32 +23,30 @@ static void rsa_exp_generate(u1024_t *n, u1024_t *e, u1024_t *d)
 #if RSA_DECRYPTER
 static void rsa_encode_vendor(u1024_t *v, u1024_t *n, u1024_t *exp)
 {
-    char *buf = calloc(1, sizeof(u1024_t));
+    char *sig = calloc(1, BYTES_SZ(u1024_t));
 
     number_reset(v);
-    snprintf(buf, sizeof(u1024_t) - 1, SIG);
-    memcpy(v, buf, sizeof(u1024_t));
+    snprintf(sig, BYTES_SZ(u1024_t) - 1, SIG);
+    memcpy(v, sig, BYTES_SZ(u1024_t));
     number_modular_exponentiation_montgomery(v, v, exp, n);
-    free(buf);
+    free(sig);
 }
 #endif
 
-static int rsa_write_keys(u1024_t *n, u1024_t *exp, u1024_t *mf, int is_prv, 
-    u1024_t *vendor)
+static int rsa_write_keys(u1024_t *n, u1024_t *exp, u1024_t *montgomery_factor,
+    int is_prv, u1024_t *vendor)
 {
     FILE *file = NULL;
 
-    if (!(file = is_prv ? rsa_file_create_private() : rsa_file_create_public()))
+    if (!(file = is_prv ? rsa_file_create_private() : rsa_file_create_public())
+	|| rsa_file_write_u1024(file, n) || rsa_file_write_u1024(file, exp) 
+	|| rsa_file_write_u1024(file, montgomery_factor))
     {
 	return -1;
     }
 
-    fwrite(n, sizeof(u1024_t), 1, file);
-    fwrite(exp, sizeof(u1024_t), 1, file);
-    fwrite(mf, sizeof(u1024_t), 1, file);
-
 #if RSA_DECRYPTER
-    fwrite(vendor, sizeof(u1024_t), 1, file);
+    rsa_file_write_u1024(file, vendor);
 #endif
 
     rsa_file_close(file);
@@ -91,3 +89,68 @@ void rsa_key_generate(void)
     /* ilan: TBD - error handling */
 }
 #endif
+
+#if RSA_DECRYPTER || RSA_ENCRYPTER
+int rsa_validate_key(u1024_t *n, u1024_t *exp, int is_decrypt)
+{
+    u1024_t vendor;
+    char *sig = calloc(1, BYTES_SZ(u1024_t));
+    int ret;
+
+    if (rsa_key_get_vendor(&vendor, is_decrypt))
+	return -1;
+
+    number_modular_exponentiation_montgomery(&vendor, &vendor, exp, n);
+    snprintf(sig, BYTES_SZ(u1024_t) - 1, SIG);
+    memcpy(sig, SIG, BYTES_SZ(u1024_t) - 1);
+
+    ret = memcmp(sig, &vendor, BYTES_SZ(u1024_t));
+    free(sig);
+    return ret;
+}
+#endif
+
+int rsa_function(char *file_name, int is_decrypt)
+{
+    FILE *infile, *outfile;
+    u1024_t n, exp, montgomery_factor;
+    char *preffix = "master";
+
+    if (!file_name)
+    {
+	infile = stdin;
+	outfile = stdout;
+    }
+#if RSA_MASTER || RSA_DECRYPTER
+    else if (is_decrypt && !((infile = fopen(file_name, "r+")) && (outfile = 
+	rsa_open_decryption_file("./", file_name))))
+    {
+	return -1;
+    }
+#endif
+#if RSA_MASTER || RSA_ENCRYPTER
+    else if (!is_decrypt && !((infile = fopen(file_name, "r+")) && (outfile = 
+	rsa_open_encryption_file("./", file_name))))
+    {
+	return -1;
+    }
+#endif
+
+#if RSA_DECRYPTER || RSA_ENCRYPTER
+    preffix = SIG;
+#endif
+
+    if (rsa_key_get_params(preffix, &n, &exp, &montgomery_factor, is_decrypt))
+	return -1;
+
+    number_montgomery_factor_set(&n, &montgomery_factor);
+
+#if RSA_DECRYPTER || RSA_ENCRYPTER
+    if (rsa_validate_key(&n, &exp, is_decrypt))
+	return -1;
+#endif
+
+    printf("rsa %s\n", is_decrypt ? "decrypt" : "encrypt");
+
+    return 0;
+}

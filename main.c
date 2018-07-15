@@ -284,24 +284,24 @@ int main(int argc, char *argv[])
     case RSA_OPT_HELP:
 	output_help(argv[0]);
 	break;
-#if !RSA_MASTER
+#if RSA_DECRYPTER || RSA_ENCRYPTER
     case RSA_OPT_VENDOR:
 	rsa_vendor();
 	break;
 #endif
-#if RSA_MASTER || RSA_ENCRYPTER
-    case RSA_OPT_ENCRYPT:
-	break;
-    case RSA_OPT_ENCRYPT | RSA_OPT_FILE:
-	break;
-#endif
 #if RSA_MASTER || RSA_DECRYPTER
     case RSA_OPT_DECRYPT:
-	break;
     case RSA_OPT_DECRYPT | RSA_OPT_FILE:
+	rsa_function(input_file_name, 1);
 	break;
     case RSA_OPT_GENERATE_KEY:
 	rsa_key_generate();
+	break;
+#endif
+#if RSA_MASTER || RSA_ENCRYPTER
+    case RSA_OPT_ENCRYPT:
+    case RSA_OPT_ENCRYPT | RSA_OPT_FILE:
+	rsa_function(input_file_name, 0);
 	break;
 #endif
     case RSA_OPT_ERROR:
