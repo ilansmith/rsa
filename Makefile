@@ -8,17 +8,17 @@
 # 
 # - to enable function timing feature compile with TIME_FUNCTIONS=y.
 #   determine which functions are to be timed by assigning either ENABLED or 
-#   DISSABLED in number.c:func_table[].
+#   DISSABLED in rsa_num.c:func_table[].
 
 ALL_TARGETS=rsa unit_test
 CFLAGS=-Wall -g
-TARGET_OBJS=number.o
+TARGET_OBJS=rsa_num.o
 TARGET=rsa
 
 ifeq ($(DEBUG),y)
 
 TARGET=unit_test
-TARGET_OBJS+=test.o
+TARGET_OBJS+=rsa_test.o
 CFLAGS+=-DDEBUG
 
 ifeq ($(TIME_FUNCTIONS),y)
@@ -55,8 +55,8 @@ $(TARGET): $(TARGET_OBJS)
 %.o: %.c
 	gcc -o $@ $(CFLAGS) -c $<
 
-test.o: test.c rsa.h
-number.o: number.c rsa.h
+rsa_test.o: rsa_test.c rsa.h
+rsa_num.o: rsa_num.c rsa.h
 main.o: main.c rsa.h
 rsa_key.o: rsa_key.c rsa.h
 
