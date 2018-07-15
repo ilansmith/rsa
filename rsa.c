@@ -378,38 +378,6 @@ Error:
 	return -1;
 }
 
-static int rsa_key_size(void)
-{
-	int *level, accum = 0;
-
-	for (level = encryption_levels; *level; level++)
-		accum += number_size(*level);
-
-	return strlen(RSA_SIGNITURE) + number_size(encryption_levels[0]) +
-		3 * accum;
-}
-
-static rsa_key_t *rsa_key_alloc(char type, char *name, char *path, FILE *file)
-{
-	rsa_key_t *key;
-
-	if (!(key = calloc(1, sizeof(rsa_key_t))))
-		return NULL;
-
-	key->type = type;
-	snprintf(key->name, KEY_DATA_MAX_LEN, "%s", name);
-	sprintf(key->path, "%s", path);
-	key->file = file;
-
-	return key;
-}
-
-void rsa_key_close(rsa_key_t *key)
-{
-	fclose(key->file);
-	free(key);
-}
-
 static rsa_keyring_t *rsa_keyring_alloc(rsa_key_t *key)
 {
 	rsa_keyring_t *kr;
@@ -454,70 +422,9 @@ static void rsa_keyring_free(rsa_keyring_t *kr)
 	free(kr);
 }
 
-static char *keydata_extract(FILE *f)
-{
-	static u1024_t data;
-	u1024_t scrambled_data, exp, n, montgomery_factor;
-
-	number_enclevl_set(encryption_levels[0]);
-	rsa_read_u1024_full(f, &scrambled_data);
-	rsa_read_u1024_full(f, &exp);
-	rsa_read_u1024_full(f, &n);
-	rsa_read_u1024_full(f, &montgomery_factor);
-	number_montgomery_factor_set(&n, &montgomery_factor);
-
-	rsa_decode(&data, &scrambled_data, &exp, &n);
-	if (rsa_encryption_level)
-		number_enclevl_set(rsa_encryption_level);
-	return (char*)data.arr;
-}
-
-static rsa_key_t *rsa_key_open_gen(char *path, char accept, int is_expect_key)
-{
-	int siglen = strlen(RSA_SIGNITURE);
-	char signiture[siglen], *data, keytype;
-	char *types[2] = { "private", "public" };
-	struct stat st;
-	FILE *f;
-
-	if (stat(path, &st))
-		return NULL;
-
-	if (st.st_size != rsa_key_size()) {
-		if (is_expect_key)
-			rsa_error_message(RSA_ERR_KEY_CORRUPT, path);
-		return NULL;
-	}
-	if (!(f = fopen(path, "r"))) {
-		if (is_expect_key)
-			rsa_error_message(RSA_ERR_KEY_OPEN, path);
-		return NULL;
-	}
-	if (rsa_read_str(f, signiture, siglen) || 
-		memcmp(RSA_SIGNITURE, signiture, siglen)) {
-		if (is_expect_key)
-			rsa_error_message(RSA_ERR_KEY_CORRUPT, path);
-		fclose(f);
-		return NULL;
-	}
-
-	data = keydata_extract(f);
-	keytype = *data;
-	if (!(keytype & accept)) {
-		if (is_expect_key) {
-			rsa_error_message(RSA_ERR_KEY_TYPE, path,
-				types[(keytype + 1) % 2], types[keytype % 2]);
-		}
-		fclose(f);
-		return NULL;
-	}
-
-	return rsa_key_alloc(keytype, data + 1, path, f);
-}
-
 static rsa_key_t *rsa_key_open_try(char *path, char accept)
 {
-	return rsa_key_open_gen(path, accept, 0);
+	return rsa_key_open(path, accept, 0);
 }
 
 static rsa_key_t *rsa_dirent2key(struct dirent *ent, char accept)
@@ -678,10 +585,10 @@ static rsa_key_t *rsa_key_open_default(char accept)
 
 	sprintf(path, "%s/" RSA_KEYLINK_PREFIX ".%s", key_path_get(), 
 		ext[(accept) % 2]);
-	return rsa_key_open_gen(path, accept, 1);
+	return rsa_key_open(path, accept, 1);
 }
 
-rsa_key_t *rsa_key_open(char accept)
+rsa_key_t *rsa_key_open_type(char accept)
 {
 	rsa_key_t *key;
 	int is_public = accept == RSA_KEY_TYPE_PUBLIC;
@@ -702,36 +609,6 @@ rsa_key_t *rsa_key_open(char accept)
 	}
 
 	return key;
-}
-
-int rsa_key_enclev_set(rsa_key_t *key, int new_level)
-{
-	int offset, *level, ret;
-	u1024_t montgomery_factor;
-
-	/* rsa signature */
-	offset = strlen(RSA_SIGNITURE);
-
-	/* rsa key data */
-	offset += number_size(encryption_levels[0]);
-
-	/* rsa key sets */
-	for (level = encryption_levels; *level && *level != new_level; level++)
-		offset += 3*number_size(*level);
-
-	if (!*level || fseek(key->file, offset, SEEK_SET)) {
-		rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__,
-			__LINE__);
-		return -1;
-	}
-
-	number_enclevl_set(new_level);
-	ret = rsa_read_u1024_full(key->file, &key->exp) ||
-		rsa_read_u1024_full(key->file, &key->n) || 
-		rsa_read_u1024_full(key->file, &montgomery_factor) ? -1 : 0;
-	if (!ret)
-		number_montgomery_factor_set(&key->n, &montgomery_factor);
-	return ret;
 }
 
 static void keyname_display_init(char *key, int idx)
@@ -1042,63 +919,5 @@ int rsa_action_handle_common(rsa_opt_t action, char *app,
 	}
 
 	return 0;
-}
-
-static void rsa_zero_one(u1024_t *res, u1024_t *data)
-{
-	int i;
-
-	number_assign(*res, *data);
-	for (i = 0; i < block_sz_u1024; i++)
-		res->arr[i] ^= RSA_RANDOM();
-	res->top = -1;
-}
-
-void rsa_encode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n)
-{
-	u64 q;
-	u1024_t r;
-
-	if (number_is_greater_or_equal(data, n)) {
-		u1024_t num_q;
-
-		number_dev(&num_q, &r, data, n);
-		q = *(u64*)&num_q;
-	} else {
-		number_assign(r, *data);
-		q = (u64)0;
-	}
-
-	if (number_is_equal(&r, &NUM_0) || number_is_equal(&r, &NUM_1)) {
-		rsa_zero_one(res, data);
-		return;
-	}
-
-	number_modular_exponentiation_montgomery(res, &r, exp, n);
-	res->arr[block_sz_u1024] = q;
-}
-
-void rsa_decode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n)
-{
-	u64 q;
-	u1024_t r;
-
-	if (data->top == -1) {
-		rsa_zero_one(res, data);
-		return;
-	}
-
-	q = data->arr[block_sz_u1024];
-	number_assign(r, *data);
-	r.arr[block_sz_u1024] = 0;
-	number_modular_exponentiation_montgomery(res, &r, exp, n);
-
-	if (q) {
-		u1024_t num_q;
-
-		number_small_dec2num(&num_q, q);
-		number_mul(&num_q, &num_q, n);
-		number_add(res, res, &num_q);
-	}
 }
 

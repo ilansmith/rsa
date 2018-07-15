@@ -30,17 +30,8 @@
 #define RSA_RANDOM() (u64)random()
 #endif
 
-typedef struct code2code_t {
-	int code;
-	int val;
-	int disabled;
-} code2code_t;
-
-typedef struct code2str_t {
-	int code;
-	char *str;
-	int disabled;
-} code2str_t;
+#define RSA_KEY_TYPE_PRIVATE 1<<0
+#define RSA_KEY_TYPE_PUBLIC 1<<1
 
 typedef enum {
 	V_NORMAL = 0,
@@ -76,6 +67,30 @@ typedef enum {
 	RSA_ERR_INTERNAL,
 } rsa_errno_t;
 
+typedef struct code2code_t {
+	int code;
+	int val;
+	int disabled;
+} code2code_t;
+
+typedef struct code2str_t {
+	int code;
+	char *str;
+	int disabled;
+} code2str_t;
+
+typedef struct rsa_key_t {
+	struct rsa_key_t *next;
+	char type;
+	char name[KEY_DATA_MAX_LEN];
+	char path[MAX_FILE_NAME_LEN];
+	FILE *file;
+	u1024_t n;
+	u1024_t exp;
+} rsa_key_t;
+
+extern int rsa_encryption_level;
+
 int code2code(code2code_t *list, int code);
 char *code2str(code2str_t *list, int code);
 
@@ -98,5 +113,12 @@ char *rsa_highlight_str(char *fmt, ...);
 int rsa_timeline_init(int len, int write_block_sz);
 void rsa_timeline_update(void);
 void rsa_timeline_uninit(void);
+
+void rsa_encode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);
+void rsa_decode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);
+rsa_key_t *rsa_key_open(char *path, char accept, int is_expect_key);
+void rsa_key_close(rsa_key_t *key);
+int rsa_key_enclev_set(rsa_key_t *key, int new_level);
+int rsa_encrypt_seed(rsa_key_t *key, FILE *ciphertext);
 #endif
 

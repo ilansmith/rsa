@@ -104,13 +104,13 @@ ifeq ($(CONFIG_TESTS),y)
   TARGET_OBJS_rsa_test+=unit_test.o rsa_test.o
 
 else # create rsa applications
-  TARGET_OBJS+=rsa.o
+  TARGET_OBJS_rsa=rsa.o
   TARGET_OBJS_rsa_enc=rsa_enc.o 
   TARGET_OBJS_rsa_dec=rsa_dec.o 
   ifeq ($(CONFIG_MASTER),y) # master encrypter/decrypter
     TARGETS=$(TARGET_RSA)
     CFLAGS+=-DRSA_MASTER
-    TARGET_OBJS_rsa=$(TARGET_OBJS_rsa_enc) $(TARGET_OBJS_rsa_dec) rsa_main.o
+    TARGET_OBJS_rsa+=$(TARGET_OBJS_rsa_enc) $(TARGET_OBJS_rsa_dec) rsa_main.o
   else # create separate encrypter/decrypter
     TARGETS=$(TARGET_RSA_ENC) $(TARGET_RSA_DEC)
     TARGET_OBJS_rsa_enc+=rsa_enc_main.o
@@ -130,9 +130,9 @@ $(TARGET_RSA_TEST): $(TARGET_OBJS) $(TARGET_OBJS_rsa_test)
 	$(CC) -o $@ $^ $(LFLAGS)
 $(TARGET_RSA): $(TARGET_OBJS) $(TARGET_OBJS_rsa)
 	$(CC) -o $@ $^ $(LFLAGS)
-$(TARGET_RSA_ENC): $(TARGET_OBJS) $(TARGET_OBJS_rsa_enc)
+$(TARGET_RSA_ENC): $(TARGET_OBJS) $(TARGET_OBJS_rsa) $(TARGET_OBJS_rsa_enc)
 	$(CC) -o $@ $^ $(LFLAGS)
-$(TARGET_RSA_DEC): $(TARGET_OBJS) $(TARGET_OBJS_rsa_dec)
+$(TARGET_RSA_DEC): $(TARGET_OBJS) $(TARGET_OBJS_rsa) $(TARGET_OBJS_rsa_dec)
 	$(CC) -o $@ $^ $(LFLAGS)
 
 config:

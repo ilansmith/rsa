@@ -313,7 +313,7 @@ static int rsa_decrypt_prolog(rsa_key_t **key, FILE **plaintext,
 	int file_name_len, is_enable;
 
 	/* open RSA private key */
-	if (!(*key = rsa_key_open(RSA_KEY_TYPE_PRIVATE)))
+	if (!(*key = rsa_key_open_type(RSA_KEY_TYPE_PRIVATE)))
 		return -1;
 
 	/* open file to decrypt */
