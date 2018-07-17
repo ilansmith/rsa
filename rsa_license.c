@@ -11,9 +11,9 @@
 
 #define SEED_ENCRYPTION_LEVEL 512
 
-static void xor_user_data(char *buf, int len)
+static void xor_user_data(char *buf, size_t len)
 {
-	int i;
+	size_t i;
 
 	for (i = 0; i < len; i++)
 		buf[i] ^= (char)RSA_RANDOM();
@@ -109,7 +109,7 @@ exit:
 }
 
 static int rsa_license_get(struct rsa_stream_init *pub_key_stream_init,
-		char *file_name, char **buf, int *len)
+		char *file_name, char **buf, size_t *len)
 {
 	rsa_stream_t *ciphertext;
 	struct rsa_stream_init init;
@@ -119,7 +119,7 @@ static int rsa_license_get(struct rsa_stream_init *pub_key_stream_init,
 	u64 crc;
 	int ret = -1;
 	char *_buf;
-	int _len;
+	size_t _len;
 
 	/* open file */
 	init.type = RSA_STREAM_TYPE_FILE;
@@ -157,7 +157,7 @@ static int rsa_license_get(struct rsa_stream_init *pub_key_stream_init,
 		goto exit;
 
 	/* XoR decrypt len */
-	_len ^= (u64)RSA_RANDOM();
+	_len ^= (size_t)RSA_RANDOM();
 
 	/* allocate buffer for user data */
 	if (!(_buf = (char*)calloc(_len, sizeof(char))))
@@ -194,7 +194,7 @@ int rsa_license_info(struct rsa_stream_init *pub_key_stream_init,
 		char *file_name, struct rsa_license_ops *license_ops)
 {
 	char *buf = NULL;
-	int len;
+	size_t len;
 	int ret = -1;
 
 	if (!license_ops->lic_info)
@@ -217,7 +217,7 @@ int rsa_license_extract(struct rsa_stream_init *pub_key_stream_init,
 		void *data)
 {
 	char *buf = NULL;
-	int len;
+	size_t len;
 	int ret = -1;
 
 	if (!license_ops->lic_extract)
