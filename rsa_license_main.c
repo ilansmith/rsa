@@ -247,7 +247,7 @@ static int rsa_encrypt_format_version(char **buf, size_t *len, u64 version)
 static int rsa_encrypt_vendor_name(char **buf, size_t *len, char *vendor_name)
 {
 	size_t new_len;
-	int name_len;
+	size_t name_len;
 	int i;
 
 	name_len = strlen(vendor_name);
@@ -308,7 +308,7 @@ static int rsa_license_create_rivermax(char **buf, size_t *len, void *data)
 	}
 
 	if (rsa_encrypt_time_limit(&_buf, &_len, license_data->time_limit)) {
-		printf("failed to encrypt time limit: %lu\n",
+		printf("failed to encrypt time limit: %llu\n",
 			license_data->time_limit);
 		goto error;
 	}
@@ -453,7 +453,7 @@ static int rsa_license_info_rivermax(char *buf, size_t len)
 		return -1;
 	}
 
-	return len;
+	return 0;
 }
 
 static int rsa_license_extract_rivermax(char *buf, size_t len, void *data)
