@@ -2,7 +2,9 @@
 #include <stdarg.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef __linux__
 #include <unistd.h>
+#endif
 #include "rsa_util.h"
 #include "rsa_stream.h"
 
@@ -11,6 +13,12 @@
 
 #define RSA_SIGNATURE "IASRSA"
 #define RSA_SIGNATURE_LEN 6
+
+#ifdef __linux__
+#define STRDUP strdup
+#else
+#define STRDUP _strdup
+#endif
 
 typedef int (*io_func_t)(void *ptr, int size, int nmemb, rsa_stream_t *s);
 
@@ -300,6 +308,7 @@ verbose_t rsa_verbose_get(void)
 	return rsa_verbose;
 }
 
+#if defined(__linux__)
 int is_fwrite_enable(char *name)
 {
 	char path[MAX_FILE_NAME_LEN], input[4];
@@ -327,6 +336,7 @@ int is_fwrite_enable(char *name)
 Exit:
 	return ret;
 }
+#endif
 
 char *rsa_highlight_str(char *fmt, ...)
 {
@@ -482,7 +492,7 @@ static int rsa_stream_init_dup(struct rsa_stream_init *to,
 {
 	switch (from->type) {
 	case RSA_STREAM_TYPE_FILE:
-		to->params.file.path = strdup(from->params.file.path);
+		to->params.file.path = STRDUP(from->params.file.path);
 		if (!to->params.file.path)
 			return -1;
 		to->params.file.mode = from->params.file.mode;

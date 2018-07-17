@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
+#if defined(__linux__)
 #include <sys/time.h>
+#endif
 #include <sys/stat.h>
 #include "rsa_stream.h"
 #include "rsa_num.h"

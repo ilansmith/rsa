@@ -28,7 +28,11 @@
 #ifdef CONFIG_MERSENNE_TWISTER
 #define RSA_RANDOM() (u64)genrand64_int64()
 #else
+#if defined(__linux__)
 #define RSA_RANDOM() (u64)random()
+#else
+#define RSA_RANDOM() (u64)rand()
+#endif
 #endif
 
 #define RSA_KEY_TYPE_PRIVATE (1<<0)
@@ -116,7 +120,9 @@ int rsa_read_str(rsa_stream_t *s, char *str, int len);
 int rsa_write_str(rsa_stream_t *s, char *str, int len);
 void rsa_verbose_set(verbose_t level);
 verbose_t rsa_verbose_get(void);
+#if defined (__linux__)
 int is_fwrite_enable(char *name);
+#endif
 char *rsa_highlight_str(char *fmt, ...);
 int rsa_timeline_init(int len, int write_block_sz);
 void rsa_timeline_update(void);
