@@ -7,7 +7,9 @@
 
 #include <stdlib.h>
 #include <sys/types.h>
+#ifdef __linux__
 #include <unistd.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
@@ -160,6 +162,7 @@ while (0)
 } while (0)
 
 /* return: num1 > num2 or ret_on_equal if num1 == num2 */
+#if defined(__linux__)
 #define number_compare(num1, num2, ret_on_equal) ({ \
 	int __ret; \
 	do { \
@@ -168,15 +171,32 @@ while (0)
 			u64 *__seg2 = (u64*)&(num2)->arr + (num2)->top; \
 			for ( ; __seg1 > (u64*)&(num1)->arr && \
 				*__seg1==*__seg2; __seg1--, __seg2--); \
-		__ret = (*__seg1 == *__seg2) ? \
-			ret_on_equal : *__seg1 > *__seg2; \
-		} \
-		else { \
-		__ret = (num1)->top > (num2)->top; \
+			__ret = (*__seg1 == *__seg2) ? \
+				ret_on_equal : *__seg1 > *__seg2; \
+		} else { \
+			__ret = (num1)->top > (num2)->top; \
 		} \
 	} while (0); \
 	__ret; \
 	})
+#else
+static inline int number_compare(u1024_t *num1, u1024_t *num2, int ret_on_equal)
+{
+	int __ret;
+
+	if (num1->top == num2->top) {
+		u64 *__seg1 = (u64*)&num1->arr + num1->top;
+		u64 *__seg2 = (u64*)&num2->arr + num2->top;
+		for ( ; __seg1 > (u64*)&num1->arr && *__seg1==*__seg2;
+			__seg1--, __seg2--);
+		__ret = (*__seg1 == *__seg2) ? ret_on_equal : *__seg1 > *__seg2;
+	} else {
+		__ret = num1->top > num2->top;
+	}
+
+	return __ret;
+}
+#endif
 
 /* return: num1 > num2 */
 #define number_is_greater(num1, num2) number_compare((num1), (num2), 0)
