@@ -133,9 +133,9 @@ static u64 crc64_table[256] = {
 	(u64)0xd02cdbfd228cc7, (u64)0xd0bb90b0805648,
 };
 
-u64 __crc64(u64 crc, char *str, int len)
+u64 __crc64(u64 crc, char *str, size_t len)
 {
-	int i;
+	size_t i;
 
 	for (i = 0; i < len; i++)
 		crc = crc64_table[(unsigned char)crc ^ str[i]] ^ (crc >> 8);
@@ -143,7 +143,7 @@ u64 __crc64(u64 crc, char *str, int len)
 	return crc;
 }
 
-u64 rsa_crc(char *str, int len)
+u64 rsa_crc(char *str, size_t len)
 {
 	return __crc64((u64)0xffffffffffffffff, str, len);
 }

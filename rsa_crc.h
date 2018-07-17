@@ -3,7 +3,7 @@
 
 #include "rsa_num.h"
 
-u64 rsa_crc(char *str, int len);
+u64 rsa_crc(char *str, size_t len);
 
 #endif
 
