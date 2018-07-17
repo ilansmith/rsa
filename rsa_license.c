@@ -7,9 +7,7 @@
 #include "rsa_crc.h"
 #include "rsa_license.h"
 
-#define LICENSE_LENGTH_MAX 1024
-#define LICENSE_LENGTH_USER (LICENSE_LENGTH_MAX - \
-	(sizeof(u64) * (16 + 1) + sizeof(u64) * 1))
+#define SEED_ENCRYPTION_LEVEL 512
 
 static void xor_user_data(char *buf, int len)
 {
@@ -17,19 +15,6 @@ static void xor_user_data(char *buf, int len)
 
 	for (i = 0; i < len; i++)
 		buf[i] ^= (char)RSA_RANDOM();
-}
-
-static u64 xor_encrypt_crc(char *buf, int len)
-{
-	u64 crc;
-
-	crc = rsa_crc(buf, len);
-	return crc ^ (u64)RSA_RANDOM();
-}
-
-static u64 xor_decrypt_crc(u64 crc_enc)
-{
-	return crc_enc ^= (u64)RSA_RANDOM();
 }
 
 /* 
@@ -40,6 +25,7 @@ static u64 xor_decrypt_crc(u64 crc_enc)
  * +----------+----------------------------------+--------------+
  * | u1024_t  | random seed                      | RSA (512bit) |
  * | u64      | user specific data crc encrypted | Xor with RNG |
+ * | size_t   | user specific data length        | Xor with RNG |
  * | u64[]    | user specific data...            | Xor with RNG |
  * +----------+----------------------------------+--------------+
  */
@@ -51,19 +37,15 @@ int rsa_license_create(struct rsa_stream_init *stream_init_priv_key,
 	struct rsa_stream_init init;
 	rsa_key_t *key = NULL;
 	int ret = -1;
-	char *buf;
-	u64 crc_enc;
-	int len = 0;
-
-	buf = (char*)calloc(LICENSE_LENGTH_USER, sizeof(char));
-	if (!buf)
-		return -1;
+	char *buf = NULL;
+	u64 crc;
+	size_t len;
+	size_t len_enc = 0;
 
 	/* setup extra data */
-	if (license_ops->lic_create) {
-		len = license_ops->lic_create(buf, LICENSE_LENGTH_USER, data);
-		if (len == -1)
-			goto exit;
+	if (!license_ops->lic_create ||
+			license_ops->lic_create(&buf, &len, data)) {
+		return -1;
 	}
 
 	/* open file */
@@ -82,16 +64,22 @@ int rsa_license_create(struct rsa_stream_init *stream_init_priv_key,
 	if (rsa_encrypt_seed(key, ciphertext))
 		goto exit;
 
-	len = LICENSE_LENGTH_USER - len;
-
 	/* XoR encrypt crc */
-	crc_enc = xor_encrypt_crc(buf, len);
+	crc = rsa_crc(buf, len);
+	crc ^= (u64)RSA_RANDOM();
+
+	/* XoR encrypt user data length */
+	len_enc = len ^ (size_t)RSA_RANDOM();
 
 	/* XoR encrypt user data */
 	xor_user_data(buf, len);
 
 	/* write crc to license file */
-	if (swrite(&crc_enc, sizeof(u64), 1, ciphertext) != 1)
+	if (swrite(&crc, sizeof(size_t), 1, ciphertext) != 1)
+		goto exit;
+
+	/* write len_enc to license file */
+	if (swrite(&len_enc, sizeof(u64), 1, ciphertext) != 1)
 		goto exit;
 
 	/* write user encrypted data to license file */
@@ -119,7 +107,7 @@ exit:
 }
 
 static int rsa_license_get(struct rsa_stream_init *pub_key_stream_init,
-		char *file_name, char *buf, int *len)
+		char *file_name, char **buf, int *len)
 {
 	rsa_stream_t *ciphertext;
 	struct rsa_stream_init init;
@@ -127,8 +115,9 @@ static int rsa_license_get(struct rsa_stream_init *pub_key_stream_init,
 	rsa_key_t *key = NULL;
 	u1024_t seed;
 	u64 crc;
-	u64 crc_check;
 	int ret = -1;
+	char *_buf;
+	int _len;
 
 	/* open file */
 	init.type = RSA_STREAM_TYPE_FILE;
@@ -158,21 +147,35 @@ static int rsa_license_get(struct rsa_stream_init *pub_key_stream_init,
 	if (sread(&crc, sizeof(u64), 1, ciphertext) != 1)
 		goto exit;
 
-	/* assert crc is correct */
-	crc = xor_decrypt_crc(crc);
+	/* XoR decrypt crc */
+	crc ^= (u64)RSA_RANDOM();
 
-	/* read user data from license */
-	*len = sread(buf, sizeof(char), LICENSE_LENGTH_USER, ciphertext);
-	/* assert there's no more to read in license */
-	if (0 < sread(&c, sizeof(char), 1, ciphertext))
+	/* read len from license */
+	if (sread(&_len, sizeof(size_t), 1, ciphertext) != 1)
 		goto exit;
 
-	/* XoR decrypt user data */
-	xor_user_data(buf, *len);
+	/* XoR decrypt len */
+	_len ^= (u64)RSA_RANDOM();
 
-	/* take crc check */
-	crc_check = rsa_crc(buf, *len);
-	ret = crc == crc_check ? 0 : -1;
+	/* allocate buffer for user data */
+	if (!(_buf = (char*)calloc(_len, sizeof(char))))
+		goto exit;
+
+	/* read user data from license and assert no excess data */
+	if (sread(_buf, sizeof(char), _len, ciphertext) != _len ||
+			0 < sread(&c, sizeof(char), 1, ciphertext)) {
+		goto exit;
+	}
+
+	/* XoR decrypt user data */
+	xor_user_data(_buf, _len);
+
+	/* check crc */
+	if (crc == rsa_crc(_buf, _len)) {
+		*buf = _buf;
+		*len = _len;
+		ret = 0;
+	}
 
 exit:
 	/* close file */
@@ -188,19 +191,17 @@ exit:
 int rsa_license_info(struct rsa_stream_init *pub_key_stream_init,
 		char *file_name, struct rsa_license_ops *license_ops)
 {
-	char *buf;
+	char *buf = NULL;
 	int len;
 	int ret = -1;
 
-	buf = (char*)calloc(LICENSE_LENGTH_USER, sizeof(char));
-	if (!buf)
+	if (!license_ops->lic_info)
 		return -1;
 
-	if (rsa_license_get(pub_key_stream_init, file_name, buf, &len))
+	if (rsa_license_get(pub_key_stream_init, file_name, &buf, &len))
 		goto exit;
 
-	if (license_ops->lic_info)
-		license_ops->lic_info(buf, len);
+	license_ops->lic_info(buf, len);
 
 	ret = 0;
 
@@ -213,19 +214,17 @@ int rsa_license_extract(struct rsa_stream_init *pub_key_stream_init,
 		char *file_name, struct rsa_license_ops *license_ops,
 		void *data)
 {
-	char *buf;
+	char *buf = NULL;
 	int len;
 	int ret = -1;
 
-	buf = (char*)calloc(LICENSE_LENGTH_USER, sizeof(char));
-	if (!buf)
+	if (!license_ops->lic_extract)
 		return -1;
 
-	if (rsa_license_get(pub_key_stream_init, file_name, buf, &len))
+	if (rsa_license_get(pub_key_stream_init, file_name, &buf, &len))
 		goto exit;
 
-	if (license_ops->lic_extract)
-		license_ops->lic_extract(buf, len, data);
+	license_ops->lic_extract(buf, len, data);
 
 	ret = 0;
 
@@ -236,6 +235,6 @@ exit:
 
 void rsa_license_init(void)
 {
-	rsa_encryption_level = 512;
+	rsa_encryption_level = SEED_ENCRYPTION_LEVEL;
 }
 

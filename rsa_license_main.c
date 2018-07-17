@@ -219,84 +219,98 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 	return 0;
 }
 
-static int rsa_encrypt_format_version(char **buf, int *len, u64 version)
+static int rsa_encrypt_format_version(char **buf, size_t *len, u64 version)
 {
-	if (*len < sizeof(u64))
+	size_t new_len = *len + sizeof(u64);
+
+	if (!(*buf = (char*)realloc(*buf, new_len)))
 		return -1;
 
-	memcpy(*buf, &version, sizeof(u64));
+	memcpy(*buf + *len, &version, sizeof(u64));
 
-	*buf += sizeof(u64);
-	*len -= sizeof(u64);
+	*len = new_len;
 	return 0;
 }
 
-static int rsa_encrypt_vendor_name(char **buf, int *len, char *vendor_name)
+static int rsa_encrypt_vendor_name(char **buf, size_t *len, char *vendor_name)
 {
+	size_t new_len;
 	int name_len;
 	int i;
 
 	name_len = strlen(vendor_name);
-	if (*len < VENDOR_NAME_MAX_LENGTH || VENDOR_NAME_MAX_LENGTH <= name_len)
+	if (VENDOR_NAME_MAX_LENGTH <= name_len)
+		return -1;
+
+	new_len = *len + VENDOR_NAME_MAX_LENGTH;
+	if (!(*buf = (char*)realloc(*buf, new_len)))
 		return -1;
 
 	for (i = 0; i < VENDOR_NAME_MAX_LENGTH; i++)
-		(*buf)[i] = vendor_name[i];
+		(*buf)[*len + i] = vendor_name[i % (name_len + 1)];
 
-	*buf += VENDOR_NAME_MAX_LENGTH;
-	*len -= VENDOR_NAME_MAX_LENGTH;
+	*len = new_len;
 	return 0;
 }
 
-static int rsa_encrypt_time_limit(char **buf, int *len, time_t time_limit)
+static int rsa_encrypt_time_limit(char **buf, size_t *len, time_t time_limit)
 {
-	if (*len < sizeof(time_t))
+	size_t new_len = *len + sizeof(time_t);
+
+	if (!(*buf = (char*)realloc(*buf, new_len)))
 		return -1;
 
-	memcpy(*buf, &time_limit, sizeof(time_t));
+	memcpy(*buf + *len, &time_limit, sizeof(time_t));
 
-	*buf += sizeof(time_t);
-	*len -= sizeof(time_t);
+	*len = new_len;
 	return 0;
 }
 
 /* 
  * Specific license file format:
  *
- * +----------+----------------------------+--------------+
- * | Type     | Semantic                   | Encryption   |
- * +----------+----------------------------+--------------+
- * | u64      | file format version        | XoR with RNG |
- * | char[64] | vendor name                | XoR with RNG |
- * | time_t   | time limit                 | Xor with RNG |
- * +----------+----------------------------+--------------+
+ * +----------+----------------------------+
+ * | Type     | Semantic                   |
+ * +----------+----------------------------+
+ * | u64      | file format version        |
+ * | char[64] | vendor name                |
+ * | time_t   | time limit                 |
+ * +----------+----------------------------+
  */
-static int rsa_license_create_rivermax(char *buf, int len, void *data)
+static int rsa_license_create_rivermax(char **buf, size_t *len, void *data)
 {
+	char *_buf = NULL;
+	size_t _len = 0;
 	struct rsa_license_data *license_data = (struct rsa_license_data*)data;
 
-	if (rsa_encrypt_format_version(&buf, &len, license_data->version)) {
+	if (rsa_encrypt_format_version(&_buf, &_len, license_data->version)) {
 		printf("failed to encrypt file format version: %llu\n",
 			license_data->version);
-		return -1;
+		goto error;
 	}
 
-	if (rsa_encrypt_vendor_name(&buf, &len, license_data->vendor_name)) {
+	if (rsa_encrypt_vendor_name(&_buf, &_len, license_data->vendor_name)) {
 		printf("failed to encrypt vendor name: %s\n",
 			license_data->vendor_name);
-		return -1;
+		goto error;
 	}
 
-	if (rsa_encrypt_time_limit(&buf, &len, license_data->time_limit)) {
+	if (rsa_encrypt_time_limit(&_buf, &_len, license_data->time_limit)) {
 		printf("failed to encrypt time limit: %lu\n",
 			license_data->time_limit);
-		return -1;
+		goto error;
 	}
 
-	return len;
+	*buf = _buf;
+	*len = _len;
+	return 0;
+
+error:
+	free(_buf);
+	return -1;
 }
 
-static int rsa_decrypt_version(char **buf, int *len, u64 *version_enc)
+static int rsa_decrypt_version(char **buf, size_t *len, u64 *version_enc)
 {
 	if (*len < sizeof(u64))
 		return -1;
@@ -308,7 +322,7 @@ static int rsa_decrypt_version(char **buf, int *len, u64 *version_enc)
 	return 0;
 }
 
-static int rsa_info_version(char **buf, int *len)
+static int rsa_info_version(char **buf, size_t *len)
 {
 	u64 version_enc;
 
@@ -319,7 +333,7 @@ static int rsa_info_version(char **buf, int *len)
 	return 0;
 }
 
-static int rsa_extract_version(char **buf, int *len,
+static int rsa_extract_version(char **buf, size_t *len,
 		struct rsa_license_data *data)
 {
 	if (rsa_decrypt_version(buf, len, &data->version))
@@ -328,7 +342,7 @@ static int rsa_extract_version(char **buf, int *len,
 	return 0;
 }
 
-static int rsa_decrypt_vendor_name(char **buf, int *len,
+static int rsa_decrypt_vendor_name(char **buf, size_t *len,
 		char vendor_name[VENDOR_NAME_MAX_LENGTH])
 {
 	int i;
@@ -344,7 +358,7 @@ static int rsa_decrypt_vendor_name(char **buf, int *len,
 	return 0;
 }
 
-static int rsa_info_vendor_name(char **buf, int *len)
+static int rsa_info_vendor_name(char **buf, size_t *len)
 {
 	char vendor_name[VENDOR_NAME_MAX_LENGTH];
 
@@ -355,7 +369,7 @@ static int rsa_info_vendor_name(char **buf, int *len)
 	return 0;
 }
 
-static int rsa_extract_vendor_name(char **buf, int *len,
+static int rsa_extract_vendor_name(char **buf, size_t *len,
 		struct rsa_license_data *data)
 {
 	if (rsa_decrypt_vendor_name(buf, len, data->vendor_name))
@@ -364,7 +378,7 @@ static int rsa_extract_vendor_name(char **buf, int *len,
 	return 0;
 }
 
-static int rsa_decrypt_time_limit(char **buf, int *len, time_t *time_limit)
+static int rsa_decrypt_time_limit(char **buf, size_t *len, time_t *time_limit)
 {
 	if (*len < sizeof(time_t))
 		return -1;
@@ -390,7 +404,7 @@ static char *time_t_to_str(time_t time_limit)
 	return stime;
 }
 
-static int rsa_info_time_limit(char **buf, int *len)
+static int rsa_info_time_limit(char **buf, size_t *len)
 {
 	time_t time_limit;
 
@@ -401,7 +415,7 @@ static int rsa_info_time_limit(char **buf, int *len)
 	return 0;
 }
 
-static int rsa_extract_time_limit(char **buf, int *len,
+static int rsa_extract_time_limit(char **buf, size_t *len,
 		struct rsa_license_data *data)
 {
 	if (rsa_decrypt_time_limit(buf, len, &data->time_limit))
@@ -410,7 +424,7 @@ static int rsa_extract_time_limit(char **buf, int *len,
 	return 0;
 }
 
-static int rsa_license_info_rivermax(char *buf, int len)
+static int rsa_license_info_rivermax(char *buf, size_t len)
 {
 	if (rsa_info_version(&buf, &len)) {
 		printf("could not extract file format version\n");
@@ -430,7 +444,7 @@ static int rsa_license_info_rivermax(char *buf, int len)
 	return len;
 }
 
-static int rsa_license_extract_rivermax(char *buf, int len, void *data)
+static int rsa_license_extract_rivermax(char *buf, size_t len, void *data)
 {
 	struct rsa_license_data *lic_data = (struct rsa_license_data*)data;
 

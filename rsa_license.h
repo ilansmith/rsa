@@ -6,9 +6,9 @@
 #include "rsa_util.h"
 
 struct rsa_license_ops {
-	int (*lic_create)(char *buf, int len, void *data);
-	int (*lic_info)(char *buf, int len);
-	int (*lic_extract)(char *buf, int len, void *data);
+	int (*lic_create)(char **buf, size_t *len, void *data);
+	int (*lic_info)(char *buf, size_t len);
+	int (*lic_extract)(char *buf, size_t len, void *data);
 };
 
 int rsa_license_create(struct rsa_stream_init *stream_init_priv_key,
