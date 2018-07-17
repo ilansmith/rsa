@@ -22,8 +22,12 @@
 # CONFIG_MASTER=y
 
 CC=gcc
-TARGET_OBJS=rsa_num.o rsa_util.o rsa_stream.o
+AR=ar
 CONFFILE=rsa.mk
+LIB_RSA=librsa.a
+LIB_RSA_OBJS=rsa_num.o rsa_util.o rsa_stream.o
+LIB_RSA_LIC=librsalic.a
+LIB_RSA_LIC_OBJS=rsa_crc.o rsa_license.o
 TARGET_RSA_TEST=rsa_test
 TARGET_RSA=rsa
 TARGET_RSA_ENC=rsa_enc
@@ -33,7 +37,7 @@ CYGWIN_COMPAT=echo "$1" | sed -e 's/--\|$(MAKE_MODE)//g'
 -include $(CONFFILE)
 
 CFLAGS=-Wall -Werror -Wno-unused-result
-LFLAGS=-lm
+LFLAGS=-L. -lm -l$(patsubst lib%.a,%,$(LIB_RSA))
 
 # Takuji Nishimura and Makoto Matsumoto's 64-bit version of Mersenne Twister 
 # pseudo random number generator
@@ -41,7 +45,7 @@ ifeq ($(CONFIG_MERSENNE_TWISTER),)
   CONFIG_MERSENNE_TWISTER=y
 endif
 ifeq ($(CONFIG_MERSENNE_TWISTER),y)
-  TARGET_OBJS+=mt19937_64.o
+  LIB_RSA_OBJS+=mt19937_64.o
   CFLAGS+=-DCONFIG_MERSENNE_TWISTER
 endif
 
@@ -51,6 +55,13 @@ ifeq ($(CONFIG_RSA_COLOURS),)
 endif
 ifeq ($(CONFIG_RSA_COLOURS),y)
   CFLAGS+=-DCONFIG_RSA_COLOURS
+endif
+
+# enable/disable debug mode (disabled by default)
+ifeq ($(CONFIG_DEBUG),y)
+  CFLAGS+=-O0 -g
+else
+  CFLAGS+=-O3
 endif
 
 # set unit test configuration
@@ -94,13 +105,6 @@ ifeq ($(CONFIG_TESTS),y)
     CFLAGS+=-DENC_LEVEL=$(ENC_LEVEL)
   endif
 
-  # enable/disable debug mode (disabled by default)
-  ifeq ($(CONFIG_DEBUG),y)
-    CFLAGS+=-O0 -g
-  else
-    CFLAGS+=-O3
-  endif
-
   TARGET_OBJS_rsa_test+=unit_test.o rsa_test.o
 
 else # create rsa applications
@@ -116,8 +120,6 @@ else # create rsa applications
     TARGET_OBJS_rsa_enc+=rsa_enc_main.o
     TARGET_OBJS_rsa_dec+=rsa_dec_main.o
   endif
-
-  CFLAGS+=-DULLONG -O3
 endif
 
 %.o: %.c
@@ -126,14 +128,20 @@ endif
 .PHONY: all clean cleanapps cleantags cleanconf cleanall config
 
 all: $(TARGETS)
-$(TARGET_RSA_TEST): $(TARGET_OBJS) $(TARGET_OBJS_rsa_test)
+$(TARGET_RSA_TEST): $(LIB_RSA) $(TARGET_OBJS_rsa_test)
 	$(CC) -o $@ $^ $(LFLAGS)
-$(TARGET_RSA): $(TARGET_OBJS) $(TARGET_OBJS_rsa)
+$(TARGET_RSA): $(LIB_RSA) $(TARGET_OBJS_rsa)
 	$(CC) -o $@ $^ $(LFLAGS)
-$(TARGET_RSA_ENC): $(TARGET_OBJS) $(TARGET_OBJS_rsa) $(TARGET_OBJS_rsa_enc)
+$(TARGET_RSA_ENC): $(LIB_RSA) $(TARGET_OBJS_rsa) $(TARGET_OBJS_rsa_enc)
 	$(CC) -o $@ $^ $(LFLAGS)
-$(TARGET_RSA_DEC): $(TARGET_OBJS) $(TARGET_OBJS_rsa) $(TARGET_OBJS_rsa_dec)
+$(TARGET_RSA_DEC): $(LIB_RSA) $(TARGET_OBJS_rsa) $(TARGET_OBJS_rsa_dec)
 	$(CC) -o $@ $^ $(LFLAGS)
+
+$(LIB_RSA): $(LIB_RSA_OBJS)
+	$(AR) -r $@ $^
+
+$(LIB_RSA_LIC): $(LIB_RSA) $(LIB_RSA_LIC_OBJS)
+	$(AR) -r $< $^
 
 config:
 	@echo "doing make config"
@@ -143,7 +151,7 @@ config:
 	sed -e 's/ /\r\n/g' > $(CONFFILE);
 
 clean:
-	rm -f *.o gmon.out
+	rm -f *.o *.a gmon.out
 
 cleanapps:
 	rm -f $(TARGET_RSA_TEST) $(TARGET_RSA) $(TARGET_RSA_ENC) $(TARGET_RSA_DEC)
