@@ -22,7 +22,7 @@
 # CONFIG_MASTER=y
 
 CC=gcc
-TARGET_OBJS=rsa_num.o rsa_util.o
+TARGET_OBJS=rsa_num.o rsa_util.o rsa_stream.o
 CONFFILE=rsa.mk
 TARGET_RSA_TEST=rsa_test
 TARGET_RSA=rsa

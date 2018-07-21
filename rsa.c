@@ -422,14 +422,15 @@ static void rsa_keyring_free(rsa_keyring_t *kr)
 	free(kr);
 }
 
-static rsa_key_t *rsa_key_open_try(char *path, char accept)
+static rsa_key_t *rsa_key_open_try(struct rsa_stream_init *init, char accept)
 {
-	return rsa_key_open(path, accept, 0);
+	return rsa_key_open(init, accept, 0);
 }
 
 static rsa_key_t *rsa_dirent2key(struct dirent *ent, char accept)
 {
 	char *path = key_path_get(), *fname;
+	struct rsa_stream_init init;
 	rsa_key_t *key = NULL;
 
 	if (!(fname = malloc(strlen(path) + 1 + strlen(ent->d_name) + 1)))
@@ -441,7 +442,11 @@ static rsa_key_t *rsa_dirent2key(struct dirent *ent, char accept)
 	}
 
 	sprintf(fname, "%s/%s", path, ent->d_name);
-	key = rsa_key_open_try(fname, accept);
+
+	init.params.file.path = fname;
+	init.params.file.mode = "r";
+	init.type = RSA_STREAM_TYPE_FILE;
+	key = rsa_key_open_try(&init, accept);
 
 Exit:
 	free(fname);
@@ -497,14 +502,18 @@ static rsa_key_t *rsa_key_open_dyn(char accept)
 
 	/* if decrypting - get the encrypted file's key data */
 	if (!(idx = (accept == RSA_KEY_TYPE_PUBLIC))) {
-		FILE *f;
+		rsa_stream_t *s;
+		struct rsa_stream_init init;
 
-		if (!(f = fopen(file_name, "r")))
+		init.params.file.path = file_name;
+		init.params.file.mode = "r";
+		init.type = RSA_STREAM_TYPE_FILE;
+		if (!(s = ropen(&init)))
 			goto Exit;
 
 		number_enclevl_set(encryption_levels[0]);
-		rsa_read_u1024_full(f, &data);
-		fclose(f);
+		rsa_read_u1024_full(s, &data);
+		rclose(s);
 	}
 
 	while (keyring) {
@@ -582,10 +591,15 @@ Exit:
 static rsa_key_t *rsa_key_open_default(char accept)
 {
 	char path[MAX_FILE_NAME_LEN], *ext[2] = { "pub", "prv" };
+	struct rsa_stream_init init;
 
 	sprintf(path, "%s/" RSA_KEYLINK_PREFIX ".%s", key_path_get(), 
 		ext[(accept) % 2]);
-	return rsa_key_open(path, accept, 1);
+
+	init.params.file.path = path;
+	init.params.file.mode = "r";
+	init.type = RSA_STREAM_TYPE_FILE;
+	return rsa_key_open(&init, accept, 1);
 }
 
 rsa_key_t *rsa_key_open_type(char accept)
@@ -641,12 +655,13 @@ static int keyname_display_single_verbose(rsa_keyring_t *kr, char *lnkname,
 	}
 
 	sprintf(fmt, " %%s");
-	printf(fmt, !strcmp(kr->keys[idx]->path, lnkname) ? 
+	printf(fmt, !strcmp(kr->keys[idx]->stream_init.params.file.path,
+		lnkname) ? 
 		rsa_highlight_str("%s %s", kr->name, KEY_DISPLAY_DEFAULT) :
 		kr->name);
 	sprintf(fmt, C_INDENTATION_FMT, KEY_DISPLAY_WIDTH);
 	for (key = kr->keys[idx]; key; key = key->next)
-		rsa_printf(1, 1, fmt, key->path);
+		rsa_printf(1, 1, fmt, key->stream_init.params.file.path);
 
 	return 0;
 }
@@ -704,7 +719,8 @@ static int keyname_display_single(char *fmt, rsa_keyring_t *kr, char *lnkname,
 		char name[MAX_HIGHLIGHT_STR + 1];
 
 		sprintf(name, " %s", kr->name);
-		if (!strcmp(kr->keys[idx]->path, lnkname)) {
+		if (!strcmp(kr->keys[idx]->stream_init.params.file.path,
+				lnkname)) {
 			strcat(name, " " KEY_DISPLAY_DEFAULT);
 			printf("%s", rsa_highlight_str(fmt, name));
 		} else {
@@ -803,15 +819,17 @@ static void rsa_setkey_symlink_set(rsa_keyring_t *kr, int idx)
 			"public" : "private", rsa_highlight_str(key_data));
 	} else if (kr->keys[idx]) {
 		remove(lnkname);
-		symlink(kr->keys[idx]->path, lnkname);
+		symlink(kr->keys[idx]->stream_init.params.file.path, lnkname);
 		key_set_display(idx ? "public" : "private");
 	}
 
 	if (rsa_verbose_get() == V_VERBOSE) {
 		rsa_key_t *key;
 
-		for (key = kr->keys[idx]; key; key = key->next)
-			rsa_printf(1, 1, "%s", key->path);
+		for (key = kr->keys[idx]; key; key = key->next) {
+			rsa_printf(1, 1, "%s",
+				key->stream_init.params.file.path);
+		}
 	}
 }
 

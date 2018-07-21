@@ -1,10 +1,10 @@
-#include "rsa_util.h"
-#include "rsa_num.h"
 #include <stdlib.h>
 #include <sys/time.h>
 #include <time.h>
 #include <string.h>
 #include <math.h>
+#include "rsa_util.h"
+#include "rsa_num.h"
 
 #ifdef CONFIG_MERSENNE_TWISTER
 #include "mt19937_64.h"
@@ -86,7 +86,7 @@ int number_enclevl_set(int level)
 
 int number_data2num(u1024_t *num, void *data, int len)
 {
-	if (len > block_sz_u1024 * sizeof(u64))
+	if ((unsigned int)len > block_sz_u1024 * sizeof(u64))
 		return -1;
 	number_reset(num);
 	memcpy(num->arr, data, len);
@@ -99,7 +99,7 @@ int number_size(int level)
 	return sizeof(int) + (level + bit_sz_u64) / sizeof(u64);
 }
 
-void INLINE number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
+INLINE void number_add(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
 	u1024_t num_big, num_small, num_res;
 	u64 *top, *top_max, *seg = NULL, *seg1 = NULL, *seg2 = NULL, carry = 0;
@@ -172,11 +172,13 @@ int number_seed_set_random(u1024_t *seed)
 
 int number_seed_set_fixed(u1024_t *seed)
 {
-	return number_seed_set(*(prng_seed_t*)&seed->arr) ? 0 : -1;
+	prng_seed_t *prng_seed = (prng_seed_t*)&seed->arr;
+
+	return number_seed_set(*prng_seed) ? 0 : -1;
 }
 
 /* initiates the first low (u64) blocks of num with random values */
-int INLINE number_init_random(u1024_t *num, int blocks)
+INLINE int number_init_random(u1024_t *num, int blocks)
 {
 	int i, ret;
 
@@ -206,7 +208,7 @@ Exit:
 	return ret;
 }
 
-STATIC int INLINE number_find_most_significant_set_bit(u1024_t *num,
+STATIC INLINE int number_find_most_significant_set_bit(u1024_t *num,
 	u64 **major, u64 *minor)
 {
 	int minor_offset;
@@ -226,7 +228,7 @@ STATIC int INLINE number_find_most_significant_set_bit(u1024_t *num,
 	return minor_offset;
 }
 
-void INLINE number_small_dec2num(u1024_t *num_n, u64 dec)
+INLINE void number_small_dec2num(u1024_t *num_n, u64 dec)
 {
 	u64 zero = (u64)0;
 	u64 *ptr = &zero;
@@ -237,7 +239,7 @@ void INLINE number_small_dec2num(u1024_t *num_n, u64 dec)
 	TIMER_STOP(FUNC_NUMBER_SMALL_DEC2NUM);
 }
 
-STATIC void INLINE number_2complement(u1024_t *res, u1024_t *num)
+STATIC INLINE void number_2complement(u1024_t *res, u1024_t *num)
 {
 	u1024_t tmp;
 	u64 *seg = NULL, *seg_max = (u64 *)&tmp.arr + block_sz_u1024;
@@ -255,7 +257,7 @@ STATIC void INLINE number_2complement(u1024_t *res, u1024_t *num)
 	TIMER_STOP(FUNC_NUMBER_2COMPLEMENT);
 }
 
-void INLINE number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2)
+INLINE void number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
 	u1024_t num2_2complement;
 
@@ -266,7 +268,7 @@ void INLINE number_sub(u1024_t *res, u1024_t *num1, u1024_t *num2)
 	TIMER_STOP(FUNC_NUMBER_SUB);
 }
 
-void INLINE number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
+INLINE void number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
 {
 	int i, top;
 	u1024_t tmp_res, multiplicand = *num1, multiplier = *num2;
@@ -290,7 +292,7 @@ void INLINE number_mul(u1024_t *res, u1024_t *num1, u1024_t *num2)
 	TIMER_STOP(FUNC_NUMBER_MUL);
 }
 
-STATIC void INLINE number_absolute_value(u1024_t *abs, u1024_t *num)
+STATIC INLINE void number_absolute_value(u1024_t *abs, u1024_t *num)
 {
 	TIMER_START(FUNC_NUMBER_ABSOLUTE_VALUE);
 	number_assign(*abs, *num);
@@ -307,7 +309,7 @@ STATIC void INLINE number_absolute_value(u1024_t *abs, u1024_t *num)
 	TIMER_STOP(FUNC_NUMBER_ABSOLUTE_VALUE);
 }
 
-void INLINE number_dev(u1024_t *num_q, u1024_t *num_r, u1024_t *num_dividend,
+INLINE void number_dev(u1024_t *num_q, u1024_t *num_r, u1024_t *num_dividend,
 	u1024_t *num_divisor)
 {
 	u1024_t dividend, divisor, quotient, remainder;
@@ -344,7 +346,7 @@ void INLINE number_dev(u1024_t *num_q, u1024_t *num_r, u1024_t *num_dividend,
 	TIMER_STOP(FUNC_NUMBER_DEV);
 }
 
-STATIC int INLINE number_modular_multiplication_naive(u1024_t *num_res,
+STATIC INLINE int number_modular_multiplication_naive(u1024_t *num_res,
 	u1024_t *num_a, u1024_t *num_b, u1024_t *num_n)
 {
 	u1024_t tmp;
@@ -358,7 +360,7 @@ STATIC int INLINE number_modular_multiplication_naive(u1024_t *num_res,
 }
 
 /* assigns num_n: 0 < num_n < range */
-static void INLINE number_init_random_strict_range(u1024_t *num_n,
+static INLINE void number_init_random_strict_range(u1024_t *num_n,
 	u1024_t *range)
 {
 	u1024_t num_tmp, num_range_min1;
@@ -373,7 +375,7 @@ static void INLINE number_init_random_strict_range(u1024_t *num_n,
 	TIMER_STOP(FUNC_NUMBER_INIT_RANDOM_STRICT_RANGE);
 }
 
-STATIC void INLINE number_exponentiation(u1024_t *res, u1024_t *num_base,
+STATIC INLINE void number_exponentiation(u1024_t *res, u1024_t *num_base,
 	u1024_t *num_exp)
 {
 	u1024_t num_cnt, num_tmp;
@@ -391,7 +393,7 @@ STATIC void INLINE number_exponentiation(u1024_t *res, u1024_t *num_base,
 	TIMER_STOP(FUNC_NUMBER_EXPONENTIATION);
 }
 
-STATIC int INLINE number_modular_exponentiation_naive(u1024_t *res, u1024_t *a,
+STATIC INLINE int number_modular_exponentiation_naive(u1024_t *res, u1024_t *a,
 	u1024_t *b, u1024_t *n)
 {
 	u1024_t d;
@@ -430,7 +432,7 @@ STATIC int INLINE number_modular_exponentiation_naive(u1024_t *res, u1024_t *a,
  *   end for
  *   return s(n)
  */
-static void INLINE number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
+static INLINE void number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
 	u1024_t *num_b, u1024_t *num_n)
 {
 	u1024_t multiplier, num_s;
@@ -469,7 +471,7 @@ static void INLINE number_montgomery_product(u1024_t *num_res, u1024_t *num_a,
 }
 
 /* shift left and do mod num_n 2*(encryption_level + 2) times... */
-void INLINE number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
+INLINE void number_montgomery_factor_set(u1024_t *num_n, u1024_t *num_factor)
 {
 	u1024_t factor;
 	int exp, exp_max;
@@ -506,7 +508,7 @@ Exit:
 	TIMER_START(FUNC_NUMBER_MONTGOMERY_FACTOR_SET);
 }
 
-void INLINE number_montgomery_factor_get(u1024_t *num)
+INLINE void number_montgomery_factor_get(u1024_t *num)
 {
 	number_assign(*num, num_montgomery_factor);
 }
@@ -528,7 +530,7 @@ void INLINE number_montgomery_factor_get(u1024_t *num)
  * b_tmp = MonPro(b, r^2%n, n)
  * a * b % n = MonPro(1, MonPro(a_tmp, b_tmp, n), n)
  */
-STATIC int INLINE number_modular_multiplication_montgomery(u1024_t *num_res,
+STATIC INLINE int number_modular_multiplication_montgomery(u1024_t *num_res,
 	u1024_t *num_a, u1024_t *num_b, u1024_t *num_n)
 {
 	int ret;
@@ -561,7 +563,7 @@ STATIC int INLINE number_modular_multiplication_montgomery(u1024_t *num_res,
  *   r = MonPro(1, r, n)
  *   return r
  */
-int INLINE number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a,
+INLINE int number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a,
 	u1024_t *b, u1024_t *n)
 {
 	u1024_t a_nresidue;
@@ -591,7 +593,7 @@ int INLINE number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a,
 	return ret;
 }
 
-static void INLINE number_witness_init(u1024_t *num_n_min1, u1024_t *num_u,
+static INLINE void number_witness_init(u1024_t *num_n_min1, u1024_t *num_u,
 	int *t)
 {
 	u1024_t tmp;
@@ -612,7 +614,7 @@ static void INLINE number_witness_init(u1024_t *num_n_min1, u1024_t *num_u,
  * witness of num_n's compositeness:
  * if number_witness(num_a, num_n) is true, then num_n is composite
  */
-STATIC int INLINE number_witness(u1024_t *num_a, u1024_t *num_n)
+STATIC INLINE int number_witness(u1024_t *num_a, u1024_t *num_n)
 {
 	u1024_t num_u, num_x_prev, num_x_curr, num_n_min1;
 	int i, t, ret;
@@ -663,7 +665,7 @@ Exit:
  * 0 - if num_n is composite
  * 1 - if num_n is almost surely prime
  */
-STATIC int INLINE number_miller_rabin(u1024_t *num_n, u1024_t *num_s)
+STATIC INLINE int number_miller_rabin(u1024_t *num_n, u1024_t *num_s)
 {
 	int ret;
 	u1024_t num_j, num_a;
@@ -686,7 +688,7 @@ Exit:
 	return ret;
 }
 
-STATIC int INLINE number_is_prime(u1024_t *num_n)
+STATIC INLINE int number_is_prime(u1024_t *num_n)
 {
 	int ret;
 	u1024_t num_s;
@@ -702,7 +704,7 @@ STATIC int INLINE number_is_prime(u1024_t *num_n)
 /* initiate number_generate_coprime:small_primes[] fields and generate pi and
  * incrementor
  */
-static void INLINE number_small_prime_init(small_prime_entry_t *entry,
+static INLINE void number_small_prime_init(small_prime_entry_t *entry,
 	u64 exp_initializer, u1024_t *num_pi, u1024_t *num_increment)
 {
 	TIMER_START(FUNC_NUMBER_SMALL_PRIME_INIT);
@@ -734,15 +736,26 @@ static void INLINE number_small_prime_init(small_prime_entry_t *entry,
  *   gcd(num_coprime, num_increment) == 1, that is, it does not divided by any
  *   of the first 13 primes
  */
-STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
+STATIC INLINE void number_generate_coprime(u1024_t *num_coprime,
 	u1024_t *num_increment)
 {
 	int i;
 	static u1024_t num_pi, num_mod, num_jumper, num_inc;
 	static small_prime_entry_t
 		small_primes[NUMBER_GENERATE_COPRIME_ARRAY_SZ] = {
-		{2}, {3}, {5}, {7}, {11}, {13}, {17}, {19}, {23}, {29}, {31},
-		{37}, {41}
+		{2, {{0}, 0}, {{0}, 0}, {{0}, 0}, },
+		{3, {{0}, 0}, {{0}, 0}, {{0}, 0},},
+		{5, {{0}, 0}, {{0}, 0}, {{0}, 0},},
+		{7, {{0}, 0}, {{0}, 0}, {{0}, 0},},
+		{11, {{0}, 0}, {{0}, 0}, {{0}, 0},},
+		{13, {{0}, 0}, {{0}, 0}, {{0}, 0},},
+		{17, {{0}, 0}, {{0}, 0}, {{0}, 0},},
+		{19, {{0}, 0}, {{0}, 0}, {{0}, 0},},
+		{23, {{0}, 0}, {{0}, 0}, {{0}, 0},},
+		{29, {{0}, 0}, {{0}, 0}, {{0}, 0},},
+		{31, {{0}, 0}, {{0}, 0}, {{0}, 0},},
+		{37, {{0}, 0}, {{0}, 0}, {{0}, 0},},
+		{41, {{0}, 0}, {{0}, 0}, {{0}, 0},},
 	};
 
 #ifdef CONFIG_TESTS
@@ -756,17 +769,17 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 	if (!number_generate_coprime_init) {
 		code2list_t exponents[] = {
 			/* encryption_level 64 is not yet implemented */
-			{64, {}},
+			{64, { 0 }, 0},
 			/* 16353755914851064710 */
-			{128, {1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2}},
+			{128, {1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2}, 0},
 			/* 3.310090638572971097793164988204e+38 */
-			{256, {3, 3, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3}},
+			{256, {3, 3, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3}, 0},
 			/* 1.1469339122146834228518724332952e+77 */
-			{512, {5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 5, 6, 6}},
+			{512, {5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 5, 6, 6}, 0},
 			/* 7.4619233495664116883370964193144e+153 */
 			{1024, {10, 10, 11, 11, 10, 10, 10, 10, 11, 11, 11, 11,
-				11}},
-			{-1}
+				11}, 0},
+			{-1, {0}, 0}
 		};
 		u64 *exp_initializer = code2list(exponents, encryption_level);
 
@@ -775,7 +788,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 		 * same time. */
 		number_assign(num_pi, NUM_1);
 		number_assign(num_inc, NUM_1);
-		for (i = 0; i < ARRAY_SZ(small_primes); i++) {
+		for (i = 0; (unsigned int)i < ARRAY_SZ(small_primes); i++) {
 			number_small_prime_init(&small_primes[i],
 				exp_initializer[i], &num_pi, &num_inc);
 		}
@@ -787,7 +800,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 	 * gcd(num_coprime, num_increment) == 1 */
 	number_assign(*num_increment, num_inc);
 	number_assign(*num_coprime, NUM_0);
-	for (i = 0; i < ARRAY_SZ(small_primes); i++) {
+	for (i = 0; (unsigned int)i < ARRAY_SZ(small_primes); i++) {
 		u1024_t num_a, num_a_pow;
 
 		do {
@@ -810,7 +823,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 	 * thus, gcd(num_coprime, small_primes[i].prime) == 1
 	 */
 	number_assign(num_jumper, num_inc);
-	for (i = 0; i < ARRAY_SZ(small_primes); i++) {
+	for (i = 0; (unsigned int)i < ARRAY_SZ(small_primes); i++) {
 		number_mod(&num_mod, num_coprime, &(small_primes[i].prime));
 		if (number_is_equal(&num_mod, &NUM_0)) {
 			number_dev(&num_jumper, &NUM_0, &num_jumper,
@@ -825,7 +838,7 @@ STATIC void INLINE number_generate_coprime(u1024_t *num_coprime,
 /* determine x, y and gcd according to a and b such that:
  * ax+by == gcd(a, b)
  * NOTE: a is assumed to be >= b */
-STATIC void INLINE number_extended_euclid_gcd(u1024_t *gcd, u1024_t *x,
+STATIC INLINE void number_extended_euclid_gcd(u1024_t *gcd, u1024_t *x,
 	u1024_t *a, u1024_t *y, u1024_t *b)
 {
 	u1024_t num_x, num_x1, num_x2, num_y, num_y1, num_y2;
@@ -870,7 +883,7 @@ STATIC void INLINE number_extended_euclid_gcd(u1024_t *gcd, u1024_t *x,
 	TIMER_STOP(FUNC_NUMBER_EXTENDED_EUCLID_GCD);
 }
 
-STATIC void INLINE number_euclid_gcd(u1024_t *gcd, u1024_t *a, u1024_t *b)
+STATIC INLINE void number_euclid_gcd(u1024_t *gcd, u1024_t *a, u1024_t *b)
 {
 	u1024_t x, y;
 
@@ -936,7 +949,7 @@ int number_str2num(u1024_t *num, char *str)
 {
 	u64 *seg;
 
-	if (ASCII_LEN_2_BIN_LEN(str) > encryption_level)
+	if (ASCII_LEN_2_BIN_LEN(str) > (unsigned int)encryption_level)
 		return -1;
 	number_reset(num);
 	sprintf((char *)num, "%s", str);

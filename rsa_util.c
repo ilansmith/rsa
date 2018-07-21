@@ -4,12 +4,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "rsa_util.h"
+#include "rsa_stream.h"
 
 #define RSA_TIMELINE_LEN 80
+#define MAX_OUTPUT_LEN 100
 
 #define RSA_SIGNATURE "IASRSA"
+#define RSA_SIGNATURE_LEN 6
 
-typedef int (*io_func_t)(void *ptr, int size, int nmemb, FILE *stream);
+typedef int (*io_func_t)(void *ptr, int size, int nmemb, rsa_stream_t *s);
 
 int rsa_encryption_level;
 
@@ -60,7 +63,7 @@ char *rsa_strcat(char *dest, char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	vsprintf(dest + strlen(dest), fmt, ap);
+	vsnprintf(dest + strlen(dest), MAX_OUTPUT_LEN , fmt, ap);
 	va_end(ap);
 
 	return dest;
@@ -68,7 +71,7 @@ char *rsa_strcat(char *dest, char *fmt, ...)
 
 char *rsa_vstrcat(char *dest, char *fmt, va_list ap)
 {
-	vsprintf(dest + strlen(dest), fmt, ap);
+	vsnprintf(dest + strlen(dest), MAX_OUTPUT_LEN, fmt, ap);
 
 	return dest;
 }
@@ -79,7 +82,7 @@ int rsa_sprintf_nows(char *str, char *fmt, ...)
 	int ret;
 
 	va_start(ap, fmt);
-	ret = vsprintf(str, fmt, ap);
+	ret = vsnprintf(str, MAX_OUTPUT_LEN, fmt, ap);
 	va_end(ap);
 
 	for ( ; *str; str++) {
@@ -93,7 +96,7 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 {
 	char msg[MAX_LINE_LENGTH];
 
-	sprintf(msg, "%s: ", is_error ? "error" : "warning");
+	snprintf(msg, MAX_OUTPUT_LEN, "%s: ", is_error ? "error" : "warning");
 	switch (err)
 	{
 	case RSA_ERR_ARGREP:
@@ -161,12 +164,28 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 	case RSA_ERR_KEY_CORRUPT:
 		rsa_vstrcat(msg, "RSA key %s is corrupt", ap);
 		break;
+	case RSA_ERR_KEY_CORRUPT_BUF:
+		rsa_vstrcat(msg, "RSA key %p is corrupt", ap);
+		break;
 	case RSA_ERR_KEY_OPEN:
 		rsa_vstrcat(msg, "unable to open %s", ap);
+		break;
+	case RSA_ERR_KEY_OPEN_BUF:
+		rsa_vstrcat(msg, "unable to open %p", ap);
 		break;
 	case RSA_ERR_KEY_TYPE:
 		rsa_vstrcat(msg, "%s is linked to a %s key while a %s key is "
 			"required", ap);
+		break;
+	case RSA_ERR_KEY_TYPE_BUF:
+		rsa_vstrcat(msg, "%p is a %s key while a %s key is required",
+			ap);
+		break;
+	case RSA_ERR_BUFFER_NULL:
+		rsa_vstrcat(msg, "initialization buffer is NULL: %p", ap);
+		break;
+	case RSA_ERR_STREAM_TYPE_UNKNOWN:
+		rsa_vstrcat(msg, "stream type unknown: %d", ap);
 		break;
 	case RSA_ERR_LEVEL:
 		rsa_vstrcat(msg, "invalid encryption level - %s", ap);
@@ -201,19 +220,20 @@ void rsa_warning_message(rsa_errno_t err, ...)
 	va_end(ap);
 }
 
-static int rsa_io_u1024(FILE *file, u1024_t *num, int is_full, int is_read)
+static int rsa_io_u1024(rsa_stream_t *s, u1024_t *num, int is_full,
+		int is_read)
 {
 	int ret;
-	io_func_t io = is_read ? (io_func_t)fread : (io_func_t)fwrite;
+	io_func_t io = is_read ? (io_func_t)rread : (io_func_t)rwrite;
 
 	ret = io(num->arr, sizeof(u64), block_sz_u1024 + (is_full ? 1 : 0),
-		file);
+		s);
 	if (is_full)
-		ret += io(&num->top, sizeof(int), 1, file);
+		ret += io(&num->top, sizeof(int), 1, s);
 	else if (is_read)
 		number_top_set(num);
 
-	if (ret != (block_sz_u1024 + (is_full ? 2 : 0)) && ret != EOF) {
+	if (ret != (block_sz_u1024 + (is_full ? 2 : 0)) && ret != EOS) {
 		rsa_error_message(RSA_ERR_FILEIO);
 		return -1;
 	}
@@ -221,32 +241,32 @@ static int rsa_io_u1024(FILE *file, u1024_t *num, int is_full, int is_read)
 	return 0;
 }
 
-int rsa_read_u1024(FILE *file, u1024_t *num)
+int rsa_read_u1024(rsa_stream_t *s, u1024_t *num)
 {
-	return rsa_io_u1024(file, num, 0, 1);
+	return rsa_io_u1024(s, num, 0, 1);
 }
 
-int rsa_write_u1024(FILE *file, u1024_t *num)
+int rsa_write_u1024(rsa_stream_t *s, u1024_t *num)
 {
-	return rsa_io_u1024(file, num, 0, 0);
+	return rsa_io_u1024(s, num, 0, 0);
 }
 
-int rsa_read_u1024_full(FILE *file, u1024_t *num)
+int rsa_read_u1024_full(rsa_stream_t *s, u1024_t *num)
 {
-	return rsa_io_u1024(file, num, 1, 1);
+	return rsa_io_u1024(s, num, 1, 1);
 }
 
-int rsa_write_u1024_full(FILE *file, u1024_t *num)
+int rsa_write_u1024_full(rsa_stream_t *s, u1024_t *num)
 {
-	return rsa_io_u1024(file, num, 1, 0);
+	return rsa_io_u1024(s, num, 1, 0);
 }
 
-static int rsa_io_str(FILE *file, char *str, int len, int is_read)
+static int rsa_io_str(rsa_stream_t *s, char *str, int len, int is_read)
 {
 	int ret;
-	io_func_t io = is_read ? (io_func_t)fread : (io_func_t)fwrite;
+	io_func_t io = is_read ? (io_func_t)rread : (io_func_t)rwrite;
 
-	ret = io(str, sizeof(char), len, file);
+	ret = io(str, sizeof(char), len, s);
 	if (ret != len && ret != EOF) {
 		rsa_error_message(RSA_ERR_FILEIO);
 		return -1;
@@ -254,14 +274,14 @@ static int rsa_io_str(FILE *file, char *str, int len, int is_read)
 	return 0;
 }
 
-int rsa_read_str(FILE *file, char *str, int len)
+int rsa_read_str(rsa_stream_t *s, char *str, int len)
 {
-	return rsa_io_str(file, str, len, 1);
+	return rsa_io_str(s, str, len, 1);
 }
 
-int rsa_write_str(FILE *file, char *str, int len)
+int rsa_write_str(rsa_stream_t *s, char *str, int len)
 {
-	return rsa_io_str(file, str, len, 0);
+	return rsa_io_str(s, str, len, 0);
 }
 
 void rsa_verbose_set(verbose_t level)
@@ -307,16 +327,16 @@ char *rsa_highlight_str(char *fmt, ...)
 	va_list ap;
 	static char highlight[MAX_HIGHLIGHT_STR] = C_HIGHLIGHT;
 	char *ret = highlight;
-	int len = strlen(C_HIGHLIGHT);
+	int len = (int)strlen(C_HIGHLIGHT);
 
 	va_start(ap, fmt);
-	if (vsnprintf(highlight + len, MAX_HIGHLIGHT_STR - len, fmt, ap) >
+	if ((unsigned int)vsnprintf(highlight + len, MAX_HIGHLIGHT_STR - len, fmt, ap) >
 		MAX_HIGHLIGHT_STR - strlen(C_NORMAL)) {
 		rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__,
 			__LINE__);
 		ret = "";
 	} else {
-		strcat(highlight, C_NORMAL);
+		strncat(highlight, C_NORMAL, strlen(C_NORMAL));
 	}
 	va_end(ap);
 
@@ -332,7 +352,7 @@ int rsa_timeline_init(int len, int block_sz)
 		return 0;
 
 	timeline_inc = (double)block_num/RSA_TIMELINE_LEN;
-	sprintf(fmt, "[%%-%ds]\r[", RSA_TIMELINE_LEN);
+	snprintf(fmt, ARRAY_SZ(fmt), "[%%-%ds]\r[", RSA_TIMELINE_LEN);
 
 	printf(fmt, "");
 	fflush(stdout);
@@ -429,84 +449,203 @@ static int rsa_key_size(void)
 	for (level = encryption_levels; *level; level++)
 		accum += number_size(*level);
 
-	return strlen(RSA_SIGNATURE) + number_size(encryption_levels[0]) +
+	return RSA_SIGNATURE_LEN + number_size(encryption_levels[0]) +
 		3 * accum;
 }
 
-static char *keydata_extract(FILE *f)
+static char *key_info_extract(rsa_stream_t *s)
 {
-	static u1024_t data;
-	u1024_t scrambled_data, exp, n, montgomery_factor;
+	static u1024_t info_num;
+	u1024_t scrambled_info, exp, n, montgomery_factor;
 
 	number_enclevl_set(encryption_levels[0]);
-	rsa_read_u1024_full(f, &scrambled_data);
-	rsa_read_u1024_full(f, &exp);
-	rsa_read_u1024_full(f, &n);
-	rsa_read_u1024_full(f, &montgomery_factor);
+	rsa_read_u1024_full(s, &scrambled_info);
+	rsa_read_u1024_full(s, &exp);
+	rsa_read_u1024_full(s, &n);
+	rsa_read_u1024_full(s, &montgomery_factor);
 	number_montgomery_factor_set(&n, &montgomery_factor);
 
-	rsa_decode(&data, &scrambled_data, &exp, &n);
+	rsa_decode(&info_num, &scrambled_info, &exp, &n);
 	if (rsa_encryption_level)
 		number_enclevl_set(rsa_encryption_level);
-	return (char*)data.arr;
+	return (char*)info_num.arr;
 }
 
-static rsa_key_t *rsa_key_alloc(char type, char *name, char *path, FILE *file)
+static int rsa_stream_init_dup(struct rsa_stream_init *to,
+	struct rsa_stream_init *from)
+{
+	switch (from->type) {
+	case RSA_STREAM_TYPE_FILE:
+		to->params.file.path = strdup(from->params.file.path);
+		if (!to->params.file.path)
+			return -1;
+		to->params.file.mode = from->params.file.mode;
+		break;
+	case RSA_STREAM_TYPE_MEMORY:
+		to->params.memory.buf =
+			(unsigned char*)calloc(from->params.memory.len,
+				sizeof(char));
+		if (!to->params.memory.buf)
+			return -1;
+		to->params.memory.len= from->params.memory.len;
+		break;
+	case RSA_STREAM_TYPE_NONE:
+	default:
+		break;
+	}
+
+	to->type = from->type;
+	return 0;
+}
+
+static void rsa_stream_init_free(struct rsa_stream_init *init)
+{
+	switch (init->type) {
+	case RSA_STREAM_TYPE_FILE:
+		free(init->params.file.path);
+		break;
+	case RSA_STREAM_TYPE_MEMORY:
+		free(init->params.memory.buf);
+		break;
+	case RSA_STREAM_TYPE_NONE:
+	default:
+		break;
+	}
+}
+
+static rsa_key_t *rsa_key_alloc(char type, char *name,
+		struct rsa_stream_init *init, rsa_stream_t *s)
 {
 	rsa_key_t *key;
 
-	if (!(key = calloc(1, sizeof(rsa_key_t))))
+	if (!(key = (rsa_key_t*)calloc(1, sizeof(rsa_key_t))))
 		return NULL;
 
+	if (rsa_stream_init_dup(&key->stream_init, init)) {
+		free(key);
+		return NULL;
+	}
 	key->type = type;
 	snprintf(key->name, KEY_DATA_MAX_LEN, "%s", name);
-	sprintf(key->path, "%s", path);
-	key->file = file;
+	key->stream = s;
 
 	return key;
 }
 
-rsa_key_t *rsa_key_open(char *path, char accept, int is_expect_key)
+rsa_key_t *rsa_key_open(struct rsa_stream_init *init, char accept,
+		int is_expect_key)
 {
-	int siglen = strlen(RSA_SIGNATURE);
-	char signature[siglen], *data, keytype;
-	char *types[2] = { "private", "public" };
+	char signature[RSA_SIGNATURE_LEN], *info, keytype;
+	char *key_pair[2] = { "private", "public" };
 	struct stat st;
-	FILE *f;
+	rsa_stream_t *s;
+	rsa_key_t *key;
 
-	if (stat(path, &st))
-		return NULL;
+	switch (init->type) {
+	case RSA_STREAM_TYPE_FILE:
+		if (stat(init->params.file.path, &st))
+			return NULL;
 
-	if (st.st_size != rsa_key_size()) {
-		if (is_expect_key)
-			rsa_error_message(RSA_ERR_KEY_CORRUPT, path);
+		if (st.st_size != rsa_key_size()) {
+			if (is_expect_key) {
+				rsa_error_message(RSA_ERR_KEY_CORRUPT,
+					init->params.file.path);
+			}
+			return NULL;
+		}
+		break;
+	case RSA_STREAM_TYPE_MEMORY:
+		if (!init->params.memory.buf)
+			return NULL;
+		if (init->params.memory.len != rsa_key_size()) {
+			if (is_expect_key) {
+				rsa_error_message(RSA_ERR_BUFFER_NULL,
+					init->params.memory.buf);
+			}
+			return NULL;
+		}
+		break;
+	case RSA_STREAM_TYPE_NONE:
+	default:
+		rsa_error_message(RSA_ERR_STREAM_TYPE_UNKNOWN, init->type);
 		return NULL;
 	}
-	if (!(f = fopen(path, "r"))) {
-		if (is_expect_key)
-			rsa_error_message(RSA_ERR_KEY_OPEN, path);
-		return NULL;
-	}
-	if (rsa_read_str(f, signature, siglen) || 
-		memcmp(RSA_SIGNATURE, signature, siglen)) {
-		if (is_expect_key)
-			rsa_error_message(RSA_ERR_KEY_CORRUPT, path);
-		fclose(f);
+
+	if (!(s = ropen(init))) {
+		if (is_expect_key) {
+			switch (init->type) {
+			case RSA_STREAM_TYPE_FILE:
+				rsa_error_message(RSA_ERR_KEY_OPEN,
+					init->params.file.path);
+				break;
+			case RSA_STREAM_TYPE_MEMORY:
+				rsa_error_message(RSA_ERR_KEY_OPEN_BUF,
+					init->params.memory.buf);
+				break;
+			case RSA_STREAM_TYPE_NONE:
+			default:
+				break;
+			}
+		}
+
 		return NULL;
 	}
 
-	data = keydata_extract(f);
-	keytype = *data;
+	if (rsa_read_str(s, signature, RSA_SIGNATURE_LEN) || 
+			memcmp(RSA_SIGNATURE, signature, RSA_SIGNATURE_LEN)) {
+		if (is_expect_key) {
+			switch (init->type) {
+			case RSA_STREAM_TYPE_FILE:
+				rsa_error_message(RSA_ERR_KEY_CORRUPT,
+					init->params.file.path);
+				break;
+			case RSA_STREAM_TYPE_MEMORY:
+				rsa_error_message(RSA_ERR_KEY_CORRUPT_BUF,
+					init->params.memory.buf);
+				break;
+			case RSA_STREAM_TYPE_NONE:
+			default:
+				break;
+			}
+		}
+
+		rclose(s);
+		return NULL;
+	}
+
+	info = key_info_extract(s);
+	keytype = *info;
 	if (!(keytype & accept)) {
 		if (is_expect_key) {
-			rsa_error_message(RSA_ERR_KEY_TYPE, path,
-				types[(keytype + 1) % 2], types[keytype % 2]);
+			switch (init->type) {
+			case RSA_STREAM_TYPE_FILE:
+				rsa_error_message(RSA_ERR_KEY_TYPE,
+					init->params.file.path,
+					key_pair[(keytype + 1) % 2],
+					key_pair[keytype % 2]);
+				break;
+			case RSA_STREAM_TYPE_MEMORY:
+				rsa_error_message(RSA_ERR_KEY_TYPE_BUF,
+					init->params.memory.buf,
+					key_pair[(keytype + 1) % 2],
+					key_pair[keytype % 2]);
+				break;
+			case RSA_STREAM_TYPE_NONE:
+			default:
+				break;
+			}
 		}
-		fclose(f);
+		rclose(s);
 		return NULL;
 	}
 
-	return rsa_key_alloc(keytype, data + 1, path, f);
+	key = rsa_key_alloc(keytype, info + 1, init, s);
+	if (!key) {
+		rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__,
+			__LINE__);
+	}
+
+	return key;
 }
 
 void rsa_key_close(rsa_key_t *key)
@@ -514,7 +653,8 @@ void rsa_key_close(rsa_key_t *key)
 	if (!key)
 		return;
 
-	fclose(key->file);
+	rclose(key->stream);
+	rsa_stream_init_free(&key->stream_init);
 	free(key);
 }
 
@@ -524,7 +664,7 @@ int rsa_key_enclev_set(rsa_key_t *key, int new_level)
 	u1024_t montgomery_factor;
 
 	/* rsa signature */
-	offset = strlen(RSA_SIGNATURE);
+	offset = (int)strlen(RSA_SIGNATURE);
 
 	/* rsa key data */
 	offset += number_size(encryption_levels[0]);
@@ -533,22 +673,22 @@ int rsa_key_enclev_set(rsa_key_t *key, int new_level)
 	for (level = encryption_levels; *level && *level != new_level; level++)
 		offset += 3*number_size(*level);
 
-	if (!*level || fseek(key->file, offset, SEEK_SET)) {
+	if (!*level || rseek(key->stream, offset, SEEK_SET)) {
 		rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__,
 			__LINE__);
 		return -1;
 	}
 
 	number_enclevl_set(new_level);
-	ret = rsa_read_u1024_full(key->file, &key->exp) ||
-		rsa_read_u1024_full(key->file, &key->n) || 
-		rsa_read_u1024_full(key->file, &montgomery_factor) ? -1 : 0;
+	ret = rsa_read_u1024_full(key->stream, &key->exp) ||
+		rsa_read_u1024_full(key->stream, &key->n) || 
+		rsa_read_u1024_full(key->stream, &montgomery_factor) ? -1 : 0;
 	if (!ret)
 		number_montgomery_factor_set(&key->n, &montgomery_factor);
 	return ret;
 }
 
-int rsa_encrypt_seed(rsa_key_t *key, FILE *ciphertext)
+int rsa_encrypt_seed(rsa_key_t *key, rsa_stream_t *ciphertext)
 {
 	u1024_t seed;
 

@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include "rsa_num.h"
+#include "rsa_stream.h"
 #include "mt19937_64.h"
 
 #define MAX_FILE_NAME_LEN 256
@@ -30,8 +31,8 @@
 #define RSA_RANDOM() (u64)random()
 #endif
 
-#define RSA_KEY_TYPE_PRIVATE 1<<0
-#define RSA_KEY_TYPE_PUBLIC 1<<1
+#define RSA_KEY_TYPE_PRIVATE (1<<0)
+#define RSA_KEY_TYPE_PUBLIC (1<<1)
 
 typedef enum {
 	V_NORMAL = 0,
@@ -61,8 +62,13 @@ typedef enum {
 	RSA_ERR_KEY_STAT_PRV_DEF,
 	RSA_ERR_KEY_STAT_PRV_DYN,
 	RSA_ERR_KEY_CORRUPT,
+	RSA_ERR_KEY_CORRUPT_BUF,
 	RSA_ERR_KEY_OPEN,
+	RSA_ERR_KEY_OPEN_BUF,
 	RSA_ERR_KEY_TYPE,
+	RSA_ERR_KEY_TYPE_BUF,
+	RSA_ERR_BUFFER_NULL,
+	RSA_ERR_STREAM_TYPE_UNKNOWN,
 	RSA_ERR_LEVEL,
 	RSA_ERR_INTERNAL,
 } rsa_errno_t;
@@ -83,8 +89,8 @@ typedef struct rsa_key_t {
 	struct rsa_key_t *next;
 	char type;
 	char name[KEY_DATA_MAX_LEN];
-	char path[MAX_FILE_NAME_LEN];
-	FILE *file;
+	rsa_stream_t *stream;
+	struct rsa_stream_init stream_init;
 	u1024_t n;
 	u1024_t exp;
 } rsa_key_t;
@@ -100,12 +106,12 @@ int rsa_printf(int is_verbose, int ind, char *fmt, ...);
 char *rsa_strcat(char *dest, char *fmt, ...);
 char *rsa_vstrcat(char *dest, char *fmt, va_list ap);
 int rsa_sprintf_nows(char *str, char *fmt, ...);
-int rsa_read_u1024(FILE *file, u1024_t *num);
-int rsa_write_u1024(FILE *file, u1024_t *num);
-int rsa_read_u1024_full(FILE *file, u1024_t *num);
-int rsa_write_u1024_full(FILE *file, u1024_t *num);
-int rsa_read_str(FILE *file, char *str, int len);
-int rsa_write_str(FILE *file, char *str, int len);
+int rsa_read_u1024(rsa_stream_t *s, u1024_t *num);
+int rsa_write_u1024(rsa_stream_t *s, u1024_t *num);
+int rsa_read_u1024_full(rsa_stream_t *s, u1024_t *num);
+int rsa_write_u1024_full(rsa_stream_t *s, u1024_t *num);
+int rsa_read_str(rsa_stream_t *s, char *str, int len);
+int rsa_write_str(rsa_stream_t *s, char *str, int len);
 void rsa_verbose_set(verbose_t level);
 verbose_t rsa_verbose_get(void);
 int is_fwrite_enable(char *name);
@@ -116,9 +122,10 @@ void rsa_timeline_uninit(void);
 
 void rsa_encode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);
 void rsa_decode(u1024_t *res, u1024_t *data, u1024_t *exp, u1024_t *n);
-rsa_key_t *rsa_key_open(char *path, char accept, int is_expect_key);
+rsa_key_t *rsa_key_open(struct rsa_stream_init *init, char accept,
+	int is_expect_key);
 void rsa_key_close(rsa_key_t *key);
 int rsa_key_enclev_set(rsa_key_t *key, int new_level);
-int rsa_encrypt_seed(rsa_key_t *key, FILE *ciphertext);
+int rsa_encrypt_seed(rsa_key_t *key, rsa_stream_t *ciphertext);
 #endif
 
