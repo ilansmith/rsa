@@ -10,8 +10,12 @@
 
 #if defined(__linux__)
 #define TIME_LIMIT_FMT "%lu"
+#define LOCALTIME_R(_t_, _tm_) localtime_r(_t_, _tm_)
+#define GMTIME_R(_t_, _tm_) gmtime_r(_t_, _tm_)
 #else
 #define TIME_LIMIT_FMT "%llu"
+#define LOCALTIME_R(_t_, _tm_) localtime_s(_tm_, _t_)
+#define GMTIME_R(_t_, _tm_) gmtime_s(_tm_, _t_)
 #endif
 
 #define FILE_FORMAT_VERSION 1
@@ -415,10 +419,10 @@ static int rsa_decrypt_time_limit(char **buf, size_t *len, time_t *time_limit)
 
 	abs_ts = **(time_t**)buf;
 
-	localtime_r(&abs_ts, &time_info_local);
+	LOCALTIME_R(&abs_ts, &time_info_local);
 	loc_ts = mktime(&time_info_local);
 
-	gmtime_r(&abs_ts, &time_info_gmt);
+	GMTIME_R(&abs_ts, &time_info_gmt);
 	gmt_ts = mktime(&time_info_gmt);
 	if (time_info_gmt.tm_isdst == 1)
 		gmt_ts -= SECONDS_IN_HOUR;
