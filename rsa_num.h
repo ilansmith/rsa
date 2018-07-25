@@ -122,8 +122,12 @@ typedef struct {
 	for (__i = 0; __i <= block_sz_u1024; __i++) \
 		(num)->arr[__i] = 0; \
 	(num)->top = 0; \
-} \
-while (0)
+} while (0)
+
+#define number_touch(num) do { \
+	(num).arr[0] = 0; \
+	(num).top = 0; \
+} while (0)
 
 #define number_shift_right_once(num) do { \
 	u64 *__seg, *__top; \

@@ -1,4 +1,5 @@
 #include <time.h>
+#include <inttypes.h>
 #if defined(__linux__)
 #include <unistd.h>
 #include <getopt.h>
@@ -10,8 +11,12 @@
 
 #if defined(__linux__)
 #define TIME_LIMIT_FMT "%lu"
+#define LOCALTIME_R(_t_, _tm_) localtime_r(_t_, _tm_)
+#define GMTIME_R(_t_, _tm_) gmtime_r(_t_, _tm_)
 #else
 #define TIME_LIMIT_FMT "%llu"
+#define LOCALTIME_R(_t_, _tm_) localtime_s(_tm_, _t_)
+#define GMTIME_R(_t_, _tm_) gmtime_s(_tm_, _t_)
 #endif
 
 #define FILE_FORMAT_VERSION 1
@@ -23,7 +28,7 @@
 #define SECONDS_IN_DAY (SECONDS_IN_HOUR * 24)
 #define SECONDS_IN_MONTH (SECONDS_IN_DAY * 30)
 
-#define OPT_FLAG(OPT) ((unsigned int)(1 << (OPT)))
+#define OPT_FLAG(OPT) ((uint64_t)(1 << (OPT)))
 #define OPT_ADD(flags, OPT) do { \
 	if ((flags) & OPT_FLAG(OPT)) { \
 		rsa_error_message(RSA_ERR_ARGREP); \
@@ -107,7 +112,7 @@ static void usage(char *app)
 	printf("       Print this information and exit\n");
 }
 
-static int parse_args(int argc, char **argv, unsigned long *action,
+static int parse_args(int argc, char **argv, uint64_t *action,
 		char key[FILE_NAME_MAX_LENGTH],
 		char license[FILE_NAME_MAX_LENGTH],
 		char vendor_name[VENDOR_NAME_MAX_LENGTH], time_t *time_limit)
@@ -158,7 +163,7 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 		},
 		{ 0, 0, 0, 0 }
 	};
-	unsigned long flags = 0;
+	uint64_t flags = 0;
 	int opt;
 	char *endptr;
 	int time_limit_in_months;
@@ -415,10 +420,10 @@ static int rsa_decrypt_time_limit(char **buf, size_t *len, time_t *time_limit)
 
 	abs_ts = **(time_t**)buf;
 
-	localtime_r(&abs_ts, &time_info_local);
+	LOCALTIME_R(&abs_ts, &time_info_local);
 	loc_ts = mktime(&time_info_local);
 
-	gmtime_r(&abs_ts, &time_info_gmt);
+	GMTIME_R(&abs_ts, &time_info_gmt);
 	gmt_ts = mktime(&time_info_gmt);
 	if (time_info_gmt.tm_isdst == 1)
 		gmt_ts -= SECONDS_IN_HOUR;
@@ -1036,7 +1041,7 @@ static int license_create(char private_key[FILE_NAME_MAX_LENGTH],
 int main(int argc, char **argv)
 {
 	int ret;
-	unsigned long action;
+	uint64_t action;
 	char key[FILE_NAME_MAX_LENGTH] = { 0 };
 	char license[FILE_NAME_MAX_LENGTH];
 	char vendor_name[VENDOR_NAME_MAX_LENGTH];

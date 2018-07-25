@@ -85,7 +85,7 @@ static int optlong_register_array(opt_t *ops_arr)
 
 static int optlong_register(opt_t *options_private)
 {
-	memset(longopts, 0, ARRAY_SZ(longopts));
+	memset(longopts, 0, ARRAY_SZ(longopts) * sizeof(struct option));
 	return optlong_register_array(options_common) || 
 		optlong_register_array(options_private);
 }

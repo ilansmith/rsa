@@ -644,6 +644,7 @@ static INLINE void number_witness_init(u1024_t *num_n_min1, u1024_t *num_u,
 	u1024_t tmp;
 
 	TIMER_START(FUNC_NUMBER_WITNESS_INIT);
+	number_touch(tmp);
 	number_assign(tmp, *num_n_min1);
 	*t = 0;
 	while (!number_is_odd(&tmp)) {

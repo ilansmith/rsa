@@ -20,7 +20,8 @@
 #define STRDUP _strdup
 #endif
 
-typedef int (*io_func_t)(void *ptr, int size, int nmemb, rsa_stream_t *s);
+typedef size_t (*io_func_t)(void *ptr, size_t size, size_t nmemb,
+	rsa_stream_t *s);
 
 int rsa_encryption_level;
 
@@ -240,10 +241,10 @@ static int rsa_io_u1024(rsa_stream_t *s, u1024_t *num, int is_full,
 	int ret;
 	io_func_t io = is_read ? (io_func_t)rread : (io_func_t)rwrite;
 
-	ret = io(num->arr, sizeof(u64), block_sz_u1024 + (is_full ? 1 : 0),
-		s);
+	ret = (int)io(num->arr, sizeof(u64), (size_t)(block_sz_u1024 +
+		(is_full ? 1 : 0)), s);
 	if (is_full)
-		ret += io(&num->top, sizeof(int), 1, s);
+		ret += (int)io(&num->top, sizeof(int), 1, s);
 	else if (is_read)
 		number_top_set(num);
 
@@ -280,7 +281,7 @@ static int rsa_io_str(rsa_stream_t *s, char *str, int len, int is_read)
 	int ret;
 	io_func_t io = is_read ? (io_func_t)rread : (io_func_t)rwrite;
 
-	ret = io(str, sizeof(char), len, s);
+	ret = (int)io(str, sizeof(char), (size_t)len, s);
 	if (ret != len && ret != EOF) {
 		rsa_error_message(RSA_ERR_FILEIO);
 		return -1;
