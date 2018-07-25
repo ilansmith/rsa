@@ -1,6 +1,10 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 #include "rsa_num.h"
 #include "rsa_stream.h"
@@ -135,5 +139,10 @@ rsa_key_t *rsa_key_open(struct rsa_stream_init *init, char accept,
 void rsa_key_close(rsa_key_t *key);
 int rsa_key_enclev_set(rsa_key_t *key, int new_level);
 int rsa_encrypt_seed(rsa_key_t *key, rsa_stream_t *ciphertext);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
 

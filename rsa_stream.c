@@ -4,6 +4,7 @@
 #include <string.h>
 #include "rsa_stream.h"
 
+#define STREAM_UNUSED(x) (void)(x)
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 #define EOB (-1)
@@ -22,6 +23,7 @@ struct rsa_stream {
 	enum rsa_stream_type type;
 };
 
+#if defined(CONFIG_STREAM_OUTPUT)
 static void stream_err(const char *fmt, ...)
 {
 	va_list va;
@@ -32,6 +34,12 @@ static void stream_err(const char *fmt, ...)
 	va_end(va);
 	fprintf(stderr, "\n");
 }
+#else
+static void stream_err(const char *fmt, ...)
+{
+	STREAM_UNUSED(fmt);
+}
+#endif
 
 static BUFFER *bopen(unsigned char *buf, int len)
 {

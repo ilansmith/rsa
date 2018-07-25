@@ -1,6 +1,10 @@
 #ifndef _RSA_STREAM_H_
 #define _RSA_STREAM_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -36,5 +40,10 @@ int rclose(rsa_stream_t *s);
 size_t rread(void *ptr, size_t size, size_t nmemb, rsa_stream_t *s);
 size_t rwrite(void *ptr, size_t size, size_t nmemb, rsa_stream_t *s);
 int rseek(rsa_stream_t *s, long offset, int whence);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
 

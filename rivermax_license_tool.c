@@ -7,21 +7,21 @@
 #include "getopt.h"
 #endif
 #include "rsa_license.h"
+#include "rivermax_license_tool.h"
 
 #if defined(__linux__)
 #define TIME_LIMIT_FMT "%lu"
+#define LOCALTIME_R(_t_, _tm_) localtime_r(_t_, _tm_)
+#define GMTIME_R(_t_, _tm_) gmtime_r(_t_, _tm_)
 #else
 #define TIME_LIMIT_FMT "%llu"
+#define LOCALTIME_R(_t_, _tm_) localtime_s(_tm_, _t_)
+#define GMTIME_R(_t_, _tm_) gmtime_s(_tm_, _t_)
 #endif
 
-#define FILE_FORMAT_VERSION 1
-#define VENDOR_NAME_MAX_LENGTH 64
-#define VENDOR_NAME_DEFAULT "Ilan Smith"
 #define FILE_NAME_MAX_LENGTH 256
 
-#define SECONDS_IN_HOUR (60 * 60)
-#define SECONDS_IN_DAY (SECONDS_IN_HOUR * 24)
-#define SECONDS_IN_MONTH (SECONDS_IN_DAY * 30)
+#define VENDOR_NAME_DEFAULT "Mellanox"
 
 #define OPT_FLAG(OPT) ((unsigned int)(1 << (OPT)))
 #define OPT_ADD(flags, OPT) do { \
@@ -60,12 +60,6 @@ typedef enum {
 	RSA_OPT_LIC_LICENSE,
 	RSA_OPT_MAX
 } rsa_opt_t;
-
-struct rsa_license_data {
-	u64 version;
-	char vendor_name[VENDOR_NAME_MAX_LENGTH];
-	time_t time_limit;
-};
 
 #if !defined(__linux__)
 static char *basename(char *path)
@@ -415,10 +409,10 @@ static int rsa_decrypt_time_limit(char **buf, size_t *len, time_t *time_limit)
 
 	abs_ts = **(time_t**)buf;
 
-	localtime_r(&abs_ts, &time_info_local);
+	LOCALTIME_R(&abs_ts, &time_info_local);
 	loc_ts = mktime(&time_info_local);
 
-	gmtime_r(&abs_ts, &time_info_gmt);
+	GMTIME_R(&abs_ts, &time_info_gmt);
 	gmt_ts = mktime(&time_info_gmt);
 	if (time_info_gmt.tm_isdst == 1)
 		gmt_ts -= SECONDS_IN_HOUR;

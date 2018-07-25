@@ -1,6 +1,10 @@
 #ifndef _RSA_NUM_H_
 #define _RSA_NUM_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -304,6 +308,10 @@ void number_exponentiation(u1024_t *res, u1024_t *num_base,
 void number_extended_euclid_gcd(u1024_t *gcd, u1024_t *x, u1024_t *a,
 	u1024_t *y, u1024_t *b);
 void number_absolute_value(u1024_t *abs, u1024_t *num);
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

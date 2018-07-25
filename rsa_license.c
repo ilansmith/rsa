@@ -8,6 +8,7 @@
 #include "rsa_num.h"
 #include "rsa_crc.h"
 #include "rsa_license.h"
+#include "rivermax_license_tool.h"
 
 #define SEED_ENCRYPTION_LEVEL 512
 

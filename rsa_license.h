@@ -1,9 +1,16 @@
 #ifndef _RSA_LICENSE_H_
 #define _RSA_LICENSE_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "rsa_stream.h"
 #include "rsa_num.h"
 #include "rsa_util.h"
+
+#define ROUND_UP(val, multiple) ((((val) + (multiple) - 1) / (multiple)) * \
+		(multiple))
 
 struct rsa_license_ops {
 	int (*lic_create)(char **buf, size_t *len, void *data);
@@ -21,6 +28,10 @@ int rsa_license_extract(struct rsa_stream_init *pub_key_stream_init,
 		void *data);
 
 void rsa_license_init(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 
