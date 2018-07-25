@@ -100,6 +100,7 @@ typedef struct code2list_t {
 
 STATIC u1024_t num_montgomery_n, num_res_nresidue;
 static u1024_t num_montgomery_factor;
+static u1024_t tmp;
 STATIC prng_seed_t number_random_seed;
 static int number_generate_coprime_init;
 
@@ -641,8 +642,6 @@ INLINE int number_modular_exponentiation_montgomery(u1024_t *res, u1024_t *a,
 static INLINE void number_witness_init(u1024_t *num_n_min1, u1024_t *num_u,
 	int *t)
 {
-	u1024_t tmp;
-
 	TIMER_START(FUNC_NUMBER_WITNESS_INIT);
 	number_assign(tmp, *num_n_min1);
 	*t = 0;
