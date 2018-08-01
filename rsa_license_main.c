@@ -34,6 +34,8 @@
 #define OPT_FLAG_LIC_DATA(flags) ((flags) & (OPT_FLAG(RSA_OPT_LIC_VENDOR) | \
 			OPT_FLAG(RSA_OPT_LIC_TIME_LIMIT)))
 
+#define ROUND_UP(val, round) ((((val) + (round) - 1) / (round)) * (round))
+
 typedef enum {
 	/* actions */
 	RSA_OPT_LIC_HELP,
@@ -186,13 +188,9 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 			}
 
 			if (time_limit_in_months) {
-				time_t abs_ts;
 
-				abs_ts = time(NULL) +
+				*time_limit = time(NULL) +
 					SECONDS_IN_MONTH * time_limit_in_months;
-				abs_ts -= (abs_ts % SECONDS_IN_DAY);
-				abs_ts += SECONDS_IN_DAY;
-				*time_limit = abs_ts;
 			}
 			break;
 		default:
@@ -384,27 +382,42 @@ static int rsa_extract_vendor_name(char **buf, size_t *len,
 	return 0;
 }
 
+static time_t round_up_end_of_day_localtime(time_t time_limit)
+{
+	time_t gmt_ts, eod_ts;
+	struct tm time_info_gmt;
+	time_t gmt_offset;
+
+	if (!time_limit)
+		return 0;
+
+	gmtime_r(&time_limit, &time_info_gmt);
+	time_info_gmt.tm_isdst = -1;
+	gmt_ts = mktime(&time_info_gmt);
+	if ((int)gmt_ts == -1)
+		return (time_t)-1;
+
+	gmt_offset = time_limit - gmt_ts;
+	eod_ts = ROUND_UP(time_limit + gmt_offset, SECONDS_IN_DAY) -
+		gmt_offset - 1;
+
+	return eod_ts;
+}
+
 static int rsa_decrypt_time_limit(char **buf, size_t *len, time_t *time_limit)
 {
 	time_t abs_ts;
-	struct tm time_info_local, time_info_gmt;
-	time_t loc_ts, gmt_ts, gmt_offset;
+	time_t eod_ts;
 
 	if (*len < sizeof(time_t))
 		return -1;
 
 	abs_ts = **(time_t**)buf;
+	eod_ts = round_up_end_of_day_localtime(abs_ts);
+	if ((int)eod_ts == -1)
+		return -1;
 
-	localtime_r(&abs_ts, &time_info_local);
-	loc_ts = mktime(&time_info_local);
-
-	gmtime_r(&abs_ts, &time_info_gmt);
-	gmt_ts = mktime(&time_info_gmt);
-	if (time_info_gmt.tm_isdst == 1)
-		gmt_ts -= SECONDS_IN_HOUR;
-
-	gmt_offset = loc_ts - gmt_ts;
-	*time_limit = abs_ts - gmt_offset;
+	*time_limit = eod_ts;
 
 	*buf += sizeof(time_t);
 	*len -= sizeof(time_t);
@@ -421,7 +434,7 @@ static char *time_t_to_str(time_t time_limit)
 		strftime(stime, sizeof(stime),"%d %b, %Y",
 			localtime(&last_day));
 	} else {
-		snprintf(stime, sizeof(stime), "unlimited");
+		snprintf(stime, sizeof(stime), "Unlimited");
 	}
 
 	return stime;
@@ -1007,7 +1020,8 @@ static int license_create(char private_key[FILE_NAME_MAX_LENGTH],
 	printf("  License format version: %llu\n", license_data.version);
 	printf("  Vendor name: %s\n", license_data.vendor_name);
 	printf("  Valid through: %s\n",
-		time_t_to_str(license_data.time_limit));
+		time_t_to_str(round_up_end_of_day_localtime(
+			license_data.time_limit)));
 	return 0;
 
 }
