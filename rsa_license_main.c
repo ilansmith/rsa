@@ -252,7 +252,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 			break;
 		default:
 			usage(app);
-			break;
+			return -1;
 		}
 	}
 
@@ -281,7 +281,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 
 	if (time_limit_multiple) {
 		*time_limit = time(NULL) + SECONDS_IN_DAY +
-			time_limit_multiple *time_limit_unit;
+			time_limit_multiple * time_limit_unit;
 	}
 
 	return 0;

@@ -307,8 +307,10 @@ int parse_args(int argc, char *argv[], unsigned int *flags,
 			break;
 		case RSA_OPT_KEY_SET_DEFAULT:
 			OPT_ADD(flags, RSA_OPT_KEY_SET_DEFAULT);
-			if (optarg && rsa_set_key_name(optarg))
+			if (is_optional_argument(argc, argv, &optarg,
+					&optind) && rsa_set_key_name(optarg)) {
 				return -1;
+			}
 			break;
 		case RSA_OPT_QUITE:
 		case RSA_OPT_VERBOSE:
@@ -364,6 +366,7 @@ int rsa_encryption_level_set(char *arg)
 		rsa_encryption_level = RSA_ENCRYPTION_LEVEL_DEFAULT;
 	} else {
 		char *err;
+
 		rsa_encryption_level = strtol(arg , &err, 10);
 
 		if (*err)

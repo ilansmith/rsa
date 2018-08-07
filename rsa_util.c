@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 #include <sys/types.h>
@@ -718,5 +719,29 @@ int rsa_encrypt_seed(rsa_key_t *key, rsa_stream_t *ciphertext)
 	}
 	rsa_encode(&seed, &seed, &key->exp, &key->n);
 	return rsa_write_u1024_full(ciphertext, &seed);
+}
+
+int is_optional_argument(int argc, char **argv, char **optarg, int *optind)
+{
+	char *err;
+
+	if (*optarg)
+		return 1;
+
+	if (*optind == argc)
+		return 0;
+
+	if (argv[*optind][0] != '-')
+		goto found;
+
+	strtol(&argv[*optind][1], &err, 10);
+	if (!*err)
+		goto found;
+
+	return 0;
+
+found:
+	*optarg = argv[(*optind)++];
+	return 1;
 }
 

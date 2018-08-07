@@ -136,5 +136,7 @@ rsa_key_t *rsa_key_open(struct rsa_stream_init *init, char accept,
 void rsa_key_close(rsa_key_t *key);
 int rsa_key_enclev_set(rsa_key_t *key, int new_level);
 int rsa_encrypt_seed(rsa_key_t *key, rsa_stream_t *ciphertext);
+
+int is_optional_argument(int argc, char **argv, char **optarg, int *optind);
 #endif
 
