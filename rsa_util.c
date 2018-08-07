@@ -114,6 +114,9 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 	case RSA_ERR_ARGNAN:
 		rsa_vstrcat(msg, "input not a number: %s", ap);
 		break;
+	case RSA_ERR_TIMUNIT:
+		rsa_vstrcat(msg, "input not a time unit: %s", ap);
+		break;
 	case RSA_ERR_ARGCONFLICT:
 		rsa_strcat(msg, "conflicting input switches");
 		break;
