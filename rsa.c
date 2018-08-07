@@ -65,6 +65,31 @@ int opt_short2code(opt_t *options, int opt)
 	return options->code;
 }
 
+static int is_optional_argument(int argc, char **argv, char **optarg,
+		int *optind)
+{
+	char *err;
+
+	if (*optarg)
+		return 1;
+
+	if (*optind == argc)
+		return 0;
+
+	if (argv[*optind][0] != '-')
+		goto found;
+
+	strtol(&argv[*optind][1], &err, 10);
+	if (!*err)
+		goto found;
+
+	return 0;
+
+found:
+	*optarg = argv[(*optind)++];
+	return 1;
+}
+
 static int optlong_register_array(opt_t *ops_arr)
 {
 	opt_t *cur;
@@ -307,8 +332,10 @@ int parse_args(int argc, char *argv[], unsigned int *flags,
 			break;
 		case RSA_OPT_KEY_SET_DEFAULT:
 			OPT_ADD(flags, RSA_OPT_KEY_SET_DEFAULT);
-			if (optarg && rsa_set_key_name(optarg))
+			if (is_optional_argument(argc, argv, &optarg,
+					&optind) && rsa_set_key_name(optarg)) {
 				return -1;
+			}
 			break;
 		case RSA_OPT_QUITE:
 		case RSA_OPT_VERBOSE:
@@ -364,6 +391,7 @@ int rsa_encryption_level_set(char *arg)
 		rsa_encryption_level = RSA_ENCRYPTION_LEVEL_DEFAULT;
 	} else {
 		char *err;
+
 		rsa_encryption_level = strtol(arg , &err, 10);
 
 		if (*err)

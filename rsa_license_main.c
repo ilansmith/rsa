@@ -280,7 +280,7 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 
 	if (time_limit_multiple) {
 		*time_limit = time(NULL) + SECONDS_IN_DAY +
-			time_limit_multiple *time_limit_unit;
+			time_limit_multiple * time_limit_unit;
 	}
 
 	return 0;
