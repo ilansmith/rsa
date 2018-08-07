@@ -23,7 +23,9 @@
 
 #define SECONDS_IN_HOUR (60 * 60)
 #define SECONDS_IN_DAY (SECONDS_IN_HOUR * 24)
+#define SECONDS_IN_WEEK (SECONDS_IN_DAY * 7)
 #define SECONDS_IN_MONTH (SECONDS_IN_DAY * 30)
+#define SECONDS_IN_YEAR (SECONDS_IN_DAY * 365)
 
 #define OPT_FLAG(OPT) ((unsigned int)(1 << (OPT)))
 #define OPT_ADD(flags, OPT) do { \
@@ -44,7 +46,13 @@
 } while (0)
 
 #define OPT_FLAG_LIC_DATA(flags) ((flags) & (OPT_FLAG(RSA_OPT_LIC_VENDOR) | \
-			OPT_FLAG(RSA_OPT_LIC_TIME_LIMIT)))
+			OPT_FLAG(RSA_OPT_LIC_TIME_LIMIT) | \
+			OPT_FLAG(RSA_OPT_LIC_TIME_UNIT)))
+
+#define TU_VAL_DAY "day"
+#define TU_VAL_WEEK "week"
+#define TU_VAL_MONTH "month"
+#define TU_VAL_YEAR "year"
 
 #define ROUND_UP(val, round) ((((val) + (round) - 1) / (round)) * (round))
 
@@ -57,6 +65,7 @@ typedef enum {
 
 	/* license creation data */
 	RSA_OPT_LIC_VENDOR,
+	RSA_OPT_LIC_TIME_UNIT,
 	RSA_OPT_LIC_TIME_LIMIT,
 
 	/* files to use */
@@ -94,11 +103,15 @@ static void usage(char *app)
 	printf(C_HIGHLIGHT "       -v, --vendor=VENDOR_NAME" C_NORMAL "\n");
 	printf("            Vendor being licensed (default: "
 		VENDOR_NAME_DEFAULT ")\n");
-	printf(C_HIGHLIGHT "       -t, --time-limit=TIME_IN_MONTHS" C_NORMAL
-			"\n");
-	printf("            Months valide from license creation time "
-		  "(default: unlimited)\n");
-	printf("\n");
+	printf(C_HIGHLIGHT "       -t, --time-limit=TIME" C_NORMAL "\n");
+	printf("            Validity duration from license creation time "
+		"(default: unlimited)\n");
+	printf("            The time units can be modified using the -u/--unit "
+		"switch\n");
+	printf(C_HIGHLIGHT "       -u, --unit=TIME_UNITS" C_NORMAL "\n");
+	printf("            Units of time with which to set the time limit\n");
+	printf("            Options are: \"" TU_VAL_DAY "\", \"" TU_VAL_WEEK
+		"\", \"" TU_VAL_MONTH "\" (default) and \"" TU_VAL_YEAR "\"\n");
 	printf(C_HIGHLIGHT "  -i, --info=FILE_NAME.lic" C_NORMAL "\n");
 	printf("       Extract license information with possible option:\n");
 	printf(C_HIGHLIGHT "       -k, --key=PUBLIC_KEY" C_NORMAL "\n");
@@ -111,12 +124,17 @@ static void usage(char *app)
 	printf("       Print this information and exit\n");
 }
 
+static int is_str_prefix(char *s1, char *s2)
+{
+	return !strncmp(s1, s2, strlen(s1));
+}
+
 static int parse_args(int argc, char **argv, unsigned long *action,
 		char key[FILE_NAME_MAX_LENGTH],
 		char license[FILE_NAME_MAX_LENGTH],
 		char vendor_name[VENDOR_NAME_MAX_LENGTH], time_t *time_limit)
 {
-	char *optstring = "hc:i:xk:v:t:";
+	char *optstring = "hc:i:xk:v:u:t:";
 	struct option longopts[] = {
 		{
 			.name = "help",
@@ -155,6 +173,12 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 			.flag = NULL,
 		},
 		{
+			.name = "unit",
+			.val = 'u',
+			.has_arg = required_argument,
+			.flag = NULL,
+		},
+		{
 			.name = "time-limit",
 			.val = 't',
 			.has_arg = required_argument,
@@ -165,7 +189,8 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 	unsigned long flags = 0;
 	int opt;
 	char *endptr;
-	int time_limit_in_months;
+	int time_limit_unit = SECONDS_IN_MONTH;
+	int time_limit_multiple = 0;
 	char *app = basename(argv[0]);
 
 	*action = 0;
@@ -201,18 +226,27 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 			snprintf(vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
 				optarg);
 			break;
+		case 'u':
+			OPT_ADD(flags, RSA_OPT_LIC_TIME_UNIT);
+			if (is_str_prefix(optarg, TU_VAL_DAY)) {
+				time_limit_unit = SECONDS_IN_DAY;
+			} else if (is_str_prefix(optarg, TU_VAL_WEEK)) {
+				time_limit_unit = SECONDS_IN_WEEK;
+			} else if (is_str_prefix(optarg, TU_VAL_MONTH)) {
+				time_limit_unit = SECONDS_IN_MONTH;
+			} else if (is_str_prefix(optarg, TU_VAL_YEAR)) {
+				time_limit_unit = SECONDS_IN_YEAR;
+			} else {
+				rsa_error_message(RSA_ERR_TIMUNIT, optarg);
+				return -1;
+			}
+			break;
 		case 't':
 			OPT_ADD(flags, RSA_OPT_LIC_TIME_LIMIT);
-			time_limit_in_months = strtol(optarg, &endptr, 10);
+			time_limit_multiple = strtol(optarg, &endptr, 10);
 			if (*endptr) {
 				rsa_error_message(RSA_ERR_ARGNAN, optarg);
 				return -1;
-			}
-
-			if (time_limit_in_months) {
-
-				*time_limit = time(NULL) +
-					SECONDS_IN_MONTH * time_limit_in_months;
 			}
 			break;
 		default:
@@ -221,8 +255,6 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 		}
 	}
 
-	/* XXX do the following in a finalize() function after it's clear what
-	 * switches are required/optional/disallowed for each action */
 	if (!*action) {
 		usage(app);
 		return -1;
@@ -234,11 +266,21 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 		return -1;
 	}
 	if (OPT_FLAG_LIC_DATA(flags) &&
-			!(*action & (OPT_FLAG(RSA_OPT_LIC_CREATE) |
-				OPT_FLAG(RSA_OPT_LIC_INFO)))) {
+			!(*action & (OPT_FLAG(RSA_OPT_LIC_CREATE)))) {
 		rsa_error_message(RSA_ERR_ARGCONFLICT);
 		usage(app);
 		return -1;
+	}
+
+	if ((flags & OPT_FLAG(RSA_OPT_LIC_TIME_UNIT)) &&
+			!(flags & OPT_FLAG(RSA_OPT_LIC_TIME_LIMIT))) {
+		printf("Warning: no time limit set so -u/--unit option is "
+			"ignored\n");
+	}
+
+	if (time_limit_multiple) {
+		*time_limit = time(NULL) + SECONDS_IN_DAY +
+			time_limit_multiple *time_limit_unit;
 	}
 
 	return 0;
@@ -451,7 +493,7 @@ static char *time_t_to_str(time_t time_limit)
 	static char stime[50];
 
 	if (time_limit) {
-		time_t last_day = time_limit - SECONDS_IN_DAY;
+		time_t last_day = time_limit;
 
 		strftime(stime, sizeof(stime),"%d %b, %Y",
 			localtime(&last_day));
