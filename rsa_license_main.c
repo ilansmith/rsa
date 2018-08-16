@@ -1,4 +1,5 @@
 #include <time.h>
+#include <string.h>
 #if defined(__linux__)
 #include <unistd.h>
 #include <getopt.h>
@@ -11,9 +12,11 @@
 #if defined(__linux__)
 #define TIME_LIMIT_FMT "%lu"
 #define GMTIME_R(_t_, _tm_) gmtime_r(_t_, _tm_)
+#define SSCANF sscanf
 #else
 #define TIME_LIMIT_FMT "%llu"
 #define GMTIME_R(_t_, _tm_) gmtime_s(_tm_, _t_)
+#define SSCANF sscanf_s
 #endif
 
 #define FILE_FORMAT_VERSION 1
@@ -47,7 +50,8 @@
 
 #define OPT_FLAG_LIC_DATA(flags) ((flags) & (OPT_FLAG(RSA_OPT_LIC_VENDOR) | \
 			OPT_FLAG(RSA_OPT_LIC_TIME_LIMIT) | \
-			OPT_FLAG(RSA_OPT_LIC_TIME_UNIT)))
+			OPT_FLAG(RSA_OPT_LIC_TIME_UNIT) | \
+			OPT_FLAG(RSA_OPT_LIC_DATE)))
 
 #define TU_VAL_DAY "day"
 #define TU_VAL_WEEK "week"
@@ -67,6 +71,7 @@ typedef enum {
 	RSA_OPT_LIC_VENDOR,
 	RSA_OPT_LIC_TIME_UNIT,
 	RSA_OPT_LIC_TIME_LIMIT,
+	RSA_OPT_LIC_DATE,
 
 	/* files to use */
 	RSA_OPT_LIC_KEY,
@@ -103,15 +108,18 @@ static void usage(char *app)
 	printf(C_HIGHLIGHT "       -v, --vendor=VENDOR_NAME" C_NORMAL "\n");
 	printf("            Vendor being licensed (default: "
 		VENDOR_NAME_DEFAULT ")\n");
+	printf(C_HIGHLIGHT "       -u, --unit=TIME_UNITS" C_NORMAL "\n");
+	printf("            Units of time with which to set the time limit\n");
+	printf("            Options are: \"" TU_VAL_DAY "\", \"" TU_VAL_WEEK
+		"\", \"" TU_VAL_MONTH "\" (default) and \"" TU_VAL_YEAR "\"\n");
 	printf(C_HIGHLIGHT "       -t, --time-limit=TIME" C_NORMAL "\n");
 	printf("            Validity duration from license creation time "
 		"(default: unlimited)\n");
 	printf("            The time units can be modified using the -u/--unit "
 		"switch\n");
-	printf(C_HIGHLIGHT "       -u, --unit=TIME_UNITS" C_NORMAL "\n");
-	printf("            Units of time with which to set the time limit\n");
-	printf("            Options are: \"" TU_VAL_DAY "\", \"" TU_VAL_WEEK
-		"\", \"" TU_VAL_MONTH "\" (default) and \"" TU_VAL_YEAR "\"\n");
+	printf(C_HIGHLIGHT "       -d, --date=DDMMYYYY" C_NORMAL "\n");
+	printf("            Expiry date. Mutual exclusive with -u/--unit and "
+			"-t/--time-limit\n");
 	printf(C_HIGHLIGHT "  -i, --info=FILE_NAME.lic" C_NORMAL "\n");
 	printf("       Extract license information with possible option:\n");
 	printf(C_HIGHLIGHT "       -k, --key=PUBLIC_KEY" C_NORMAL "\n");
@@ -124,6 +132,62 @@ static void usage(char *app)
 	printf("       Print this information and exit\n");
 }
 
+static int extract_date_arg(char *date_str, time_t *time)
+{
+	unsigned short year;
+	unsigned short month;
+	unsigned short day;
+	int is_leap_year;
+	int ret;
+	struct tm tm = { 0 };
+	int days_in_month[12] = {
+		31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+	};
+
+	if (strnlen(date_str, 9) != 8) {
+		printf("date string too long: %s\n", date_str);
+		return -1;
+	}
+
+	ret = SSCANF(date_str, "%2hu%2hu%4hu", &day, &month, &year);
+	if (ret != 3) {
+		printf("failed to scan date %d elements\n", ret);
+		return -1;
+	}
+
+	if (!year && !month && !day) {
+		*time = 0;
+		return 0;
+	}
+
+	is_leap_year = ((year & ((unsigned short)~0)<<2) == year) &&
+		((year % 100) || !(year % 400));
+	if (year < 1970) {
+		printf("year is less than 1970: %hu\n", year);
+		return -1;
+	}
+	if (month < 1 || 12 < month) {
+		printf("month is not between 1 and 12: %hu\n", month);
+		return -1;
+	}
+	if ((day < 1 || days_in_month[month - 1] < day) && (!is_leap_year ||
+			month != 2 || day != days_in_month[1] + 1)) {
+		printf("day is out of range: %hu\n", day);
+		return -1;
+	}
+
+	memset(&tm, 0, sizeof(struct tm));
+	tm.tm_sec = 59;
+	tm.tm_min = 59;
+	tm.tm_hour = 22;
+	tm.tm_mday = day;
+	tm.tm_mon = month - 1;
+	tm.tm_year = year - 1900;
+
+	*time = mktime(&tm);
+	return 0;
+}
+
 static int is_str_prefix(char *s1, char *s2)
 {
 	return !strncmp(s1, s2, strlen(s1));
@@ -134,7 +198,7 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 		char license[FILE_NAME_MAX_LENGTH],
 		char vendor_name[VENDOR_NAME_MAX_LENGTH], time_t *time_limit)
 {
-	char *optstring = "hc:i:xk:v:u:t:";
+	char *optstring = "h:c:i:xk:v:u:t:d:";
 	struct option longopts[] = {
 		{
 			.name = "help",
@@ -181,6 +245,12 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 		{
 			.name = "time-limit",
 			.val = 't',
+			.has_arg = required_argument,
+			.flag = NULL,
+		},
+		{
+			.name = "date",
+			.val = 'd',
 			.has_arg = required_argument,
 			.flag = NULL,
 		},
@@ -249,6 +319,11 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 				return -1;
 			}
 			break;
+		case 'd':
+			OPT_ADD(flags, RSA_OPT_LIC_DATE);
+			if (extract_date_arg(optarg, time_limit))
+				return -1;
+			break;
 		default:
 			usage(app);
 			return -1;
@@ -259,14 +334,24 @@ static int parse_args(int argc, char **argv, unsigned long *action,
 		usage(app);
 		return -1;
 	}
+
 	if (flags & OPT_FLAG(RSA_OPT_LIC_HELP) &&
 			(flags & ~OPT_FLAG(RSA_OPT_LIC_HELP))) {
 		rsa_error_message(RSA_ERR_ARGCONFLICT);
 		usage(app);
 		return -1;
 	}
+
 	if (OPT_FLAG_LIC_DATA(flags) &&
 			!(*action & (OPT_FLAG(RSA_OPT_LIC_CREATE)))) {
+		rsa_error_message(RSA_ERR_ARGCONFLICT);
+		usage(app);
+		return -1;
+	}
+
+	if (flags & (OPT_FLAG(RSA_OPT_LIC_DATE) &
+			(OPT_FLAG(RSA_OPT_LIC_TIME_UNIT) |
+			OPT_FLAG(RSA_OPT_LIC_TIME_LIMIT)))) {
 		rsa_error_message(RSA_ERR_ARGCONFLICT);
 		usage(app);
 		return -1;
