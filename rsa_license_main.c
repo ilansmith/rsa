@@ -533,7 +533,7 @@ static int rsa_encrypt_time_limit(char **buf, size_t *len, time_t time_limit)
  * | time_t   | time limit                 |
  * +----------+----------------------------+
  */
-static int rsa_license_create_rivermax_v1(char **buf, size_t *len,
+static int rsa_license_create_cb_v1(char **buf, size_t *len,
 		struct rsa_license_data *license_data)
 {
 	if (rsa_encrypt_vendor_name(buf, len,
@@ -558,7 +558,7 @@ static int rsa_license_create_rivermax_v1(char **buf, size_t *len,
 	return 0;
 }
 
-static int rsa_license_create_rivermax(char **buf, size_t *len, void *data)
+static int rsa_license_create_cb(char **buf, size_t *len, void *data)
 {
 	char *_buf = NULL;
 	size_t _len = 0;
@@ -574,7 +574,7 @@ static int rsa_license_create_rivermax(char **buf, size_t *len, void *data)
 
 	switch (license_data->version) {
 	case 1:
-		if (rsa_license_create_rivermax_v1(&_buf, &_len, license_data))
+		if (rsa_license_create_cb_v1(&_buf, &_len, license_data))
 			goto error;
 		break;
 	default:
@@ -698,7 +698,7 @@ static int rsa_license_info_parse_v1(char **buf, size_t *len)
 	return 0;
 }
 
-static int rsa_license_info_rivermax(char *buf, size_t len)
+static int rsa_license_info_cb(char *buf, size_t len)
 {
 	u64 version = 0;
 	int ret;
@@ -730,7 +730,7 @@ static int rsa_license_info_rivermax(char *buf, size_t len)
 	return ret;
 }
 
-static int rsa_license_extract_rivermax_v1(char **buf, size_t *len,
+static int rsa_license_extract_cb_v1(char **buf, size_t *len,
 		struct rsa_license_data *lic_data)
 {
 	if (rsa_decrypt_vendor_name(buf, len, lic_data->info.v1.vendor_name))
@@ -742,7 +742,7 @@ static int rsa_license_extract_rivermax_v1(char **buf, size_t *len,
 	return 0;
 }
 
-static int rsa_license_extract_rivermax(char *buf, size_t len, void *data)
+static int rsa_license_extract_cb(char *buf, size_t len, void *data)
 {
 	struct rsa_license_data *lic_data = (struct rsa_license_data*)data;
 
@@ -751,7 +751,7 @@ static int rsa_license_extract_rivermax(char *buf, size_t len, void *data)
 
 	switch (lic_data->version) {
 	case 1:
-		return rsa_license_extract_rivermax_v1(&buf, &len, lic_data);
+		return rsa_license_extract_cb_v1(&buf, &len, lic_data);
 	default:
 		return -1;
 	}
@@ -1016,9 +1016,9 @@ int license_test(void)
 		0x00, 0x00,
 	};
 	struct rsa_license_ops licnese_ops = {
-		rsa_license_create_rivermax,
-		rsa_license_info_rivermax,
-		rsa_license_extract_rivermax,
+		rsa_license_create_cb,
+		rsa_license_info_cb,
+		rsa_license_extract_cb,
 	};
 	struct rsa_license_data license_data;
 	char *license = "test.lic";
@@ -1198,9 +1198,9 @@ static int license_info(char key_path[FILE_NAME_MAX_LENGTH],
 		0x00, 0x00,
 	};
 	struct rsa_license_ops licnese_ops = {
-		rsa_license_create_rivermax,
-		rsa_license_info_rivermax,
-		rsa_license_extract_rivermax,
+		rsa_license_create_cb,
+		rsa_license_info_cb,
+		rsa_license_extract_cb,
 	};
 	struct rsa_stream_init init;
 	int ret;
@@ -1230,9 +1230,9 @@ static int license_create(char private_key[FILE_NAME_MAX_LENGTH],
 		struct rsa_license_data *license_data)
 {
 	struct rsa_license_ops licnese_ops = {
-		rsa_license_create_rivermax,
-		rsa_license_info_rivermax,
-		rsa_license_extract_rivermax,
+		rsa_license_create_cb,
+		rsa_license_info_cb,
+		rsa_license_extract_cb,
 	};
 	struct rsa_stream_init init;
 	int ret;
