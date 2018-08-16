@@ -99,6 +99,9 @@ static void rsa_message(int is_error, rsa_errno_t err, va_list ap)
 	snprintf(msg, MAX_OUTPUT_LEN, "%s: ", is_error ? "error" : "warning");
 	switch (err)
 	{
+	case RSA_ERR_REVISION:
+		rsa_vstrcat(msg, "bad revision value: %s", ap);
+		break;
 	case RSA_ERR_ARGREP:
 		rsa_vstrcat(msg, "option repeated", ap);
 		break;
