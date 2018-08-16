@@ -1,5 +1,4 @@
 #include <time.h>
-#include <string.h>
 #include <inttypes.h>
 #if defined(__linux__)
 #include <unistd.h>
@@ -50,9 +49,15 @@
 } while (0)
 
 #define OPT_FLAG_LIC_DATA(flags) ((flags) & (OPT_FLAG(RSA_OPT_LIC_VENDOR) | \
+			OPT_FLAG(RSA_OPT_LIC_REVISION) | \
 			OPT_FLAG(RSA_OPT_LIC_TIME_LIMIT) | \
 			OPT_FLAG(RSA_OPT_LIC_TIME_UNIT) | \
 			OPT_FLAG(RSA_OPT_LIC_DATE)))
+
+#define OPT_ASSERT_VERSION_COMPAT(_opt, _compat, _version) do { \
+	if (!is_compabile (_opt, _compat, _version)) \
+		return -1; \
+} while (0)
 
 #define TU_VAL_DAY "day"
 #define TU_VAL_WEEK "week"
@@ -64,6 +69,7 @@
 typedef enum {
 	/* actions */
 	RSA_OPT_LIC_HELP,
+	RSA_OPT_LIC_REVISION,
 	RSA_OPT_LIC_CREATE,
 	RSA_OPT_LIC_INFO,
 	RSA_OPT_LIC_TEST,
@@ -82,8 +88,12 @@ typedef enum {
 
 struct rsa_license_data {
 	u64 version;
-	char vendor_name[VENDOR_NAME_MAX_LENGTH];
-	time_t time_limit;
+	union {
+		struct {
+			char vendor_name[VENDOR_NAME_MAX_LENGTH];
+			time_t time_limit;
+		} v1;
+	} info;
 };
 
 #if !defined(__linux__)
@@ -102,6 +112,10 @@ static void usage(char *app)
 	printf("\n");
 	printf("Where possible actions are:\n");
 	printf("\n");
+	printf(C_HIGHLIGHT "  -r, --revision=FILE_FORMAT_VERSION" C_NORMAL
+		"\n");
+	printf("       Revision of license to create (default: %d)\n",
+		FILE_FORMAT_VERSION);
 	printf(C_HIGHLIGHT "  -c, --create=FILE_NAME" C_NORMAL "\n");
 	printf("       Create a license file with the following options:\n");
 	printf(C_HIGHLIGHT "       -k, --key=PRIVATE_KEY" C_NORMAL "\n");
@@ -194,17 +208,40 @@ static int is_str_prefix(char *s1, char *s2)
 	return !strncmp(s1, s2, strlen(s1));
 }
 
+static int is_compabile(char option, struct code2str_t *compat, u64 version)
+{
+	char *compat_str = code2str(compat, (int)version);
+
+	if (!compat_str)
+		return 0;
+
+	if (!strchr(compat_str, option)) {
+		rsa_error_message(RSA_ERR_REVISION, "option %s is not "
+			"compatible with version %d", option, version);
+
+		return 0;
+	}
+
+	return 1;
+}
+
 static int parse_args(int argc, char **argv, uint64_t *action,
 		char key[FILE_NAME_MAX_LENGTH],
 		char license[FILE_NAME_MAX_LENGTH],
-		char vendor_name[VENDOR_NAME_MAX_LENGTH], time_t *time_limit)
+		struct rsa_license_data *data)
 {
-	char *optstring = "h:c:i:xk:v:u:t:d:";
+	char *optstring = "hr:c:i:xk:v:u:t:d:";
 	struct option longopts[] = {
 		{
 			.name = "help",
 			.val = 'h',
 			.has_arg = no_argument,
+			.flag = NULL,
+		},
+		{
+			.name = "revision",
+			.val = 'r',
+			.has_arg = required_argument,
 			.flag = NULL,
 		},
 		{
@@ -257,23 +294,72 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 		},
 		{ 0, 0, 0, 0 }
 	};
+	struct code2str_t compat[] = {
+		{ 0, "hcixk" },      /* compatible for all versions: */
+		{ 1, "vutd" },       /* compabible options for v1: */
+		{ -1, "" },
+	};
 	uint64_t flags = 0;
 	int opt;
 	char *endptr;
 	int time_limit_unit = SECONDS_IN_MONTH;
 	int time_limit_multiple = 0;
 	char *app = basename(argv[0]);
+	int i;
+
+	/* version 1 data */
+	char *vendor_name = NULL;
+	time_t *time_limit = NULL;
 
 	*action = 0;
 	memset(license, 0, FILE_NAME_MAX_LENGTH);
-	memset(vendor_name, 0, VENDOR_NAME_MAX_LENGTH);
-	*time_limit = 0;
+	data->version = FILE_FORMAT_VERSION;
+
+	for (i = 0; i < argc; i++) {
+		u64 version;
+
+		if (strncmp(argv[i], "-r", 2) &&
+				strncmp(argv[i], "--revision", 10)) {
+			continue;
+		}
+
+		if (i == argc - 1) {
+			rsa_error_message(RSA_ERR_REVISION, "no argument");
+			return -1;
+		}
+
+		version = strtol(argv[i + 1], &endptr, 10);
+		if (*endptr || version < 1 || FILE_FORMAT_VERSION < version) {
+			rsa_error_message(RSA_ERR_REVISION, argv[i + 1]);
+			return -1;
+		}
+
+		data->version = version;
+		break;
+	}
+
+	switch (data->version) {
+	case 1:
+		vendor_name = data->info.v1.vendor_name;
+		time_limit = &data->info.v1.time_limit;
+
+		snprintf(vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
+			VENDOR_NAME_DEFAULT);
+		*time_limit = 0;
+		break;
+	default:
+		return -1;
+		break;
+	}
 
 	while ((opt = getopt_long(argc, argv, optstring, longopts, NULL)) !=
 			-1) {
 		switch (opt) {
 		case 'h':
 			OPT_ADD_ACTION(flags, RSA_OPT_LIC_HELP, *action);
+			break;
+		case 'r':
+			OPT_ADD(flags, RSA_OPT_LIC_REVISION);
 			break;
 		case 'c':
 			OPT_ADD_ACTION(flags, RSA_OPT_LIC_CREATE, *action);
@@ -293,11 +379,13 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 				optarg);
 			break;
 		case 'v':
+			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
 			OPT_ADD(flags, RSA_OPT_LIC_VENDOR);
 			snprintf(vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
 				optarg);
 			break;
 		case 'u':
+			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
 			OPT_ADD(flags, RSA_OPT_LIC_TIME_UNIT);
 			if (is_str_prefix(optarg, TU_VAL_DAY)) {
 				time_limit_unit = SECONDS_IN_DAY;
@@ -313,6 +401,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 			}
 			break;
 		case 't':
+			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
 			OPT_ADD(flags, RSA_OPT_LIC_TIME_LIMIT);
 			time_limit_multiple = strtol(optarg, &endptr, 10);
 			if (*endptr) {
@@ -321,6 +410,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 			}
 			break;
 		case 'd':
+			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
 			OPT_ADD(flags, RSA_OPT_LIC_DATE);
 			if (extract_date_arg(optarg, time_limit))
 				return -1;
@@ -372,6 +462,44 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 	return 0;
 }
 
+static char *time_t_to_str(time_t time_limit)
+{
+	static char stime[50];
+
+	if (time_limit) {
+		time_t last_day = time_limit;
+
+		strftime(stime, sizeof(stime),"%d %b, %Y",
+			localtime(&last_day));
+	} else {
+		snprintf(stime, sizeof(stime), "Unlimited");
+	}
+
+	return stime;
+}
+
+static time_t round_up_end_of_day_localtime(time_t time_limit)
+{
+	time_t gmt_ts, eod_ts;
+	struct tm time_info_gmt;
+	time_t gmt_offset;
+
+	if (!time_limit)
+		return 0;
+
+	GMTIME_R(&time_limit, &time_info_gmt);
+	time_info_gmt.tm_isdst = -1;
+	gmt_ts = mktime(&time_info_gmt);
+	if ((int)gmt_ts == -1)
+		return (time_t)-1;
+
+	gmt_offset = time_limit - gmt_ts;
+	eod_ts = ROUND_UP(time_limit + gmt_offset, SECONDS_IN_DAY) -
+		gmt_offset - 1;
+
+	return eod_ts;
+}
+
 static int rsa_encrypt_format_version(char **buf, size_t *len, u64 version)
 {
 	size_t new_len = *len + sizeof(u64);
@@ -420,7 +548,7 @@ static int rsa_encrypt_time_limit(char **buf, size_t *len, time_t time_limit)
 }
 
 /*
- * Specific license file format:
+ * Specific license file format v1:
  *
  * +----------+----------------------------+
  * | Type     | Semantic                   |
@@ -430,6 +558,31 @@ static int rsa_encrypt_time_limit(char **buf, size_t *len, time_t time_limit)
  * | time_t   | time limit                 |
  * +----------+----------------------------+
  */
+static int rsa_license_create_cb_v1(char **buf, size_t *len,
+		struct rsa_license_data *license_data)
+{
+	if (rsa_encrypt_vendor_name(buf, len,
+			license_data->info.v1.vendor_name)) {
+		printf("failed to encrypt vendor name: %s\n",
+			license_data->info.v1.vendor_name);
+		return -1;
+	}
+
+	if (rsa_encrypt_time_limit(buf, len,
+			license_data->info.v1.time_limit)) {
+		printf("failed to encrypt time limit: " TIME_LIMIT_FMT "\n",
+			license_data->info.v1.time_limit);
+		return -1;
+	}
+
+	printf("  Vendor name: %s\n", license_data->info.v1.vendor_name);
+	printf("  Valid through: %s\n",
+		time_t_to_str(round_up_end_of_day_localtime(
+			license_data->info.v1.time_limit)));
+
+	return 0;
+}
+
 static int rsa_license_create_cb(char **buf, size_t *len, void *data)
 {
 	char *_buf = NULL;
@@ -442,20 +595,21 @@ static int rsa_license_create_cb(char **buf, size_t *len, void *data)
 		goto error;
 	}
 
-	if (rsa_encrypt_vendor_name(&_buf, &_len, license_data->vendor_name)) {
-		printf("failed to encrypt vendor name: %s\n",
-			license_data->vendor_name);
-		goto error;
-	}
+	printf("  License format version: %llu\n", license_data->version);
 
-	if (rsa_encrypt_time_limit(&_buf, &_len, license_data->time_limit)) {
-		printf("failed to encrypt time limit: " TIME_LIMIT_FMT "\n",
-			license_data->time_limit);
-		goto error;
+	switch (license_data->version) {
+	case 1:
+		if (rsa_license_create_cb_v1(&_buf, &_len, license_data))
+			goto error;
+		break;
+	default:
+			goto error;
+		break;
 	}
 
 	*buf = _buf;
 	*len = _len;
+
 	return 0;
 
 error:
@@ -523,37 +677,6 @@ static int rsa_info_vendor_name(char **buf, size_t *len)
 	return 0;
 }
 
-static int rsa_extract_vendor_name(char **buf, size_t *len,
-		struct rsa_license_data *data)
-{
-	if (rsa_decrypt_vendor_name(buf, len, data->vendor_name))
-		return -1;
-
-	return 0;
-}
-
-static time_t round_up_end_of_day_localtime(time_t time_limit)
-{
-	time_t gmt_ts, eod_ts;
-	struct tm time_info_gmt;
-	time_t gmt_offset;
-
-	if (!time_limit)
-		return 0;
-
-	GMTIME_R(&time_limit, &time_info_gmt);
-	time_info_gmt.tm_isdst = -1;
-	gmt_ts = mktime(&time_info_gmt);
-	if ((int)gmt_ts == -1)
-		return (time_t)-1;
-
-	gmt_offset = time_limit - gmt_ts;
-	eod_ts = ROUND_UP(time_limit + gmt_offset, SECONDS_IN_DAY) -
-		gmt_offset - 1;
-
-	return eod_ts;
-}
-
 static int rsa_decrypt_time_limit(char **buf, size_t *len, time_t *time_limit)
 {
 	time_t abs_ts;
@@ -574,22 +697,6 @@ static int rsa_decrypt_time_limit(char **buf, size_t *len, time_t *time_limit)
 	return 0;
 }
 
-static char *time_t_to_str(time_t time_limit)
-{
-	static char stime[50];
-
-	if (time_limit) {
-		time_t last_day = time_limit;
-
-		strftime(stime, sizeof(stime),"%d %b, %Y",
-			localtime(&last_day));
-	} else {
-		snprintf(stime, sizeof(stime), "Unlimited");
-	}
-
-	return stime;
-}
-
 static int rsa_info_time_limit(char **buf, size_t *len)
 {
 	time_t time_limit;
@@ -598,15 +705,6 @@ static int rsa_info_time_limit(char **buf, size_t *len)
 		return -1;
 
 	printf("Valid through: %s\n", time_t_to_str(time_limit));
-	return 0;
-}
-
-static int rsa_extract_time_limit(char **buf, size_t *len,
-		struct rsa_license_data *data)
-{
-	if (rsa_decrypt_time_limit(buf, len, &data->time_limit))
-		return -1;
-
 	return 0;
 }
 
@@ -657,6 +755,18 @@ static int rsa_license_info_cb(char *buf, size_t len)
 	return ret;
 }
 
+static int rsa_license_extract_cb_v1(char **buf, size_t *len,
+		struct rsa_license_data *lic_data)
+{
+	if (rsa_decrypt_vendor_name(buf, len, lic_data->info.v1.vendor_name))
+		return -1;
+
+	if (rsa_decrypt_time_limit(buf, len, &lic_data->info.v1.time_limit))
+		return -1;
+
+	return 0;
+}
+
 static int rsa_license_extract_cb(char *buf, size_t len, void *data)
 {
 	struct rsa_license_data *lic_data = (struct rsa_license_data*)data;
@@ -664,11 +774,12 @@ static int rsa_license_extract_cb(char *buf, size_t len, void *data)
 	if (rsa_extract_version(&buf, &len, lic_data))
 		return -1;
 
-	if (rsa_extract_vendor_name(&buf, &len, lic_data))
+	switch (lic_data->version) {
+	case 1:
+		return rsa_license_extract_cb_v1(&buf, &len, lic_data);
+	default:
 		return -1;
-
-	if (rsa_extract_time_limit(&buf, &len, lic_data))
-		return -1;
+	}
 
 	return 0;
 }
@@ -940,10 +1051,10 @@ int license_test(void)
 	int ret = -1;
 
 	/* test license create */
-	license_data.version = FILE_FORMAT_VERSION;
-	snprintf(license_data.vendor_name, VENDOR_NAME_MAX_LENGTH,
+	license_data.version = 1;
+	snprintf(license_data.info.v1.vendor_name, VENDOR_NAME_MAX_LENGTH,
 		"Ilan Smith");
-	license_data.time_limit = get_time_limit(1);
+	license_data.info.v1.time_limit = get_time_limit(1);
 
 	init.type = RSA_STREAM_TYPE_MEMORY;
 	init.params.memory.buf = private_key_test;
@@ -980,9 +1091,9 @@ int license_test(void)
 		goto exit;
 	}
 	printf("file format version extract: %llu\n", license_data.version);
-	printf("vendor name extract: %s\n", license_data.vendor_name);
+	printf("vendor name extract: %s\n", license_data.info.v1.vendor_name);
 	printf("valid through extract: 0x" TIME_LIMIT_FMT "\n",
-		license_data.time_limit);
+		license_data.info.v1.time_limit);
 
 	ret = 0;
 
@@ -1141,38 +1252,25 @@ static int license_info(char key_path[FILE_NAME_MAX_LENGTH],
 
 static int license_create(char private_key[FILE_NAME_MAX_LENGTH],
 		char license[FILE_NAME_MAX_LENGTH],
-		char vendor_name[VENDOR_NAME_MAX_LENGTH], time_t time_limit)
+		struct rsa_license_data *license_data)
 {
 	struct rsa_license_ops licnese_ops = {
 		rsa_license_create_cb,
 		rsa_license_info_cb,
 		rsa_license_extract_cb,
 	};
-	struct rsa_license_data license_data;
 	struct rsa_stream_init init;
 	int ret;
 
 	/* test license create */
-	license_data.version = FILE_FORMAT_VERSION;
-	snprintf(license_data.vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
-		vendor_name[0] ? vendor_name : VENDOR_NAME_DEFAULT);
-	license_data.time_limit = time_limit;
-
 	init.type = RSA_STREAM_TYPE_FILE;
 	init.params.file.path = private_key;
 	init.params.file.mode = "rb";
-	ret = rsa_license_create(&init, license, &licnese_ops, &license_data);
+	ret = rsa_license_create(&init, license, &licnese_ops, license_data);
 	if (ret) {
 		printf("rsa_license_create() failed\n");
 		return -1;
 	}
-
-	printf("Created license %s:\n", license);
-	printf("  License format version: %llu\n", license_data.version);
-	printf("  Vendor name: %s\n", license_data.vendor_name);
-	printf("  Valid through: %s\n",
-		time_t_to_str(round_up_end_of_day_localtime(
-			license_data.time_limit)));
 	return 0;
 
 }
@@ -1183,15 +1281,12 @@ int main(int argc, char **argv)
 	uint64_t action;
 	char key[FILE_NAME_MAX_LENGTH] = { 0 };
 	char license[FILE_NAME_MAX_LENGTH];
-	char vendor_name[VENDOR_NAME_MAX_LENGTH];
-	time_t time_limit;
+	struct rsa_license_data data;
 
 	rsa_license_init();
 
-	if (parse_args(argc, argv, &action, key, license, vendor_name,
-			&time_limit)) {
+	if (parse_args(argc, argv, &action, key, license, &data))
 		return -1;
-	}
 
 	switch (action) {
 	case OPT_FLAG(RSA_OPT_LIC_HELP):
@@ -1199,7 +1294,7 @@ int main(int argc, char **argv)
 		ret = 0;
 		break;
 	case OPT_FLAG(RSA_OPT_LIC_CREATE):
-		ret = license_create(key, license, vendor_name, time_limit);
+		ret = license_create(key, license, &data);
 		break;
 	case OPT_FLAG(RSA_OPT_LIC_INFO):
 		ret = license_info(key, license);

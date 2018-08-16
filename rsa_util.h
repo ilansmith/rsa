@@ -46,6 +46,7 @@ typedef enum {
 
 typedef enum {
 	RSA_ERR_NONE,
+	RSA_ERR_REVISION,
 	RSA_ERR_ARGREP,
 	RSA_ERR_ARGNAN,
 	RSA_ERR_TIMUNIT,
