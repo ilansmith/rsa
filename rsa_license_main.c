@@ -19,8 +19,10 @@
 #define SSCANF sscanf_s
 #endif
 
-#define FILE_FORMAT_VERSION 1
+#define FILE_FORMAT_VERSION 2
 #define VENDOR_NAME_MAX_LENGTH 64
+#define EXPIRY_DATE_LENGTH (8 * sizeof(char))
+#define EXPIRY_DATE_LENGTH_STR (EXPIRY_DATE_LENGTH + 1)
 #define VENDOR_NAME_DEFAULT "Ilan Smith"
 #define FILE_NAME_MAX_LENGTH 256
 
@@ -93,6 +95,10 @@ struct rsa_license_data {
 			char vendor_name[VENDOR_NAME_MAX_LENGTH];
 			time_t time_limit;
 		} v1;
+		struct {
+			char vendor_name[VENDOR_NAME_MAX_LENGTH];
+			char expiry_date[EXPIRY_DATE_LENGTH_STR];
+		} v2;
 	} info;
 };
 
@@ -116,6 +122,7 @@ static void usage(char *app)
 		"\n");
 	printf("       Revision of license to create (default: %d)\n",
 		FILE_FORMAT_VERSION);
+	printf("\n");
 	printf(C_HIGHLIGHT "  -c, --create=FILE_NAME" C_NORMAL "\n");
 	printf("       Create a license file with the following options:\n");
 	printf(C_HIGHLIGHT "       -k, --key=PRIVATE_KEY" C_NORMAL "\n");
@@ -135,6 +142,7 @@ static void usage(char *app)
 	printf(C_HIGHLIGHT "       -d, --date=DDMMYYYY" C_NORMAL "\n");
 	printf("            Expiry date. Mutual exclusive with -u/--unit and "
 			"-t/--time-limit\n");
+	printf("\n");
 	printf(C_HIGHLIGHT "  -i, --info=FILE_NAME.lic" C_NORMAL "\n");
 	printf("       Extract license information with possible option:\n");
 	printf(C_HIGHLIGHT "       -k, --key=PUBLIC_KEY" C_NORMAL "\n");
@@ -147,49 +155,74 @@ static void usage(char *app)
 	printf("       Print this information and exit\n");
 }
 
-static int extract_date_arg(char *date_str, time_t *time)
+static int sscanf_date(char *date_str, unsigned short *day,
+		unsigned short *month, unsigned short *year)
 {
-	unsigned short year;
-	unsigned short month;
-	unsigned short day;
-	int is_leap_year;
 	int ret;
-	struct tm tm = { 0 };
-	int days_in_month[12] = {
-		31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
-	};
 
-	if (strnlen(date_str, 9) != 8) {
-		printf("date string too long: %s\n", date_str);
-		return -1;
-	}
-
-	ret = SSCANF(date_str, "%2hu%2hu%4hu", &day, &month, &year);
+	ret = SSCANF(date_str, "%2hu%2hu%4hu", day, month, year);
 	if (ret != 3) {
 		printf("failed to scan date %d elements\n", ret);
 		return -1;
 	}
 
-	if (!year && !month && !day) {
-		*time = 0;
+	return 0;
+}
+
+static int is_valid_expiry_date(char *date_str)
+{
+	unsigned short year;
+	unsigned short month;
+	unsigned short day;
+	int is_leap_year;
+	int days_in_month[12] = {
+		31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+	};
+
+	if (strnlen(date_str, 9) != 8) {
+		printf("date string does not have format DDMMYYYY: %s\n",
+			date_str);
 		return 0;
 	}
 
-	is_leap_year = ((year & ((unsigned short)~0)<<2) == year) &&
+	if (sscanf_date(date_str, &day, &month, &year))
+		return 0;
+
+	if (!year && !month && !day)
+		return 1; /* Unlimited */
+
+	/* A leap year occurs in years which are multiples of 4 with the
+	 * exception of years divisible by 100 but not by 400 */
+	is_leap_year = ((~year & 0x3) == 0x3) &&
 		((year % 100) || !(year % 400));
 	if (year < 1970) {
 		printf("year is less than 1970: %hu\n", year);
-		return -1;
+		return 0;
 	}
 	if (month < 1 || 12 < month) {
 		printf("month is not between 1 and 12: %hu\n", month);
-		return -1;
+		return 0;
 	}
 	if ((day < 1 || days_in_month[month - 1] < day) && (!is_leap_year ||
 			month != 2 || day != days_in_month[1] + 1)) {
 		printf("day is out of range: %hu\n", day);
-		return -1;
+		return 0;
 	}
+
+	return 1;
+}
+
+static time_t extract_date_arg(char *date_str)
+{
+	unsigned short year;
+	unsigned short month;
+	unsigned short day;
+	struct tm tm;
+
+	/* used after sscanf() is known to succeed */
+	sscanf_date(date_str, &day, &month, &year);
+	if (!day && !month && !year)
+		return 0;
 
 	memset(&tm, 0, sizeof(struct tm));
 	tm.tm_sec = 59;
@@ -199,8 +232,7 @@ static int extract_date_arg(char *date_str, time_t *time)
 	tm.tm_mon = month - 1;
 	tm.tm_year = year - 1900;
 
-	*time = mktime(&tm);
-	return 0;
+	return mktime(&tm);
 }
 
 static int is_str_prefix(char *s1, char *s2)
@@ -297,6 +329,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 	struct code2str_t compat[] = {
 		{ 0, "hcixk" },      /* compatible for all versions: */
 		{ 1, "vutd" },       /* compabible options for v1: */
+		{ 2, "vutd" },       /* compabible options for v1: */
 		{ -1, "" },
 	};
 	uint64_t flags = 0;
@@ -310,6 +343,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 	/* version 1 data */
 	char *vendor_name = NULL;
 	time_t *time_limit = NULL;
+	char *expiry_date = NULL;
 
 	*action = 0;
 	memset(license, 0, FILE_NAME_MAX_LENGTH);
@@ -347,9 +381,16 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 			VENDOR_NAME_DEFAULT);
 		*time_limit = 0;
 		break;
+	case 2:
+		vendor_name = data->info.v2.vendor_name;
+		expiry_date = data->info.v2.expiry_date;
+
+		snprintf(vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
+			VENDOR_NAME_DEFAULT);
+		snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR, "00000000");
+		break;
 	default:
 		return -1;
-		break;
 	}
 
 	while ((opt = getopt_long(argc, argv, optstring, longopts, NULL)) !=
@@ -411,9 +452,23 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 			break;
 		case 'd':
 			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
-			OPT_ADD(flags, RSA_OPT_LIC_DATE);
-			if (extract_date_arg(optarg, time_limit))
+
+			if (!is_valid_expiry_date(optarg))
 				return -1;
+
+			OPT_ADD(flags, RSA_OPT_LIC_DATE);
+
+			switch (data->version) {
+			case 1:
+				*time_limit = extract_date_arg(optarg);
+				break;
+			case 2:
+				snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR,
+					"%s", optarg);
+				break;
+			default:
+				return -1;
+			}
 			break;
 		default:
 			usage(app);
@@ -440,8 +495,8 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 		return -1;
 	}
 
-	if (flags & (OPT_FLAG(RSA_OPT_LIC_DATE) &
-			(OPT_FLAG(RSA_OPT_LIC_TIME_UNIT) |
+	if ((flags & OPT_FLAG(RSA_OPT_LIC_DATE)) &&
+			(flags & (OPT_FLAG(RSA_OPT_LIC_TIME_UNIT) |
 			OPT_FLAG(RSA_OPT_LIC_TIME_LIMIT)))) {
 		rsa_error_message(RSA_ERR_ARGCONFLICT);
 		usage(app);
@@ -455,8 +510,23 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 	}
 
 	if (time_limit_multiple) {
-		*time_limit = time(NULL) + SECONDS_IN_DAY +
+		time_t t = time(NULL) + SECONDS_IN_DAY +
 			time_limit_multiple * time_limit_unit;
+		struct tm tm;
+
+		switch (data->version) {
+		case 1:
+			*time_limit = t;
+			break;
+		case 2:
+			GMTIME_R(&t, &tm);
+			snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR,
+				"%02u%02u%04u", tm.tm_mday, tm.tm_mon + 1,
+				tm.tm_year + 1900);
+			break;
+		default:
+			return -1;
+		}
 	}
 
 	return 0;
@@ -583,6 +653,57 @@ static int rsa_license_create_cb_v1(char **buf, size_t *len,
 	return 0;
 }
 
+static int rsa_encrypt_expiry_date(char **buf, size_t *len, char *date)
+{
+	size_t new_len = *len + EXPIRY_DATE_LENGTH;
+
+	if (!(*buf = (char*)realloc(*buf, new_len)))
+		return -1;
+
+	memcpy(*buf + *len, date, EXPIRY_DATE_LENGTH);
+
+	*len = new_len;
+	return 0;
+}
+
+/*
+ * Specific license file format v2:
+ *
+ * +----------+----------------------------+
+ * | Type     | Semantic                   |
+ * +----------+----------------------------+
+ * | u64      | file format version        |
+ * | char[64] | vendor name                |
+ * | char[8]  | exipry date as: DDMMYYYY   |
+ * +----------+----------------------------+
+ */
+static int rsa_license_create_cb_v2(char **buf, size_t *len,
+		struct rsa_license_data *license_data)
+{
+	time_t time_limit;
+
+	if (rsa_encrypt_vendor_name(buf, len,
+			license_data->info.v2.vendor_name)) {
+		printf("failed to encrypt vendor name: %s\n",
+			license_data->info.v2.vendor_name);
+		return -1;
+	}
+
+	if (rsa_encrypt_expiry_date(buf, len,
+			license_data->info.v2.expiry_date)) {
+		printf("failed to encrypt expiry date: %s\n",
+			license_data->info.v2.expiry_date);
+		return -1;
+	}
+
+	time_limit = extract_date_arg(license_data->info.v2.expiry_date);
+	printf("  Vendor name: %s\n", license_data->info.v2.vendor_name);
+	printf("  Valid through: %s\n",
+		time_t_to_str(round_up_end_of_day_localtime(time_limit)));
+
+	return 0;
+}
+
 static int rsa_license_create_cb(char **buf, size_t *len, void *data)
 {
 	char *_buf = NULL;
@@ -602,9 +723,12 @@ static int rsa_license_create_cb(char **buf, size_t *len, void *data)
 		if (rsa_license_create_cb_v1(&_buf, &_len, license_data))
 			goto error;
 		break;
-	default:
+	case 2:
+		if (rsa_license_create_cb_v2(&_buf, &_len, license_data))
 			goto error;
 		break;
+	default:
+		goto error;
 	}
 
 	*buf = _buf;
@@ -723,6 +847,44 @@ static int rsa_license_info_parse_v1(char **buf, size_t *len)
 	return 0;
 }
 
+static int rsa_decrypt_expiry_date(char **buf, size_t *len,
+		char date[EXPIRY_DATE_LENGTH_STR])
+{
+	snprintf(date, EXPIRY_DATE_LENGTH_STR, "%s", *buf);
+
+	*buf += EXPIRY_DATE_LENGTH * sizeof(char);
+	*len -= EXPIRY_DATE_LENGTH * sizeof(char);
+	return 0;
+}
+
+static int rsa_info_expirty_date(char **buf, size_t *len)
+{
+	char date[EXPIRY_DATE_LENGTH_STR];
+	time_t time_limit;
+
+	if (rsa_decrypt_expiry_date(buf, len, date))
+		return -1;
+
+	time_limit = extract_date_arg(date);
+	printf("Valid through: %s\n", time_t_to_str(time_limit));
+	return 0;
+}
+
+static int rsa_license_info_parse_v2(char **buf, size_t *len)
+{
+	if (rsa_info_vendor_name(buf, len)) {
+		printf("Could not extract vendor name\n");
+		return -1;
+	}
+
+	if (rsa_info_expirty_date(buf, len)) {
+		printf("Could not extract expirty date\n");
+		return -1;
+	}
+
+	return 0;
+}
+
 static int rsa_license_info_cb(char *buf, size_t len)
 {
 	u64 version = 0;
@@ -737,6 +899,9 @@ static int rsa_license_info_cb(char *buf, size_t len)
 	{
 	case 1:
 		ret = rsa_license_info_parse_v1(&buf, &len);
+		break;
+	case 2:
+		ret = rsa_license_info_parse_v2(&buf, &len);
 		break;
 	default:
 		if (!version) {
@@ -767,6 +932,18 @@ static int rsa_license_extract_cb_v1(char **buf, size_t *len,
 	return 0;
 }
 
+static int rsa_license_extract_cb_v2(char **buf, size_t *len,
+		struct rsa_license_data *lic_data)
+{
+	if (rsa_decrypt_vendor_name(buf, len, lic_data->info.v2.vendor_name))
+		return -1;
+
+	if (rsa_decrypt_expiry_date(buf, len, lic_data->info.v2.expiry_date))
+		return -1;
+
+	return 0;
+}
+
 static int rsa_license_extract_cb(char *buf, size_t len, void *data)
 {
 	struct rsa_license_data *lic_data = (struct rsa_license_data*)data;
@@ -777,6 +954,8 @@ static int rsa_license_extract_cb(char *buf, size_t len, void *data)
 	switch (lic_data->version) {
 	case 1:
 		return rsa_license_extract_cb_v1(&buf, &len, lic_data);
+	case 2:
+		return rsa_license_extract_cb_v2(&buf, &len, lic_data);
 	default:
 		return -1;
 	}
