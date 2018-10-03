@@ -8,6 +8,7 @@
 #include "getopt.h"
 #endif
 #include "rsa_license.h"
+#include "rsa_license_product.h"
 
 #if defined(__linux__)
 #define TIME_LIMIT_FMT "%lu"
@@ -19,7 +20,7 @@
 #define SSCANF sscanf_s
 #endif
 
-#define FILE_FORMAT_VERSION 2
+#define FILE_FORMAT_VERSION 3
 #define VENDOR_NAME_MAX_LENGTH 64
 #define EXPIRY_DATE_LENGTH (8 * sizeof(char))
 #define EXPIRY_DATE_LENGTH_STR (EXPIRY_DATE_LENGTH + 1)
@@ -71,6 +72,7 @@
 typedef enum {
 	/* actions */
 	RSA_OPT_LIC_HELP,
+	RSA_OPT_LIC_PRODUCTS_LIST,
 	RSA_OPT_LIC_REVISION,
 	RSA_OPT_LIC_CREATE,
 	RSA_OPT_LIC_INFO,
@@ -78,6 +80,7 @@ typedef enum {
 
 	/* license creation data */
 	RSA_OPT_LIC_VENDOR,
+	RSA_OPT_LIC_PRODUCTS,
 	RSA_OPT_LIC_TIME_UNIT,
 	RSA_OPT_LIC_TIME_LIMIT,
 	RSA_OPT_LIC_DATE,
@@ -87,6 +90,12 @@ typedef enum {
 	RSA_OPT_LIC_LICENSE,
 	RSA_OPT_MAX
 } rsa_opt_t;
+
+struct product {
+	char name[PRODUCT_NAME_LEN_MAX];
+	u64 version;
+	uint64_t features;
+};
 
 struct rsa_license_data {
 	u64 version;
@@ -99,6 +108,11 @@ struct rsa_license_data {
 			char vendor_name[VENDOR_NAME_MAX_LENGTH];
 			char expiry_date[EXPIRY_DATE_LENGTH_STR];
 		} v2;
+		struct {
+			struct product product;
+			char vendor_name[VENDOR_NAME_MAX_LENGTH];
+			char expiry_date[EXPIRY_DATE_LENGTH_STR];
+		} v3;
 	} info;
 };
 
@@ -117,6 +131,11 @@ static void usage(char *app)
 	printf("Usage: %s [ACTION] [OPTIONS]\n", app);
 	printf("\n");
 	printf("Where possible actions are:\n");
+	printf("\n");
+	printf(C_HIGHLIGHT "  -l, --list[=product]" C_NORMAL "\n");
+	printf("            List licensable products. If product is "
+		"provided, Its licensable\n");
+	printf("            features per license version are displayed\n");
 	printf("\n");
 	printf(C_HIGHLIGHT "  -r, --revision=FILE_FORMAT_VERSION" C_NORMAL
 		"\n");
@@ -262,12 +281,18 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 		char license[FILE_NAME_MAX_LENGTH],
 		struct rsa_license_data *data)
 {
-	char *optstring = "hr:c:i:xk:v:u:t:d:";
+	char *optstring = "hr:c:i:xl::k:v:p:u:t:d:";
 	struct option longopts[] = {
 		{
 			.name = "help",
 			.val = 'h',
 			.has_arg = no_argument,
+			.flag = NULL,
+		},
+		{
+			.name = "list",
+			.val = 'l',
+			.has_arg = optional_argument,
 			.flag = NULL,
 		},
 		{
@@ -307,6 +332,12 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 			.flag = NULL,
 		},
 		{
+			.name = "product",
+			.val = 'p',
+			.has_arg = required_argument,
+			.flag = NULL,
+		},
+		{
 			.name = "unit",
 			.val = 'u',
 			.has_arg = required_argument,
@@ -328,8 +359,9 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 	};
 	struct code2str_t compat[] = {
 		{ 0, "hcixk" },      /* compatible for all versions: */
-		{ 1, "vutd" },       /* compabible options for v1: */
-		{ 2, "vutd" },       /* compabible options for v1: */
+		{ 1, "vutd" },       /* compabible options for v1 */
+		{ 2, "vutd" },       /* compabible options for v2 */
+		{ 3, "vutdlp" },     /* compabible options for v3 */
 		{ -1, "" },
 	};
 	uint64_t flags = 0;
@@ -340,7 +372,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 	char *app = basename(argv[0]);
 	int i;
 
-	/* version 1 data */
+	struct product *product = NULL;
 	char *vendor_name = NULL;
 	time_t *time_limit = NULL;
 	char *expiry_date = NULL;
@@ -389,6 +421,15 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 			VENDOR_NAME_DEFAULT);
 		snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR, "00000000");
 		break;
+	case 3:
+		product = &data->info.v3.product;
+		vendor_name = data->info.v3.vendor_name;
+		expiry_date = data->info.v3.expiry_date;
+
+		snprintf(vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
+			VENDOR_NAME_DEFAULT);
+		snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR, "00000000");
+		break;
 	default:
 		return -1;
 	}
@@ -398,6 +439,20 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 		switch (opt) {
 		case 'h':
 			OPT_ADD_ACTION(flags, RSA_OPT_LIC_HELP, *action);
+			break;
+		case 'l':
+			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
+			OPT_ADD_ACTION(flags, RSA_OPT_LIC_PRODUCTS_LIST,
+				*action);
+
+			if (!product)
+				return -1;
+
+			if (is_optional_argument(argc, argv, &optarg,
+					&optind)) {
+				strncpy(product->name, optarg,
+					PRODUCT_NAME_LEN_MAX - 1);
+			}
 			break;
 		case 'r':
 			OPT_ADD(flags, RSA_OPT_LIC_REVISION);
@@ -425,6 +480,15 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 			snprintf(vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
 				optarg);
 			break;
+#if 0
+		case 'p':
+			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
+			OPT_ADD(flags, RSA_OPT_LIC_PRODUCTS);
+
+			if (retrieve_products(optarg, products))
+				return -1;
+			break;
+#endif
 		case 'u':
 			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
 			OPT_ADD(flags, RSA_OPT_LIC_TIME_UNIT);
@@ -1454,6 +1518,11 @@ static int license_create(char private_key[FILE_NAME_MAX_LENGTH],
 
 }
 
+static int list_products(struct rsa_license_data *data)
+{
+	return license_list_products(data->info.v3.product.name);
+}
+
 int main(int argc, char **argv)
 {
 	int ret;
@@ -1471,6 +1540,9 @@ int main(int argc, char **argv)
 	case OPT_FLAG(RSA_OPT_LIC_HELP):
 		usage(basename(argv[0]));
 		ret = 0;
+		break;
+	case OPT_FLAG(RSA_OPT_LIC_PRODUCTS_LIST):
+		ret = list_products(&data);
 		break;
 	case OPT_FLAG(RSA_OPT_LIC_CREATE):
 		ret = license_create(key, license, &data);

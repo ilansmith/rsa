@@ -27,7 +27,7 @@ CONFFILE=rsa.mk
 LIB_RSA=librsa.a
 LIB_RSA_OBJS=rsa_num.o rsa_util.o rsa_stream.o
 LIB_RSA_LIC=librsalic.a
-LIB_RSA_LIC_OBJS=rsa_crc.o rsa_license.o
+LIB_RSA_LIC_OBJS=rsa_crc.o rsa_license.o rsa_license_product.o
 TARGET_RSA_TEST=rsa_test
 TARGET_RSA=rsa
 TARGET_RSA_ENC=rsa_enc
@@ -122,7 +122,9 @@ else # create rsa applications
     TARGET_OBJS_rsa_dec+=rsa_dec_main.o
   endif
 
-  TARGET_OBJS_rsa_license=rsa_license_main.o
+  TARGET_OBJS_rsa_license=rsa_license_main.o \
+			  rsa_license_product_encoder.o \
+			  rsa_license_product_encrypter.o
 endif
 
 %.o: %.c
