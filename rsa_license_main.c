@@ -1,5 +1,6 @@
 #include <time.h>
 #include <inttypes.h>
+#include <string.h>
 #if defined(__linux__)
 #include <unistd.h>
 #include <getopt.h>
@@ -53,6 +54,7 @@
 
 #define OPT_FLAG_LIC_DATA(flags) ((flags) & (OPT_FLAG(RSA_OPT_LIC_VENDOR) | \
 			OPT_FLAG(RSA_OPT_LIC_REVISION) | \
+			OPT_FLAG(RSA_OPT_LIC_PRODUCT) | \
 			OPT_FLAG(RSA_OPT_LIC_TIME_LIMIT) | \
 			OPT_FLAG(RSA_OPT_LIC_TIME_UNIT) | \
 			OPT_FLAG(RSA_OPT_LIC_DATE)))
@@ -79,8 +81,8 @@ typedef enum {
 	RSA_OPT_LIC_TEST,
 
 	/* license creation data */
+	RSA_OPT_LIC_PRODUCT,
 	RSA_OPT_LIC_VENDOR,
-	RSA_OPT_LIC_PRODUCTS,
 	RSA_OPT_LIC_TIME_UNIT,
 	RSA_OPT_LIC_TIME_LIMIT,
 	RSA_OPT_LIC_DATE,
@@ -146,6 +148,17 @@ static void usage(char *app)
 	printf("       Create a license file with the following options:\n");
 	printf(C_HIGHLIGHT "       -k, --key=PRIVATE_KEY" C_NORMAL "\n");
 	printf("            Private RSA key (required)\n");
+	printf(C_HIGHLIGHT "       -p, --product=PROD[,VER[,FEATURE]*]" C_NORMAL
+		"\n");
+	printf("            Set product and optionally feature a set for "
+		"licensing\n");
+	printf("            Where:\n");
+	printf("              PROD    - one of the products listed by "
+		"-l/--list\n");
+	printf("              VER     - one of the feature sets given by "
+		"-l/--list=PROD\n");
+	printf("              FEATURE - any of the features listed by "
+		"-l/--list=PROD\n");
 	printf(C_HIGHLIGHT "       -v, --vendor=VENDOR_NAME" C_NORMAL "\n");
 	printf("            Vendor being licensed (default: "
 		VENDOR_NAME_DEFAULT ")\n");
@@ -172,6 +185,119 @@ static void usage(char *app)
 	printf("\n");
 	printf(C_HIGHLIGHT "  -h, --help" C_NORMAL "\n");
 	printf("       Print this information and exit\n");
+}
+
+static int parse_product(struct product *product, char *fmt)
+{
+	int ret = -1;
+	char *ptr;
+	char **feature_list;
+	int feature_num;
+	int version_current;
+	int version;
+	struct license_product *license_product;
+	uint64_t features;
+	char *fmt_cpy;
+	size_t fmt_len;
+
+	fmt_len = strlen(fmt) + 1;
+	fmt_cpy = (char*)malloc(fmt_len);
+	if (!fmt_cpy)
+		return -1;
+
+	snprintf(fmt_cpy, fmt_len, "%s", fmt);
+
+	ptr = comma_separated_tok(fmt_cpy);
+	if (!ptr)
+		goto exit;
+
+	license_product = license_product_get_specific(ptr);
+	if (!license_product)
+		goto exit;
+
+	strncpy(product->name, license_product->name, PRODUCT_NAME_LEN_MAX - 1);
+	version_current = license_product_version(license_product);
+
+	ptr = comma_separated_tok(NULL);
+	if (!ptr || !*ptr) {
+		version = version_current;
+	} else {
+		char *endptr;
+
+		version = strtol(ptr, &endptr, 10);
+		if (*endptr) {
+			printf("Not a product version: %s\n", ptr);
+			goto exit;
+		}
+		if (version < 1 || version_current < version) {
+			printf("Bad product version: %d\n", version);
+			goto exit;
+		}
+	}
+
+	product->version = (u64)version;
+
+	feature_list = license_product_feature_list(license_product, version);
+	if (!feature_list) {
+		printf("Cannot retreive feature list of %s (feature set v%d)\n",
+			license_product->name, version);
+		goto exit;
+	}
+	feature_num = license_product_feature_num(license_product,
+		(int)product->version);
+
+	features = 0;
+	while ((ptr = comma_separated_tok(NULL))) {
+		int f;
+		int shift = -1;
+		int is_found;
+		size_t ptr_len = strlen(ptr);
+
+		if (!*ptr) {
+			printf("Badly formatted featrue list\n");
+			goto exit;
+		}
+
+		is_found = 0;
+		for (f = 0; f < feature_num; f++) {
+			int is_match;
+
+			if (strncasecmp(feature_list[f], ptr, ptr_len))
+				continue;
+
+			is_match = ptr_len == strlen(feature_list[f]);
+			if (is_found && !is_match) {
+				printf("Ambiguous prefix: %s (%s, %s)\n", ptr,
+					feature_list[shift], feature_list[f]);
+				goto exit;
+			}
+
+			is_found = 1;
+			shift = f;
+			if (is_match)
+				break;
+		}
+		if (!is_found) {
+			printf("Unsuported feature of %s (feature set v%d): "
+				"%s\n", license_product->name, version, ptr);
+			goto exit;
+		}
+		if (features & ((uint64_t)1 << shift)) {
+			printf("Duplicate feature request: %s\n", ptr);
+			goto exit;
+		}
+
+		features |= ((uint64_t)1 << shift);
+	}
+
+	if (features != ~(uint64_t)0)
+		product->features = features;
+
+	ret = 0;
+
+exit:
+	free(fmt_cpy);
+	return ret;
 }
 
 static int sscanf_date(char *date_str, unsigned short *day,
@@ -281,7 +407,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 		char license[FILE_NAME_MAX_LENGTH],
 		struct rsa_license_data *data)
 {
-	char *optstring = "hr:c:i:xl::k:v:p:u:t:d:";
+	char *optstring = "hr:c:i:xl::p:k:v:p:u:t:d:";
 	struct option longopts[] = {
 		{
 			.name = "help",
@@ -326,14 +452,14 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 			.flag = NULL,
 		},
 		{
-			.name = "vendor",
-			.val = 'v',
+			.name = "product",
+			.val = 'p',
 			.has_arg = required_argument,
 			.flag = NULL,
 		},
 		{
-			.name = "product",
-			.val = 'p',
+			.name = "vendor",
+			.val = 'v',
 			.has_arg = required_argument,
 			.flag = NULL,
 		},
@@ -426,6 +552,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 		vendor_name = data->info.v3.vendor_name;
 		expiry_date = data->info.v3.expiry_date;
 
+		memset(product, 0, sizeof(struct product));
 		snprintf(vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
 			VENDOR_NAME_DEFAULT);
 		snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR, "00000000");
@@ -452,6 +579,8 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 					&optind)) {
 				strncpy(product->name, optarg,
 					PRODUCT_NAME_LEN_MAX - 1);
+			} else {
+				*product->name = 0;
 			}
 			break;
 		case 'r':
@@ -474,21 +603,22 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 			snprintf(key, FILE_NAME_MAX_LENGTH, "%s",
 				optarg);
 			break;
+		case 'p':
+			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
+			OPT_ADD(flags, RSA_OPT_LIC_PRODUCT);
+
+			if (!product)
+				return -1;
+
+			if (parse_product(product, optarg))
+				return -1;
+			break;
 		case 'v':
 			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
 			OPT_ADD(flags, RSA_OPT_LIC_VENDOR);
 			snprintf(vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
 				optarg);
 			break;
-#if 0
-		case 'p':
-			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
-			OPT_ADD(flags, RSA_OPT_LIC_PRODUCTS);
-
-			if (retrieve_products(optarg, products))
-				return -1;
-			break;
-#endif
 		case 'u':
 			OPT_ASSERT_VERSION_COMPAT(opt, compat, data->version);
 			OPT_ADD(flags, RSA_OPT_LIC_TIME_UNIT);
@@ -527,6 +657,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 				*time_limit = extract_date_arg(optarg);
 				break;
 			case 2:
+			case 3:
 				snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR,
 					"%s", optarg);
 				break;
@@ -583,6 +714,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 			*time_limit = t;
 			break;
 		case 2:
+		case 3:
 			GMTIME_R(&t, &tm);
 			snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR,
 				"%02u%02u%04u", tm.tm_mday, tm.tm_mon + 1,
@@ -634,7 +766,7 @@ static time_t round_up_end_of_day_localtime(time_t time_limit)
 	return eod_ts;
 }
 
-static int rsa_encrypt_format_version(char **buf, size_t *len, u64 version)
+static int rsa_encrypt_version(char **buf, size_t *len, u64 version)
 {
 	size_t new_len = *len + sizeof(u64);
 
@@ -647,25 +779,117 @@ static int rsa_encrypt_format_version(char **buf, size_t *len, u64 version)
 	return 0;
 }
 
-static int rsa_encrypt_vendor_name(char **buf, size_t *len, char *vendor_name)
+static int rsa_encrypt_text(char **buf, size_t *len, char *text, int max_len)
 {
 	size_t new_len;
-	size_t name_len;
+	size_t text_len;
 	int i;
 
-	name_len = strlen(vendor_name);
-	if (VENDOR_NAME_MAX_LENGTH <= name_len)
+	text_len = strlen(text);
+	if ((size_t)max_len <= text_len)
 		return -1;
 
-	new_len = *len + VENDOR_NAME_MAX_LENGTH;
+	new_len = *len + max_len;
 	if (!(*buf = (char*)realloc(*buf, new_len)))
 		return -1;
 
-	for (i = 0; i < VENDOR_NAME_MAX_LENGTH; i++)
-		(*buf)[*len + i] = vendor_name[i % (name_len + 1)];
+	for (i = 0; i < max_len; i++)
+		(*buf)[*len + i] = text[i % (text_len + 1)];
 
 	*len = new_len;
 	return 0;
+}
+
+static int rsa_encrypt_product_name(char **buf, size_t *len, char *product_name)
+{
+	return rsa_encrypt_text(buf, len, product_name, PRODUCT_NAME_LEN_MAX);
+}
+
+static int rsa_encrypt_product_features(char **buf, size_t *len,
+		uint64_t features)
+{
+	size_t new_len = *len + sizeof(uint64_t);
+
+	if (!(*buf = (char*)realloc(*buf, new_len)))
+		return -1;
+
+	memcpy(*buf + *len, &features, sizeof(uint64_t));
+
+	*len = new_len;
+	return 0;
+}
+
+static int list_features(struct product *product)
+{
+	struct license_product *license_product;
+	char **features;
+	int feature_num;
+	int f;
+
+	license_product = license_product_get_specific(product->name);
+	if (!license_product)
+		return -1;
+
+	features = license_product_feature_list(license_product,
+			(int)product->version);
+	if (!features) {
+		printf("Unsupported license versionf for %s: %llu\n",
+				product->name, product->version);
+		return -1;
+	}
+
+	feature_num = license_product_feature_num(license_product,
+		(int)product->version);
+	for (f = 0; f < feature_num; f++) {
+		if (!(product->features & ((uint64_t)1 << f)))
+			continue;
+
+		printf("  %s\n", features[f]);
+	}
+
+	return 0;
+}
+
+static int rsa_encrypt_product(char **buf, size_t *len, struct product *product)
+{
+	if (rsa_encrypt_product_name(buf, len, product->name)) {
+		printf("failed to encrypt product name: %s\n", product->name);
+		return -1;
+	}
+
+	if (rsa_encrypt_version(buf, len, product->version)) {
+		printf("failed to encrypt product version: %llu\n",
+			product->version);
+		return -1;
+	}
+
+	if (rsa_encrypt_product_features(buf, len, product->features)) {
+		printf("failed to encrypt product name: %lu\n",
+			product->features);
+		return -1;
+	}
+
+	printf("Product: ");
+	if (!*product->name) {
+		printf("Unrestricted\n");
+		return 0;
+	}
+
+	printf("%s (feature set v%llu), ", product->name,
+		product->version);
+	if (!product->features) {
+		printf("full features\n");
+	} else {
+		printf("features:\n");
+		if (list_features(product))
+			return -1;
+	}
+	return 0;
+}
+
+static int rsa_encrypt_vendor_name(char **buf, size_t *len, char *vendor_name)
+{
+	return rsa_encrypt_text(buf, len, vendor_name, VENDOR_NAME_MAX_LENGTH);
 }
 
 static int rsa_encrypt_time_limit(char **buf, size_t *len, time_t time_limit)
@@ -709,8 +933,8 @@ static int rsa_license_create_cb_v1(char **buf, size_t *len,
 		return -1;
 	}
 
-	printf("  Vendor name: %s\n", license_data->info.v1.vendor_name);
-	printf("  Valid through: %s\n",
+	printf("Vendor name: %s\n", license_data->info.v1.vendor_name);
+	printf("Valid through: %s\n",
 		time_t_to_str(round_up_end_of_day_localtime(
 			license_data->info.v1.time_limit)));
 
@@ -761,8 +985,52 @@ static int rsa_license_create_cb_v2(char **buf, size_t *len,
 	}
 
 	time_limit = extract_date_arg(license_data->info.v2.expiry_date);
-	printf("  Vendor name: %s\n", license_data->info.v2.vendor_name);
-	printf("  Valid through: %s\n",
+	printf("Vendor name: %s\n", license_data->info.v2.vendor_name);
+	printf("Valid through: %s\n",
+		time_t_to_str(round_up_end_of_day_localtime(time_limit)));
+
+	return 0;
+}
+
+/*
+ * Specific license file format v3:
+ *
+ * +----------+----------------------------+
+ * | Type     | Semantic                   |
+ * +----------+----------------------------+
+ * | u64      | file format version        |
+ * | char[32] | product name               |
+ * | u64      | product version            |
+ * | uint64_t | product features           |
+ * | char[64] | vendor name                |
+ * | char[8]  | exipry date as: DDMMYYYY   |
+ * +----------+----------------------------+
+ */
+static int rsa_license_create_cb_v3(char **buf, size_t *len,
+		struct rsa_license_data *license_data)
+{
+	time_t time_limit;
+
+	if (rsa_encrypt_product(buf, len, &license_data->info.v3.product))
+		return -1;
+
+	if (rsa_encrypt_vendor_name(buf, len,
+			license_data->info.v3.vendor_name)) {
+		printf("failed to encrypt vendor name: %s\n",
+			license_data->info.v3.vendor_name);
+		return -1;
+	}
+
+	if (rsa_encrypt_expiry_date(buf, len,
+			license_data->info.v3.expiry_date)) {
+		printf("failed to encrypt expiry date: %s\n",
+			license_data->info.v3.expiry_date);
+		return -1;
+	}
+
+	time_limit = extract_date_arg(license_data->info.v3.expiry_date);
+	printf("Vendor name: %s\n", license_data->info.v3.vendor_name);
+	printf("Valid through: %s\n",
 		time_t_to_str(round_up_end_of_day_localtime(time_limit)));
 
 	return 0;
@@ -774,13 +1042,13 @@ static int rsa_license_create_cb(char **buf, size_t *len, void *data)
 	size_t _len = 0;
 	struct rsa_license_data *license_data = (struct rsa_license_data*)data;
 
-	if (rsa_encrypt_format_version(&_buf, &_len, license_data->version)) {
+	if (rsa_encrypt_version(&_buf, &_len, license_data->version)) {
 		printf("failed to encrypt file format version: %llu\n",
 			license_data->version);
 		goto error;
 	}
 
-	printf("  License format version: %llu\n", license_data->version);
+	printf("License format version: %llu\n", license_data->version);
 
 	switch (license_data->version) {
 	case 1:
@@ -789,6 +1057,10 @@ static int rsa_license_create_cb(char **buf, size_t *len, void *data)
 		break;
 	case 2:
 		if (rsa_license_create_cb_v2(&_buf, &_len, license_data))
+			goto error;
+		break;
+	case 3:
+		if (rsa_license_create_cb_v3(&_buf, &_len, license_data))
 			goto error;
 		break;
 	default:
@@ -838,19 +1110,76 @@ static int rsa_extract_version(char **buf, size_t *len,
 	return 0;
 }
 
-static int rsa_decrypt_vendor_name(char **buf, size_t *len,
-		char vendor_name[VENDOR_NAME_MAX_LENGTH])
+static int rsa_decrypt_text(char **buf, size_t *len, char *text, int text_len)
 {
 	int i;
 
-	if (*len < VENDOR_NAME_MAX_LENGTH)
+	if (*len < (size_t)text_len)
 		return -1;
 
-	for (i = 0; i < VENDOR_NAME_MAX_LENGTH; i++)
-		vendor_name[i] = (*buf)[i];
+	for (i = 0; i < text_len; i++)
+		text[i] = (*buf)[i];
 
-	*buf += VENDOR_NAME_MAX_LENGTH;
-	*len -= VENDOR_NAME_MAX_LENGTH;
+	*buf += text_len;
+	*len -= text_len;
+	return 0;
+}
+
+static int rsa_decrypt_product_features(char **buf, size_t *len,
+		uint64_t *features)
+{
+	if (*len < sizeof(uint64_t))
+		return -1;
+
+	*features = **((uint64_t**)buf);
+
+	*buf += sizeof(uint64_t);
+	*len -= sizeof(uint64_t);
+	return 0;
+}
+
+static int rsa_extract_product(char **buf, size_t *len, struct product *product)
+{
+	if (rsa_decrypt_text(buf, len, product->name, PRODUCT_NAME_LEN_MAX)) {
+		printf("Could not extract product name\n");
+		return -1;
+	}
+
+	if (rsa_decrypt_version(buf, len, &product->version)) {
+		printf("Could not extract product license version\n");
+		return -1;
+	}
+
+	if (rsa_decrypt_product_features(buf, len, &product->features)) {
+		printf("Could not extract product licensed features\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int rsa_info_product(char **buf, size_t *len)
+{
+	struct product product;
+
+	if (rsa_extract_product(buf, len, &product))
+		return -1;
+
+	printf("Product: ");
+	if (!*product.name) {
+		printf("Unrestricted\n");
+		return 0;
+	}
+
+	printf("%s (feature set v%llu), ", product.name,
+		product.version);
+	if (!product.features) {
+		printf("full features\n");
+	} else {
+		printf("features:\n");
+		if (list_features(&product))
+			return -1;
+	}
 	return 0;
 }
 
@@ -858,7 +1187,7 @@ static int rsa_info_vendor_name(char **buf, size_t *len)
 {
 	char vendor_name[VENDOR_NAME_MAX_LENGTH];
 
-	if (rsa_decrypt_vendor_name(buf, len, vendor_name))
+	if (rsa_decrypt_text(buf, len, vendor_name, VENDOR_NAME_MAX_LENGTH))
 		return -1;
 
 	printf("Vendor name: %s\n", vendor_name);
@@ -949,6 +1278,24 @@ static int rsa_license_info_parse_v2(char **buf, size_t *len)
 	return 0;
 }
 
+static int rsa_license_info_parse_v3(char **buf, size_t *len)
+{
+	if (rsa_info_product(buf, len))
+		return -1;
+
+	if (rsa_info_vendor_name(buf, len)) {
+		printf("Could not extract vendor name\n");
+		return -1;
+	}
+
+	if (rsa_info_expirty_date(buf, len)) {
+		printf("Could not extract expirty date\n");
+		return -1;
+	}
+
+	return 0;
+}
+
 static int rsa_license_info_cb(char *buf, size_t len)
 {
 	u64 version = 0;
@@ -966,6 +1313,9 @@ static int rsa_license_info_cb(char *buf, size_t len)
 		break;
 	case 2:
 		ret = rsa_license_info_parse_v2(&buf, &len);
+		break;
+	case 3:
+		ret = rsa_license_info_parse_v3(&buf, &len);
 		break;
 	default:
 		if (!version) {
@@ -987,8 +1337,10 @@ static int rsa_license_info_cb(char *buf, size_t len)
 static int rsa_license_extract_cb_v1(char **buf, size_t *len,
 		struct rsa_license_data *lic_data)
 {
-	if (rsa_decrypt_vendor_name(buf, len, lic_data->info.v1.vendor_name))
+	if (rsa_decrypt_text(buf, len, lic_data->info.v1.vendor_name,
+			VENDOR_NAME_MAX_LENGTH)) {
 		return -1;
+	}
 
 	if (rsa_decrypt_time_limit(buf, len, &lic_data->info.v1.time_limit))
 		return -1;
@@ -999,10 +1351,29 @@ static int rsa_license_extract_cb_v1(char **buf, size_t *len,
 static int rsa_license_extract_cb_v2(char **buf, size_t *len,
 		struct rsa_license_data *lic_data)
 {
-	if (rsa_decrypt_vendor_name(buf, len, lic_data->info.v2.vendor_name))
+	if (rsa_decrypt_text(buf, len, lic_data->info.v2.vendor_name,
+			VENDOR_NAME_MAX_LENGTH)) {
 		return -1;
+	}
 
 	if (rsa_decrypt_expiry_date(buf, len, lic_data->info.v2.expiry_date))
+		return -1;
+
+	return 0;
+}
+
+static int rsa_license_extract_cb_v3(char **buf, size_t *len,
+		struct rsa_license_data *lic_data)
+{
+	if (rsa_extract_product(buf, len, &lic_data->info.v3.product))
+		return -1;
+
+	if (rsa_decrypt_text(buf, len, lic_data->info.v3.vendor_name,
+			VENDOR_NAME_MAX_LENGTH)) {
+		return -1;
+	}
+
+	if (rsa_decrypt_expiry_date(buf, len, lic_data->info.v3.expiry_date))
 		return -1;
 
 	return 0;
@@ -1020,6 +1391,8 @@ static int rsa_license_extract_cb(char *buf, size_t len, void *data)
 		return rsa_license_extract_cb_v1(&buf, &len, lic_data);
 	case 2:
 		return rsa_license_extract_cb_v2(&buf, &len, lic_data);
+	case 3:
+		return rsa_license_extract_cb_v3(&buf, &len, lic_data);
 	default:
 		return -1;
 	}
@@ -1049,6 +1422,11 @@ static time_t get_time_limit(int do_limit)
 	printf("setting time limit to: %s\n", stime);
 
 	return t;
+}
+
+static int list_products(struct rsa_license_data *data)
+{
+	return license_list_products(data->info.v3.product.name);
 }
 
 int license_test(void)
@@ -1516,11 +1894,6 @@ static int license_create(char private_key[FILE_NAME_MAX_LENGTH],
 	}
 	return 0;
 
-}
-
-static int list_products(struct rsa_license_data *data)
-{
-	return license_list_products(data->info.v3.product.name);
 }
 
 int main(int argc, char **argv)

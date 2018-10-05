@@ -54,6 +54,37 @@ struct license_product **license_products_get(void)
 	return (struct license_product**)products;
 }
 
+struct license_product *license_product_get_specific(char *name)
+{
+	struct license_product **product = license_products_get();
+	struct license_product *found = NULL;
+	int name_len = (int)strnlen(name, PRODUCT_NAME_LEN_MAX);
+
+	for (product = license_products_get(); *product; product++) {
+		int is_match;
+
+		if (strncasecmp((*product)->name, name, name_len))
+			continue;
+
+		is_match = strlen((*product)->name) == (size_t)name_len;
+		if (found && !is_match) {
+			printf("Ambiguous prefix: %s (%s, %s)\n", name,
+				found->name, (*product)->name);
+
+			return NULL;
+		}
+
+		found = *product;
+		if (is_match)
+			break;
+	}
+
+	if (!found)
+		printf("Unsupported product: %s\n", name);
+
+	return found;
+}
+
 static void list_products_features(struct license_product *product)
 {
 	int v;

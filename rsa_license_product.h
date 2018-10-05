@@ -52,6 +52,7 @@ char **license_product_feature_list(struct license_product *product,
 int license_product_feature_num(struct license_product *product, int version);
 
 struct license_product **license_products_get(void);
+struct license_product *license_product_get_specific(char *name);
 int license_list_products(char *specific);
 
 #endif
