@@ -15,6 +15,8 @@
 #define RSA_SIGNATURE "IASRSA"
 #define RSA_SIGNATURE_LEN 6
 
+#define IS_WHITESPACE(c) ((c) == ' ' || (c) == '\t')
+
 #ifdef __linux__
 #define STRDUP strdup
 #else
@@ -354,8 +356,8 @@ char *rsa_highlight_str(char *fmt, ...)
 	int len = (int)strlen(C_HIGHLIGHT);
 
 	va_start(ap, fmt);
-	if ((unsigned int)vsnprintf(highlight + len, MAX_HIGHLIGHT_STR - len, fmt, ap) >
-		MAX_HIGHLIGHT_STR - strlen(C_NORMAL)) {
+	if ((unsigned int)vsnprintf(highlight + len, MAX_HIGHLIGHT_STR - len,
+			fmt, ap) > MAX_HIGHLIGHT_STR - strlen(C_NORMAL)) {
 		rsa_error_message(RSA_ERR_INTERNAL, __FILE__, __FUNCTION__,
 			__LINE__);
 		ret = "";
@@ -746,5 +748,49 @@ int is_optional_argument(int argc, char **argv, char **optarg, int *optind)
 found:
 	*optarg = argv[(*optind)++];
 	return 1;
+}
+
+char *comma_separated_tok(char *str)
+{
+	static char *start;
+	static int idx;
+	int idx_new;
+	char *token;
+	char *endtkn;
+
+	if (str) {
+		start = str;
+		idx = 0;
+	}
+
+	/* skip leading whitespaces */
+	token = start + idx;
+	while (*token && IS_WHITESPACE(*token))
+		token++;
+
+	/* set idx at begining of token */
+	idx += (int)(token - (start + idx));
+
+	/* find delim / end of str */
+	endtkn = token;
+	while (*endtkn && *endtkn != ',')
+		endtkn++;
+
+	/* set idx to start of next token */
+	idx_new = (int)(idx + (endtkn - (start + idx)));
+	if (*endtkn)
+		idx_new++;
+
+	/* if idx has not advanced - it's time to terminate */
+	if (idx_new == idx)
+		return NULL;
+	idx = idx_new;
+
+	/* trim trailing whitespaces */
+	do {
+		*endtkn = 0;
+	} while (IS_WHITESPACE(*(--endtkn)));
+
+	return token;
 }
 

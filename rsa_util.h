@@ -139,5 +139,7 @@ int rsa_key_enclev_set(rsa_key_t *key, int new_level);
 int rsa_encrypt_seed(rsa_key_t *key, rsa_stream_t *ciphertext);
 
 int is_optional_argument(int argc, char **argv, char **optarg, int *optind);
+char *comma_separated_tok(char *str);
+
 #endif
 
