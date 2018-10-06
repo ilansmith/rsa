@@ -33,6 +33,15 @@
     <ClCompile Include="mt19937_64.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="rsa_license_product.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="rsa_license_product_encoder.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="rsa_license_product_encrypter.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="rsa_crc.h">
@@ -51,6 +60,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="mt19937_64.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rsa_license_product.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rsa_license_product_encoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rsa_license_product_encrypter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

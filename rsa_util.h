@@ -5,6 +5,10 @@
 #include "rsa_num.h"
 #include "rsa_stream.h"
 #include "mt19937_64.h"
+#if defined(_WIN32)
+#include <string.h>
+#define strncasecmp _strnicmp
+#endif
 
 #define MAX_FILE_NAME_LEN 256
 #define MAX_LINE_LENGTH 128

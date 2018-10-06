@@ -5,6 +5,11 @@
 #include "rsa_license_product_encoder.h"
 #include "rsa_license_product_encrypter.h"
 
+#if defined(_WIN32)
+#define strncasecmp _strnicmp
+
+#endif
+
 char *license_product_name(struct license_product *product)
 {
 	return product->name;

@@ -120,6 +120,9 @@
     <ClCompile Include="mt19937_64.c" />
     <ClCompile Include="rsa_crc.c" />
     <ClCompile Include="rsa_license.c" />
+    <ClCompile Include="rsa_license_product.c" />
+    <ClCompile Include="rsa_license_product_encoder.c" />
+    <ClCompile Include="rsa_license_product_encrypter.c" />
     <ClCompile Include="rsa_num.c" />
     <ClCompile Include="rsa_stream.c" />
     <ClCompile Include="rsa_util.c" />
@@ -128,6 +131,9 @@
     <ClInclude Include="mt19937_64.h" />
     <ClInclude Include="rsa_crc.h" />
     <ClInclude Include="rsa_license.h" />
+    <ClInclude Include="rsa_license_product.h" />
+    <ClInclude Include="rsa_license_product_encoder.h" />
+    <ClInclude Include="rsa_license_product_encrypter.h" />
     <ClInclude Include="rsa_num.h" />
     <ClInclude Include="rsa_stream.h" />
     <ClInclude Include="rsa_util.h" />
