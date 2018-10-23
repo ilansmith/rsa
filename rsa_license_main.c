@@ -24,7 +24,6 @@
 #define FILE_FORMAT_VERSION 3
 #define VENDOR_NAME_MAX_LENGTH 64
 #define EXPIRY_DATE_LENGTH (8 * sizeof(char))
-#define EXPIRY_DATE_LENGTH_STR (EXPIRY_DATE_LENGTH + 1)
 #define VENDOR_NAME_DEFAULT "Ilan Smith"
 #define FILE_NAME_MAX_LENGTH 256
 
@@ -108,12 +107,12 @@ struct rsa_license_data {
 		} v1;
 		struct {
 			char vendor_name[VENDOR_NAME_MAX_LENGTH];
-			char expiry_date[EXPIRY_DATE_LENGTH_STR];
+			char expiry_date[EXPIRY_DATE_LENGTH + 1];
 		} v2;
 		struct {
 			struct product product;
 			char vendor_name[VENDOR_NAME_MAX_LENGTH];
-			char expiry_date[EXPIRY_DATE_LENGTH_STR];
+			char expiry_date[EXPIRY_DATE_LENGTH + 1];
 		} v3;
 	} info;
 };
@@ -545,7 +544,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 
 		snprintf(vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
 			VENDOR_NAME_DEFAULT);
-		snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR, "00000000");
+		snprintf(expiry_date, EXPIRY_DATE_LENGTH + 1, "00000000");
 		break;
 	case 3:
 		product = &data->info.v3.product;
@@ -555,7 +554,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 		memset(product, 0, sizeof(struct product));
 		snprintf(vendor_name, VENDOR_NAME_MAX_LENGTH, "%s",
 			VENDOR_NAME_DEFAULT);
-		snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR, "00000000");
+		snprintf(expiry_date, EXPIRY_DATE_LENGTH + 1, "00000000");
 		break;
 	default:
 		return -1;
@@ -658,7 +657,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 				break;
 			case 2:
 			case 3:
-				snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR,
+				snprintf(expiry_date, EXPIRY_DATE_LENGTH + 1,
 					"%s", optarg);
 				break;
 			default:
@@ -716,7 +715,7 @@ static int parse_args(int argc, char **argv, uint64_t *action,
 		case 2:
 		case 3:
 			GMTIME_R(&t, &tm);
-			snprintf(expiry_date, EXPIRY_DATE_LENGTH_STR,
+			snprintf(expiry_date, EXPIRY_DATE_LENGTH + 1,
 				"%02u%02u%04u", tm.tm_mday, tm.tm_mon + 1,
 				tm.tm_year + 1900);
 			break;
@@ -1241,9 +1240,9 @@ static int rsa_license_info_parse_v1(char **buf, size_t *len)
 }
 
 static int rsa_decrypt_expiry_date(char **buf, size_t *len,
-		char date[EXPIRY_DATE_LENGTH_STR])
+		char date[EXPIRY_DATE_LENGTH + 1])
 {
-	snprintf(date, EXPIRY_DATE_LENGTH_STR, "%s", *buf);
+	memcpy_str(date, *buf, EXPIRY_DATE_LENGTH);
 
 	*buf += EXPIRY_DATE_LENGTH * sizeof(char);
 	*len -= EXPIRY_DATE_LENGTH * sizeof(char);
@@ -1252,7 +1251,7 @@ static int rsa_decrypt_expiry_date(char **buf, size_t *len,
 
 static int rsa_info_expirty_date(char **buf, size_t *len)
 {
-	char date[EXPIRY_DATE_LENGTH_STR];
+	char date[EXPIRY_DATE_LENGTH + 1];
 	time_t time_limit;
 
 	if (rsa_decrypt_expiry_date(buf, len, date))

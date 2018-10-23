@@ -794,3 +794,12 @@ char *comma_separated_tok(char *str)
 	return token;
 }
 
+char *memcpy_str(char *dest, char *src, size_t n)
+{
+	void *ret;
+	
+	ret = memcpy(dest, (const void*)src, n);
+	dest[n] = 0;
+	return (char*)ret;
+}
+

@@ -2,11 +2,11 @@
 #define _UTIL_H_
 
 #include <stdio.h>
+#include <string.h>
 #include "rsa_num.h"
 #include "rsa_stream.h"
 #include "mt19937_64.h"
 #if defined(_WIN32)
-#include <string.h>
 #define strncasecmp _strnicmp
 #endif
 
@@ -144,6 +144,7 @@ int rsa_encrypt_seed(rsa_key_t *key, rsa_stream_t *ciphertext);
 
 int is_optional_argument(int argc, char **argv, char **optarg, int *optind);
 char *comma_separated_tok(char *str);
+char *memcpy_str(char *dest, char *src, size_t n);
 
 #endif
 
